@@ -173,10 +173,35 @@ public final class InMemoryGuildService {
 
     public synchronized boolean canAssignRole(UUID guildId, UUID requesterId, UUID roleId) {
         Guild guild = guild(guildId);
+        Role role = guild.role(roleId);
         if (guild.ownerId().equals(requesterId)) {
             return true;
         }
-        return canGrantRolePermissions(guildId, requesterId, guild.role(roleId).permissions());
+        return canGrantRolePermissions(guildId, requesterId, role.permissions());
+    }
+
+    public synchronized boolean canAssignRoles(UUID guildId, UUID requesterId, List<UUID> roleIds) {
+        Guild guild = guild(guildId);
+        List<UUID> requestedRoleIds = roleIds == null ? List.of() : roleIds;
+        for (UUID roleId : requestedRoleIds) {
+            Role role = guild.role(roleId);
+            if (!guild.ownerId().equals(requesterId) && !canGrantRolePermissions(guildId, requesterId, role.permissions())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public synchronized void requireChannel(UUID guildId, UUID channelId) {
+        guild(guildId).channel(channelId);
+    }
+
+    public synchronized void requireRoles(UUID guildId, List<UUID> roleIds) {
+        Guild guild = guild(guildId);
+        List<UUID> requestedRoleIds = roleIds == null ? List.of() : roleIds;
+        for (UUID roleId : requestedRoleIds) {
+            guild.role(roleId);
+        }
     }
 
     public synchronized boolean canManageChannels(UUID guildId, UUID requesterId) {

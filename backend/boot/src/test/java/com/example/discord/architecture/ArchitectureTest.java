@@ -16,7 +16,14 @@ import org.junit.jupiter.api.Test;
 class ArchitectureTest {
     @ArchTest
     static final ArchRule domainModulesDoNotDependOnBoot =
-        noClasses().that().resideInAnyPackage("..channel..", "..guild..", "..identity..", "..permission..", "..user..")
+        noClasses().that().resideInAnyPackage(
+                "..channel..",
+                "..guild..",
+                "..identity..",
+                "..invite..",
+                "..permission..",
+                "..user.."
+            )
             .should().dependOnClassesThat().resideInAPackage("..boot..");
 
     @Test
