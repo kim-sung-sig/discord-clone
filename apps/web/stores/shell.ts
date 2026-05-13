@@ -14,9 +14,15 @@ export interface ShellChannel {
 }
 
 export interface ShellMessage {
+  id: string
   channelId: string
   author: string
   body: string
+  createdAt: string
+  edited: boolean
+  pinned: boolean
+  deleted: boolean
+  mentions: string[]
 }
 
 export interface ShellChannelGroup {
@@ -52,6 +58,15 @@ export interface ShellMember {
   name: string
   status: string
   roleIds: string[]
+}
+
+const extractMentions = (body: string): string[] => {
+  const mentions = new Set<string>()
+  const mentionPattern = /(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})/g
+  for (const match of body.matchAll(mentionPattern)) {
+    mentions.add(match[1].toLowerCase())
+  }
+  return Array.from(mentions)
 }
 
 export const useShellStore = defineStore('shell', {
@@ -102,14 +117,37 @@ export const useShellStore = defineStore('shell', {
     ] satisfies ShellChannelGroup[],
     messages: [
       {
+        id: 'message-general-welcome',
         channelId: 'channel-general',
         author: 'vibe-coder',
-        body: 'Welcome to the guild. This shell is wired for the first T00 QA pass.'
+        body: 'Welcome to the guild. This shell is wired for the first T00 QA pass. @cto-bot is tracking metadata.',
+        createdAt: '2026-05-13T09:00:00.000Z',
+        edited: true,
+        pinned: true,
+        deleted: false,
+        mentions: ['cto-bot']
       },
       {
+        id: 'message-general-deleted',
+        channelId: 'channel-general',
+        author: 'cto-bot',
+        body: '',
+        createdAt: '2026-05-13T09:05:00.000Z',
+        edited: false,
+        pinned: false,
+        deleted: true,
+        mentions: []
+      },
+      {
+        id: 'message-architecture-notes',
         channelId: 'channel-architecture',
         author: 'cto-bot',
-        body: 'Architecture notes belong in this channel.'
+        body: 'Architecture notes belong in this channel.',
+        createdAt: '2026-05-13T09:10:00.000Z',
+        edited: false,
+        pinned: false,
+        deleted: false,
+        mentions: []
       }
     ] satisfies ShellMessage[],
     members: [
@@ -154,6 +192,7 @@ export const useShellStore = defineStore('shell', {
       roleGrantIds: ['role-moderator']
     } satisfies ShellInvitePreview,
     currentUser: 'vibe-coder',
+    composerBody: '',
     voiceState: 'voice disconnected'
   }),
   getters: {
@@ -213,6 +252,26 @@ export const useShellStore = defineStore('shell', {
       if (channelExists) {
         this.activeChannelId = channelId
       }
+    },
+    sendMessage() {
+      const body = this.composerBody.trim()
+
+      if (!body) {
+        return
+      }
+
+      this.messages.push({
+        id: `message-${Date.now()}`,
+        channelId: this.activeChannelId,
+        author: this.currentUser,
+        body,
+        createdAt: new Date().toISOString(),
+        edited: false,
+        pinned: false,
+        deleted: false,
+        mentions: extractMentions(body)
+      })
+      this.composerBody = ''
     }
   }
 })

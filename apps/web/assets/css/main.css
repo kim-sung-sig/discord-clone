@@ -126,9 +126,16 @@ input {
 }
 
 .chat-viewport {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   padding: 26px 28px;
   background: rgba(15, 23, 42, 0.86);
+}
+
+.message-list {
+  min-height: 0;
+  overflow: auto;
 }
 
 .chat-header {
@@ -160,6 +167,89 @@ input {
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid var(--line);
   border-radius: 18px;
+}
+
+.message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-meta time,
+.message-edited {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.message-pill,
+.mention-chip {
+  padding: 4px 8px;
+  color: #06131d;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.mention-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mention-chip {
+  color: #dbeafe;
+  background: rgba(84, 166, 255, 0.16);
+  border: 1px solid rgba(84, 166, 255, 0.32);
+}
+
+.message-tombstone {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.message-deleted .avatar {
+  opacity: 0.56;
+}
+
+.message-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  max-width: 760px;
+  margin-top: 18px;
+}
+
+.message-composer input {
+  min-width: 0;
+  padding: 13px 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.message-composer input:focus-visible {
+  outline: 3px solid rgba(57, 217, 138, 0.44);
+  outline-offset: 2px;
+}
+
+.message-composer button {
+  padding: 0 16px;
+  color: #06131d;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(145deg, var(--accent), #54a6ff);
+  border: 0;
+  border-radius: 14px;
+}
+
+.message-composer button:disabled,
+.message-composer input:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .member-sidebar {

@@ -15,9 +15,48 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="active-channel"]').text()).toContain('# general')
     expect(wrapper.get('[data-channel-id="channel-general"]').attributes('aria-current')).toBe('page')
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Welcome to the guild')
+    expect(wrapper.get('[data-testid="message-pinned-label"]').text()).toContain('Pinned')
+    expect(wrapper.get('[data-testid="message-edited-marker"]').text()).toContain('edited')
+    expect(wrapper.get('[data-testid="message-tombstone"]').text()).toContain('message deleted')
+    expect(wrapper.get('[data-testid="mention-chip-cto-bot"]').text()).toContain('@cto-bot')
+    expect(wrapper.get('[data-testid="message-input"]').attributes('placeholder')).toContain('Message # general')
+    expect(wrapper.get('[data-testid="message-list"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="chat-viewport"]').find('[data-testid="message-composer"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="member-sidebar"]').text()).toContain('Members')
     expect(wrapper.get('[data-testid="member-sidebar"]').text()).toContain('online')
     expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('vibe-coder')
+  })
+
+  it('sends composed messages from the active channel composer', async () => {
+    const wrapper = await mountSuspended(App)
+    const input = wrapper.get('[data-testid="message-input"]')
+
+    const beforeEmptySubmit = wrapper.findAll('[data-testid="message-card"]').length
+    await input.setValue('   ')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+    expect(wrapper.findAll('[data-testid="message-card"]')).toHaveLength(beforeEmptySubmit)
+
+    await input.setValue('Shipping T04 from the composer')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Shipping T04 from the composer')
+    expect((input.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('extracts user mentions without matching emails and scopes sends to the active channel', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="channel-architecture"]').trigger('click')
+    await wrapper.get('[data-testid="message-input"]').setValue('Ping dev@example.com @cto-bot @CTO-BOT')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Ping dev@example.com @cto-bot @CTO-BOT')
+    expect(wrapper.findAll('[data-testid="mention-chip-cto-bot"]')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="mention-chip-example"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="channel-general"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('Ping dev@example.com @cto-bot @CTO-BOT')
   })
 
   it('renders role permissions, member assignments, and active channel overwrites', async () => {
@@ -61,5 +100,6 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="active-channel"]').text()).toContain('# architecture')
     expect(wrapper.get('[data-channel-id="channel-architecture"]').attributes('aria-current')).toBe('page')
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Architecture notes belong in this channel')
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('Welcome to the guild')
   })
 })
