@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "completed",
-  "currentFeature": "T09-attachments-storage",
+  "phase": "plan",
+  "currentFeature": "T10-emoji-reactions-stickers",
   "updatedAt": "2026-05-14"
 }
