@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "completed",
-  "currentFeature": "T07-friendship-dm-group-dm",
+  "phase": "plan",
+  "currentFeature": "T08-presence-typing-read-state",
   "updatedAt": "2026-05-14"
 }
