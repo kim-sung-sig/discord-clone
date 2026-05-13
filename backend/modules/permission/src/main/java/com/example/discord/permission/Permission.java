@@ -7,6 +7,7 @@ public enum Permission {
     MANAGE_ROLES(1L << 3),
     MANAGE_MESSAGES(1L << 4),
     CONNECT(1L << 5),
+    MANAGE_EXPRESSIONS(1L << 6),
     ADMINISTRATOR(1L << 62);
 
     private final long bit;

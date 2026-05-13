@@ -239,6 +239,10 @@ public final class InMemoryGuildService {
             && canUseChannelPermission(guildId, channelId, memberId, Permission.MANAGE_MESSAGES);
     }
 
+    public synchronized boolean canManageExpressions(UUID guildId, UUID requesterId) {
+        return canManage(guild(guildId), requesterId, Permission.MANAGE_EXPRESSIONS);
+    }
+
     public synchronized UUID guildIdForChannel(UUID channelId) {
         if (channelId == null) {
             throw new IllegalArgumentException("channelId is required");
