@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "completed",
-  "currentFeature": "T04-message-core",
+  "phase": "plan",
+  "currentFeature": "T05-gateway-core",
   "updatedAt": "2026-05-13"
 }
