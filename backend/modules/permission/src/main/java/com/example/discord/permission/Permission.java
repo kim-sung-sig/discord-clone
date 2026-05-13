@@ -4,7 +4,8 @@ public enum Permission {
     VIEW_CHANNEL(1L << 0),
     SEND_MESSAGES(1L << 1),
     MANAGE_CHANNELS(1L << 2),
-    CONNECT(1L << 3),
+    MANAGE_ROLES(1L << 3),
+    CONNECT(1L << 4),
     ADMINISTRATOR(1L << 62);
 
     private final long bit;

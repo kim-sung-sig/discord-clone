@@ -1,11 +1,13 @@
 package com.example.discord.guild;
 
+import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,32 +17,42 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/guilds")
 class GuildController {
     private final InMemoryGuildService guildService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    GuildController(InMemoryGuildService guildService) {
+    GuildController(InMemoryGuildService guildService, AuthenticatedUserResolver authenticatedUserResolver) {
         this.guildService = guildService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @PostMapping
-    ResponseEntity<GuildResponse> createGuild(@RequestBody CreateGuildRequest request) {
+    ResponseEntity<GuildResponse> createGuild(
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody CreateGuildRequest request
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         requireRequest(request);
-        Guild guild = guildService.createGuild(request.name(), request.ownerId());
+        Guild guild = guildService.createGuild(request.name(), requesterId);
         return ResponseEntity.status(HttpStatus.CREATED).body(GuildResponse.from(guild));
     }
 
     @PostMapping("/{guildId}/channels")
     ResponseEntity<ChannelResponse> createChannel(
         @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody CreateChannelRequest request
     ) {
+        requireManageChannels(guildId, authorization);
         requireRequest(request);
         if (request.type() == null) {
             throw new IllegalArgumentException("channel type is required");
@@ -64,9 +76,16 @@ class GuildController {
     }
 
     @PostMapping("/{guildId}/roles")
-    ResponseEntity<RoleResponse> createRole(@PathVariable UUID guildId, @RequestBody CreateRoleRequest request) {
+    ResponseEntity<RoleResponse> createRole(
+        @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody CreateRoleRequest request
+    ) {
+        UUID requesterId = requireManageRoles(guildId, authorization);
         requireRequest(request);
-        Role role = guildService.createRole(guildId, request.name(), permissionSet(request.permissions(), true));
+        PermissionSet permissions = permissionSet(request.permissions(), true);
+        requireGrantableRolePermissions(guildId, requesterId, permissions);
+        Role role = guildService.createRole(guildId, request.name(), permissions);
         return ResponseEntity.status(HttpStatus.CREATED).body(RoleResponse.from(role));
     }
 
@@ -74,19 +93,36 @@ class GuildController {
     RoleResponse replaceRolePermissions(
         @PathVariable UUID guildId,
         @PathVariable UUID roleId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody ReplaceRolePermissionsRequest request
     ) {
+        UUID requesterId = requireManageRoles(guildId, authorization);
         requireRequest(request);
-        Role role = guildService.assignRolePermissions(guildId, roleId, permissionSet(request.permissions(), false));
+        PermissionSet permissions = permissionSet(request.permissions(), false);
+        requireGrantableRolePermissions(guildId, requesterId, permissions);
+        Role role = guildService.assignRolePermissions(guildId, roleId, permissions);
         return RoleResponse.from(role);
+    }
+
+    @PutMapping("/{guildId}/members/{memberId}")
+    MemberRoleResponse addMember(
+        @PathVariable UUID guildId,
+        @PathVariable UUID memberId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        requireManageRoles(guildId, authorization);
+        return MemberRoleResponse.from(guildService.addMember(guildId, memberId));
     }
 
     @PutMapping("/{guildId}/members/{memberId}/roles/{roleId}")
     MemberRoleResponse assignRoleToMember(
         @PathVariable UUID guildId,
         @PathVariable UUID memberId,
-        @PathVariable UUID roleId
+        @PathVariable UUID roleId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
+        UUID requesterId = requireManageRoles(guildId, authorization);
+        requireAssignableRole(guildId, requesterId, roleId);
         return MemberRoleResponse.from(guildService.assignRoleToMember(guildId, memberId, roleId));
     }
 
@@ -95,8 +131,10 @@ class GuildController {
         @PathVariable UUID guildId,
         @PathVariable UUID channelId,
         @PathVariable UUID roleId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody ReplaceChannelRoleOverwriteRequest request
     ) {
+        requireManageChannels(guildId, authorization);
         requireRequest(request);
         Channel channel = guildService.addChannelRoleOverwrite(
             guildId,
@@ -106,6 +144,33 @@ class GuildController {
             permissionSet(request.deny(), false)
         );
         return ChannelResponse.from(channel);
+    }
+
+    private UUID requireManageRoles(UUID guildId, String authorization) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        if (!guildService.canManageRoles(guildId, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage roles permission required");
+        }
+        return requesterId;
+    }
+
+    private void requireManageChannels(UUID guildId, String authorization) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        if (!guildService.canManageChannels(guildId, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage channels permission required");
+        }
+    }
+
+    private void requireGrantableRolePermissions(UUID guildId, UUID requesterId, PermissionSet permissions) {
+        if (!guildService.canGrantRolePermissions(guildId, requesterId, permissions)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "cannot grant permissions above requester");
+        }
+    }
+
+    private void requireAssignableRole(UUID guildId, UUID requesterId, UUID roleId) {
+        if (!guildService.canAssignRole(guildId, requesterId, roleId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "cannot assign role above requester");
+        }
     }
 
     private static void requireRequest(Object request) {

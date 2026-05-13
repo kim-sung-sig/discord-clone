@@ -92,6 +92,20 @@ public final class InMemoryGuildService {
         return member;
     }
 
+    public synchronized GuildMember addMember(UUID guildId, UUID memberId) {
+        if (memberId == null) {
+            throw new IllegalArgumentException("memberId is required");
+        }
+        Guild guild = guild(guildId);
+        try {
+            return guild.member(memberId);
+        } catch (IllegalArgumentException ignored) {
+            GuildMember member = new GuildMember(memberId, java.util.Set.of(guild.everyoneRole().id()));
+            guild.putMember(member);
+            return member;
+        }
+    }
+
     public synchronized Channel addChannelRoleOverwrite(
         UUID guildId,
         UUID channelId,
@@ -136,6 +150,60 @@ public final class InMemoryGuildService {
             }
         }
         return List.copyOf(visible);
+    }
+
+    public synchronized boolean canManageRoles(UUID guildId, UUID requesterId) {
+        return canManage(guild(guildId), requesterId, Permission.MANAGE_ROLES);
+    }
+
+    public synchronized boolean canGrantRolePermissions(UUID guildId, UUID requesterId, PermissionSet requestedPermissions) {
+        if (requestedPermissions == null) {
+            return false;
+        }
+        Guild guild = guild(guildId);
+        if (guild.ownerId().equals(requesterId)) {
+            return true;
+        }
+        if ((requestedPermissions.raw() & Permission.ADMINISTRATOR.bit()) != 0) {
+            return false;
+        }
+        PermissionSet requesterPermissions = guildPermissions(guild, requesterId);
+        return (requestedPermissions.raw() & ~requesterPermissions.raw()) == 0;
+    }
+
+    public synchronized boolean canAssignRole(UUID guildId, UUID requesterId, UUID roleId) {
+        Guild guild = guild(guildId);
+        if (guild.ownerId().equals(requesterId)) {
+            return true;
+        }
+        return canGrantRolePermissions(guildId, requesterId, guild.role(roleId).permissions());
+    }
+
+    public synchronized boolean canManageChannels(UUID guildId, UUID requesterId) {
+        return canManage(guild(guildId), requesterId, Permission.MANAGE_CHANNELS);
+    }
+
+    private boolean canManage(Guild guild, UUID requesterId, Permission permission) {
+        if (requesterId == null) {
+            return false;
+        }
+        if (guild.ownerId().equals(requesterId)) {
+            return true;
+        }
+        try {
+            return guildPermissions(guild, requesterId).allows(permission);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private PermissionSet guildPermissions(Guild guild, UUID userId) {
+        GuildMember member = guild.member(userId);
+        PermissionSet permissions = PermissionSet.empty();
+        for (UUID roleId : member.roleIds()) {
+            permissions = permissions.grantAll(guild.role(roleId).permissions());
+        }
+        return permissions;
     }
 
     public synchronized Guild guild(UUID guildId) {

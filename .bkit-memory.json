@@ -2,6 +2,6 @@
   "project": "discord-clone-platform",
   "level": "enterprise",
   "phase": "completed",
-  "currentFeature": "T02B-role-permission-management",
+  "currentFeature": "T02C-guild-authorization-boundary",
   "updatedAt": "2026-05-13"
 }
