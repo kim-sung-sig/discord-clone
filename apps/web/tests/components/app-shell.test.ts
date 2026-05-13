@@ -1,6 +1,8 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 import App from '../../app.vue'
+import { useShellStore } from '../../stores/shell'
 
 describe('Discord app shell', () => {
   it('renders guild, grouped channels, active channel, member sidebar, and user panel', async () => {
@@ -101,5 +103,44 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-channel-id="channel-architecture"]').attributes('aria-current')).toBe('page')
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Architecture notes belong in this channel')
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('Welcome to the guild')
+  })
+
+  it('renders deterministic gateway READY, heartbeat ACK, resume, and last sequence state', async () => {
+    const wrapper = await mountSuspended(App)
+    const gatewayPanel = wrapper.get('[data-testid="gateway-status-panel"]')
+
+    expect(gatewayPanel.text()).toContain('Gateway')
+    expect(gatewayPanel.get('[data-testid="gateway-status"]').text()).toContain('READY')
+    expect(gatewayPanel.get('[data-testid="gateway-last-sequence"]').text()).toContain('Last sequence 42')
+    expect(gatewayPanel.get('[data-testid="gateway-heartbeat-ack"]').text()).toContain('Heartbeat ACK received')
+    expect(gatewayPanel.get('[data-testid="gateway-resumed"]').text()).toContain('Session resumed')
+    expect(gatewayPanel.get('[data-testid="gateway-event-42"]').text()).toContain('READY')
+  })
+
+  it('guards duplicate gateway events by sequence number', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+
+    ;(shell as any).recordGatewayEvent?.({
+      sequence: 41,
+      type: 'MESSAGE_DELETE',
+      label: 'stale delete'
+    })
+    ;(shell as any).recordGatewayEvent?.({
+      sequence: 43,
+      type: 'MESSAGE_CREATE',
+      label: 'message created'
+    })
+    ;(shell as any).recordGatewayEvent?.({
+      sequence: 43,
+      type: 'MESSAGE_UPDATE',
+      label: 'duplicate message update'
+    })
+    await nextTick()
+
+    expect(wrapper.find('[data-gateway-sequence="41"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-gateway-sequence="43"]')).toHaveLength(1)
+    expect(wrapper.get('[data-gateway-sequence="43"]').text()).toContain('MESSAGE_CREATE')
+    expect(wrapper.get('[data-gateway-sequence="43"]').text()).not.toContain('MESSAGE_UPDATE')
   })
 })

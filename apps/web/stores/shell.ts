@@ -60,6 +60,23 @@ export interface ShellMember {
   roleIds: string[]
 }
 
+export type GatewayConnectionStatus = 'READY' | 'DISCONNECTED'
+
+export interface ShellGatewayEvent {
+  sequence: number
+  type: string
+  label: string
+}
+
+export interface ShellGatewayState {
+  status: GatewayConnectionStatus
+  sessionId: string
+  lastSequence: number
+  lastHeartbeatAckAt: string
+  resumed: boolean
+  events: ShellGatewayEvent[]
+}
+
 const extractMentions = (body: string): string[] => {
   const mentions = new Set<string>()
   const mentionPattern = /(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})/g
@@ -191,6 +208,20 @@ export const useShellStore = defineStore('shell', {
       uses: 0,
       roleGrantIds: ['role-moderator']
     } satisfies ShellInvitePreview,
+    gateway: {
+      status: 'READY',
+      sessionId: 'gateway-session-t05',
+      lastSequence: 42,
+      lastHeartbeatAckAt: '2026-05-13T09:12:00.000Z',
+      resumed: true,
+      events: [
+        {
+          sequence: 42,
+          type: 'READY',
+          label: 'ready dispatch accepted'
+        }
+      ]
+    } satisfies ShellGatewayState,
     currentUser: 'vibe-coder',
     composerBody: '',
     voiceState: 'voice disconnected'
@@ -241,7 +272,10 @@ export const useShellStore = defineStore('shell', {
         usesRemaining: state.invitePreview.maxUses - state.invitePreview.uses,
         roleNames
       }
-    }
+    },
+    gatewayHeartbeatAckLabel: (state) =>
+      state.gateway.lastHeartbeatAckAt ? 'Heartbeat ACK received' : 'Awaiting heartbeat ACK',
+    gatewayResumeLabel: (state) => (state.gateway.resumed ? 'Session resumed' : 'Fresh session')
   },
   actions: {
     selectChannel(channelId: string) {
@@ -272,6 +306,22 @@ export const useShellStore = defineStore('shell', {
         mentions: extractMentions(body)
       })
       this.composerBody = ''
+    },
+    recordGatewayEvent(event: ShellGatewayEvent) {
+      if (event.sequence <= this.gateway.lastSequence) {
+        return
+      }
+
+      const alreadyRecorded = this.gateway.events.some(
+        (candidate) => candidate.sequence === event.sequence
+      )
+
+      if (alreadyRecorded) {
+        return
+      }
+
+      this.gateway.events.push(event)
+      this.gateway.lastSequence = Math.max(this.gateway.lastSequence, event.sequence)
     }
   }
 })

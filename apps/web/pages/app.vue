@@ -5,6 +5,7 @@ import ChatViewport from '../components/shell/ChatViewport.vue'
 import InviteModal from '../components/invite/InviteModal.vue'
 import MemberSidebar from '../components/shell/MemberSidebar.vue'
 import RolePermissionPanel from '../components/shell/RolePermissionPanel.vue'
+import GatewayStatusPanel from '../components/shell/GatewayStatusPanel.vue'
 import UserPanel from '../components/shell/UserPanel.vue'
 
 definePageMeta({
@@ -20,6 +21,7 @@ definePageMeta({
       <ChatViewport />
       <MemberSidebar />
       <RolePermissionPanel />
+      <GatewayStatusPanel />
       <InviteModal />
       <UserPanel />
     </section>

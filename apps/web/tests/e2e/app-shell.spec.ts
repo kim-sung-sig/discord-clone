@@ -38,6 +38,12 @@ test('loads Discord shell landmarks', async ({ page }) => {
   await expect(page.getByTestId('invite-role-grants')).toContainText('Role grants')
   await expect(page.getByTestId('invite-role-grants')).toContainText('Moderator')
   await expect(page.getByTestId('invite-accept')).toContainText('Accept invite')
+  await expect(page.getByTestId('gateway-status-panel')).toContainText('Gateway')
+  await expect(page.getByTestId('gateway-status')).toContainText('READY')
+  await expect(page.getByTestId('gateway-last-sequence')).toContainText('Last sequence 42')
+  await expect(page.getByTestId('gateway-heartbeat-ack')).toContainText('Heartbeat ACK received')
+  await expect(page.getByTestId('gateway-resumed')).toContainText('Session resumed')
+  await expect(page.locator('[data-gateway-sequence="42"]')).toHaveCount(1)
 })
 
 test('sends a message from the active channel composer', async ({ page }) => {
