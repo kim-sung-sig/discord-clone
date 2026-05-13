@@ -1,0 +1,16 @@
+plugins {
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+}
+
+dependencies {
+    implementation(project(":backend:modules:identity"))
+    implementation(project(":backend:modules:permission"))
+    implementation(project(":backend:modules:user"))
+    implementation(project(":backend:shared:common"))
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+}

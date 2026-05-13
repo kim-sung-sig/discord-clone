@@ -1,0 +1,16 @@
+{
+  "name": "discord-clone",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "e2e": "npm run e2e --workspaces"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
+}
