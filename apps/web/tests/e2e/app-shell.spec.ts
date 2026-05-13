@@ -83,6 +83,26 @@ test('selects a text channel and updates active channel content', async ({ page 
   await expect(page.getByTestId('chat-viewport')).not.toContainText('Scoped architecture note')
 })
 
+test('opens a group DM, mutates members, and starts the group call skeleton', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('dm-sidebar')).toContainText('Direct messages')
+  await page.getByTestId('group-dm-t07-strike-team').click()
+
+  await expect(page.getByTestId('active-dm-summary')).toContainText('T07 strike team')
+  await expect(page.getByTestId('group-dm-members')).toContainText('vibe-coder')
+
+  await page.getByTestId('add-group-member').click()
+  await expect(page.getByTestId('group-dm-member-qa-scout')).toContainText('qa-scout')
+
+  await page.getByTestId('remove-group-member-qa-scout').click()
+  await expect(page.getByTestId('group-dm-member-qa-scout')).toHaveCount(0)
+
+  await page.getByTestId('group-call-toggle').click()
+  await expect(page.getByTestId('group-call-status')).toContainText('Call active')
+  await expect(page.getByTestId('group-call-participants')).toContainText('vibe-coder')
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 

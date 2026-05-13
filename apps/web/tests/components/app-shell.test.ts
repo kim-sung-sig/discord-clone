@@ -143,4 +143,54 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-gateway-sequence="43"]').text()).toContain('MESSAGE_CREATE')
     expect(wrapper.get('[data-gateway-sequence="43"]').text()).not.toContain('MESSAGE_UPDATE')
   })
+
+  it('renders direct and group DM lists inside the workspace', async () => {
+    const wrapper = await mountSuspended(App)
+    const dmSidebar = wrapper.get('[data-testid="dm-sidebar"]')
+
+    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="dm-sidebar"]').exists()).toBe(true)
+    expect(dmSidebar.text()).toContain('Direct messages')
+    expect(dmSidebar.get('[data-testid="dm-friend-cto-bot"]').text()).toContain('cto-bot')
+    expect(dmSidebar.get('[data-testid="dm-friend-cto-bot"]').text()).toContain('Friend')
+    expect(dmSidebar.get('[data-testid="group-dm-t07-strike-team"]').text()).toContain('T07 strike team')
+    expect(dmSidebar.get('[data-testid="group-dm-t07-strike-team"]').attributes('aria-current')).toBe('page')
+    expect(dmSidebar.get('[data-testid="active-dm-summary"]').text()).toContain('T07 strike team')
+  })
+
+  it('surfaces blocked users and prevents selecting their DM', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="dm-friend-spam-drone"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="dm-blocked-spam-drone"]').text()).toContain('Blocked')
+    expect(wrapper.get('[data-testid="active-dm-summary"]').text()).not.toContain('spam-drone')
+    expect(wrapper.get('[data-testid="active-dm-summary"]').text()).toContain('T07 strike team')
+  })
+
+  it('adds and removes group DM members through store-backed shell actions', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+
+    ;(shell as any).addGroupDmMember?.('group-dm-t07-strike-team', 'qa-scout')
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="group-dm-members"]').text()).toContain('qa-scout')
+    expect(wrapper.get('[data-testid="group-dm-member-qa-scout"]').text()).toContain('qa-scout')
+
+    await wrapper.get('[data-testid="remove-group-member-qa-scout"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="group-dm-member-qa-scout"]').exists()).toBe(false)
+  })
+
+  it('renders a group call skeleton and toggles participant state', async () => {
+    const wrapper = await mountSuspended(App)
+
+    expect(wrapper.get('[data-testid="group-call-skeleton"]').text()).toContain('Group call')
+    expect(wrapper.get('[data-testid="group-call-status"]').text()).toContain('Call idle')
+
+    await wrapper.get('[data-testid="group-call-toggle"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="group-call-status"]').text()).toContain('Call active')
+    expect(wrapper.get('[data-testid="group-call-participants"]').text()).toContain('vibe-coder')
+  })
 })

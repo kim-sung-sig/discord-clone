@@ -82,6 +82,45 @@ export interface ShellGatewayState {
   events: ShellGatewayEvent[]
 }
 
+export type ShellFriendshipStatus = 'FRIEND' | 'BLOCKED'
+export type ShellSocialSelectionType = 'DIRECT' | 'GROUP'
+
+export interface ShellFriend {
+  id: string
+  name: string
+  status: ShellFriendshipStatus
+  directMessageId: string
+}
+
+export interface ShellDirectMessage {
+  id: string
+  userId: string
+  unreadCount: number
+}
+
+export interface ShellGroupCall {
+  active: boolean
+  participants: string[]
+}
+
+export interface ShellGroupDm {
+  id: string
+  name: string
+  ownerId: string
+  memberIds: string[]
+  call: ShellGroupCall
+}
+
+export interface ShellSocialState {
+  activeSelection: {
+    type: ShellSocialSelectionType
+    id: string
+  }
+  friends: ShellFriend[]
+  directMessages: ShellDirectMessage[]
+  groupDms: ShellGroupDm[]
+}
+
 const extractMentions = (body: string): string[] => {
   const mentions = new Set<string>()
   const mentionPattern = /(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})/g
@@ -232,6 +271,50 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellGatewayState,
+    social: {
+      activeSelection: {
+        type: 'GROUP',
+        id: 'group-dm-t07-strike-team'
+      },
+      friends: [
+        {
+          id: 'user-cto-bot',
+          name: 'cto-bot',
+          status: 'FRIEND',
+          directMessageId: 'dm-cto-bot'
+        },
+        {
+          id: 'user-spam-drone',
+          name: 'spam-drone',
+          status: 'BLOCKED',
+          directMessageId: 'dm-spam-drone'
+        }
+      ],
+      directMessages: [
+        {
+          id: 'dm-cto-bot',
+          userId: 'user-cto-bot',
+          unreadCount: 2
+        },
+        {
+          id: 'dm-spam-drone',
+          userId: 'user-spam-drone',
+          unreadCount: 0
+        }
+      ],
+      groupDms: [
+        {
+          id: 'group-dm-t07-strike-team',
+          name: 'T07 strike team',
+          ownerId: 'vibe-coder',
+          memberIds: ['vibe-coder', 'cto-bot'],
+          call: {
+            active: false,
+            participants: []
+          }
+        }
+      ]
+    } satisfies ShellSocialState,
     currentUser: 'vibe-coder',
     composerBody: '',
     voiceState: 'voice disconnected'
@@ -285,7 +368,31 @@ export const useShellStore = defineStore('shell', {
     },
     gatewayHeartbeatAckLabel: (state) =>
       state.gateway.lastHeartbeatAckAt ? 'Heartbeat ACK received' : 'Awaiting heartbeat ACK',
-    gatewayResumeLabel: (state) => (state.gateway.resumed ? 'Session resumed' : 'Fresh session')
+    gatewayResumeLabel: (state) => (state.gateway.resumed ? 'Session resumed' : 'Fresh session'),
+    socialDirectSummaries: (state) =>
+      state.social.directMessages.map((dm) => ({
+        ...dm,
+        friend: state.social.friends.find((friend) => friend.id === dm.userId)
+      })),
+    activeGroupDm: (state): ShellGroupDm | undefined =>
+      state.social.activeSelection.type === 'GROUP'
+        ? state.social.groupDms.find((groupDm) => groupDm.id === state.social.activeSelection.id)
+        : undefined,
+    activeDirectFriend: (state): ShellFriend | undefined => {
+      if (state.social.activeSelection.type !== 'DIRECT') {
+        return undefined
+      }
+
+      const activeDm = state.social.directMessages.find(
+        (dm) => dm.id === state.social.activeSelection.id
+      )
+      return activeDm
+        ? state.social.friends.find((friend) => friend.id === activeDm.userId)
+        : undefined
+    },
+    activeSocialLabel(): string {
+      return this.activeGroupDm?.name ?? this.activeDirectFriend?.name ?? 'No DM selected'
+    }
   },
   actions: {
     selectChannel(channelId: string) {
@@ -376,6 +483,74 @@ export const useShellStore = defineStore('shell', {
         this.gateway.status = 'DISCONNECTED'
         this.gateway.resumed = false
       }
+    },
+    selectDirectDm(directMessageId: string): boolean {
+      const dm = this.social.directMessages.find((candidate) => candidate.id === directMessageId)
+      const friend = dm
+        ? this.social.friends.find((candidate) => candidate.id === dm.userId)
+        : undefined
+
+      if (!dm || friend?.status === 'BLOCKED') {
+        return false
+      }
+
+      this.social.activeSelection = {
+        type: 'DIRECT',
+        id: directMessageId
+      }
+      return true
+    },
+    selectGroupDm(groupDmId: string): boolean {
+      const groupExists = this.social.groupDms.some((groupDm) => groupDm.id === groupDmId)
+
+      if (!groupExists) {
+        return false
+      }
+
+      this.social.activeSelection = {
+        type: 'GROUP',
+        id: groupDmId
+      }
+      return true
+    },
+    addGroupDmMember(groupDmId: string, memberId: string): boolean {
+      const groupDm = this.social.groupDms.find((candidate) => candidate.id === groupDmId)
+
+      if (!groupDm || groupDm.memberIds.includes(memberId)) {
+        return false
+      }
+
+      groupDm.memberIds.push(memberId)
+      return true
+    },
+    removeGroupDmMember(groupDmId: string, memberId: string): boolean {
+      const groupDm = this.social.groupDms.find((candidate) => candidate.id === groupDmId)
+
+      if (!groupDm || memberId === groupDm.ownerId) {
+        return false
+      }
+
+      const nextMembers = groupDm.memberIds.filter((candidate) => candidate !== memberId)
+      if (nextMembers.length === groupDm.memberIds.length) {
+        return false
+      }
+
+      groupDm.memberIds = nextMembers
+      groupDm.call.participants = groupDm.call.participants.filter(
+        (candidate) => candidate !== memberId
+      )
+      return true
+    },
+    toggleActiveGroupCall(): boolean {
+      const activeGroup = this.activeGroupDm
+
+      if (!activeGroup) {
+        return false
+      }
+
+      activeGroup.call.active = !activeGroup.call.active
+      activeGroup.call.participants = activeGroup.call.active ? [this.currentUser] : []
+      return true
     }
   }
 })
