@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import UnreadBadge from '../shell/UnreadBadge.vue'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
@@ -46,7 +47,10 @@ onMounted(() => {
           Blocked
         </strong>
         <strong v-else>Friend</strong>
-        <small v-if="dm.unreadCount">{{ dm.unreadCount }} unread</small>
+        <UnreadBadge
+          :count="dm.unreadCount"
+          :target-id="dm.id"
+        />
       </button>
     </section>
 

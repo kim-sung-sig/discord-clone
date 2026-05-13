@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import TypingIndicator from './TypingIndicator.vue'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
@@ -16,6 +17,7 @@ const activeChannelLabel = computed(() => {
     : `Voice ${activeChannel.name}`
 })
 const composerPlaceholder = computed(() => `Message ${activeChannelLabel.value}`)
+const activeTypingUserIds = computed(() => shell.activeTypingUserIds)
 
 onMounted(() => {
   composerReady.value = true
@@ -74,6 +76,7 @@ onMounted(() => {
         </div>
       </article>
     </div>
+    <TypingIndicator :user-names="activeTypingUserIds" />
     <form class="message-composer" data-testid="message-composer" @submit.prevent="shell.sendMessage">
       <input
         v-model="shell.composerBody"

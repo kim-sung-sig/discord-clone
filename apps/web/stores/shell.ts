@@ -21,6 +21,7 @@ export interface ShellChannel {
 export interface ShellMessage {
   id: string
   channelId: string
+  sequence: number
   author: string
   body: string
   createdAt: string
@@ -121,6 +122,31 @@ export interface ShellSocialState {
   groupDms: ShellGroupDm[]
 }
 
+export type ShellPresenceStatus = 'ONLINE' | 'IDLE' | 'DO_NOT_DISTURB' | 'OFFLINE'
+
+export interface ShellPresenceRecord {
+  userId: string
+  status: ShellPresenceStatus
+  expiresAt: number | null
+}
+
+export interface ShellTypingRecord {
+  userId: string
+  expiresAt: number
+}
+
+export interface ShellReadMarker {
+  channelId: string
+  lastReadSequence: number
+}
+
+export interface ShellPresenceState {
+  nowMs: number
+  users: Record<string, ShellPresenceRecord>
+  typingByChannel: Record<string, ShellTypingRecord[]>
+  readMarkers: Record<string, ShellReadMarker>
+}
+
 const extractMentions = (body: string): string[] => {
   const mentions = new Set<string>()
   const mentionPattern = /(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})/g
@@ -185,6 +211,7 @@ export const useShellStore = defineStore('shell', {
       {
         id: 'message-general-welcome',
         channelId: 'channel-general',
+        sequence: 1,
         author: 'vibe-coder',
         body: 'Welcome to the guild. This shell is wired for the first T00 QA pass. @cto-bot is tracking metadata.',
         createdAt: '2026-05-13T09:00:00.000Z',
@@ -196,6 +223,7 @@ export const useShellStore = defineStore('shell', {
       {
         id: 'message-general-deleted',
         channelId: 'channel-general',
+        sequence: 2,
         author: 'cto-bot',
         body: '',
         createdAt: '2026-05-13T09:05:00.000Z',
@@ -207,6 +235,7 @@ export const useShellStore = defineStore('shell', {
       {
         id: 'message-architecture-notes',
         channelId: 'channel-architecture',
+        sequence: 3,
         author: 'cto-bot',
         body: 'Architecture notes belong in this channel.',
         createdAt: '2026-05-13T09:10:00.000Z',
@@ -315,6 +344,48 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellSocialState,
+    presence: {
+      nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
+      users: {
+        'vibe-coder': {
+          userId: 'vibe-coder',
+          status: 'ONLINE',
+          expiresAt: null
+        },
+        'cto-bot': {
+          userId: 'cto-bot',
+          status: 'IDLE',
+          expiresAt: null
+        },
+        'spam-drone': {
+          userId: 'spam-drone',
+          status: 'OFFLINE',
+          expiresAt: null
+        }
+      },
+      typingByChannel: {
+        'channel-general': [
+          {
+            userId: 'cto-bot',
+            expiresAt: Date.parse('2026-05-13T09:17:00.000Z')
+          }
+        ]
+      },
+      readMarkers: {
+        'channel-general': {
+          channelId: 'channel-general',
+          lastReadSequence: 2
+        },
+        'channel-architecture': {
+          channelId: 'channel-architecture',
+          lastReadSequence: 0
+        },
+        'channel-qa-lab': {
+          channelId: 'channel-qa-lab',
+          lastReadSequence: 0
+        }
+      }
+    } satisfies ShellPresenceState,
     currentUser: 'vibe-coder',
     composerBody: '',
     voiceState: 'voice disconnected'
@@ -326,6 +397,30 @@ export const useShellStore = defineStore('shell', {
         .find((channel) => channel.id === state.activeChannelId),
     activeMessages: (state): ShellMessage[] =>
       state.messages.filter((message) => message.channelId === state.activeChannelId),
+    presenceStatusForUser: (state) => (userId: string): ShellPresenceStatus => {
+      const record = state.presence.users[userId]
+
+      if (!record || (record.expiresAt !== null && record.expiresAt <= state.presence.nowMs)) {
+        return 'OFFLINE'
+      }
+
+      return record.status
+    },
+    activeTypingUserIds: (state): string[] =>
+      (state.presence.typingByChannel[state.activeChannelId] ?? [])
+        .filter((typing) => typing.expiresAt > state.presence.nowMs)
+        .map((typing) => typing.userId),
+    unreadCountForChannel: (state) => (channelId: string): number => {
+      const lastReadSequence = state.presence.readMarkers[channelId]?.lastReadSequence ?? 0
+
+      return state.messages.filter(
+        (message) =>
+          message.channelId === channelId &&
+          !message.deleted &&
+          message.author !== state.currentUser &&
+          message.sequence > lastReadSequence
+      ).length
+    },
     memberRoleSummaries: (state) =>
       state.members.map((member) => ({
         ...member,
@@ -395,6 +490,40 @@ export const useShellStore = defineStore('shell', {
     }
   },
   actions: {
+    setPresenceClock(nowMs: number) {
+      this.presence.nowMs = nowMs
+    },
+    setUserPresence(userId: string, status: ShellPresenceStatus, ttlMs?: number) {
+      this.presence.users[userId] = {
+        userId,
+        status,
+        expiresAt: ttlMs === undefined ? null : this.presence.nowMs + ttlMs
+      }
+    },
+    startTyping(channelId: string, userId: string, ttlMs = 5_000) {
+      const currentTyping = this.presence.typingByChannel[channelId] ?? []
+      this.presence.typingByChannel[channelId] = [
+        ...currentTyping.filter((typing) => typing.userId !== userId),
+        {
+          userId,
+          expiresAt: this.presence.nowMs + ttlMs
+        }
+      ]
+    },
+    stopTyping(channelId: string, userId: string) {
+      this.presence.typingByChannel[channelId] = (this.presence.typingByChannel[channelId] ?? [])
+        .filter((typing) => typing.userId !== userId)
+    },
+    markChannelRead(channelId: string) {
+      const lastReadSequence = this.messages
+        .filter((message) => message.channelId === channelId && !message.deleted)
+        .reduce((highest, message) => Math.max(highest, message.sequence), 0)
+
+      this.presence.readMarkers[channelId] = {
+        channelId,
+        lastReadSequence
+      }
+    },
     selectChannel(channelId: string) {
       const channelExists = this.channelGroups
         .flatMap((group) => group.channels)
@@ -402,6 +531,7 @@ export const useShellStore = defineStore('shell', {
 
       if (channelExists) {
         this.activeChannelId = channelId
+        this.markChannelRead(channelId)
       }
     },
     sendMessage() {
@@ -414,6 +544,7 @@ export const useShellStore = defineStore('shell', {
       this.messages.push({
         id: `message-${Date.now()}`,
         channelId: this.activeChannelId,
+        sequence: this.messages.reduce((highest, message) => Math.max(highest, message.sequence), 0) + 1,
         author: this.currentUser,
         body,
         createdAt: new Date().toISOString(),

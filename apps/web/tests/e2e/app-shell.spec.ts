@@ -83,6 +83,26 @@ test('selects a text channel and updates active channel content', async ({ page 
   await expect(page.getByTestId('chat-viewport')).not.toContainText('Scoped architecture note')
 })
 
+test('clears a channel unread badge after selecting the channel', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('unread-badge-channel-architecture')).toContainText('1')
+
+  await page.getByTestId('channel-architecture').click()
+
+  await expect(page.getByTestId('unread-badge-channel-architecture')).toHaveCount(0)
+})
+
+test('shows active channel typing state in the message viewport', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('typing-indicator')).toContainText('cto-bot is typing')
+
+  await page.getByTestId('channel-architecture').click()
+
+  await expect(page.getByTestId('typing-indicator')).toHaveCount(0)
+})
+
 test('opens a group DM, mutates members, and starts the group call skeleton', async ({ page }) => {
   await page.goto('/')
 

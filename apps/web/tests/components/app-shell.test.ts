@@ -29,6 +29,51 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('vibe-coder')
   })
 
+  it('renders deterministic presence badges for members', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="presence-badge-vibe-coder"]').text()).toContain('Online')
+    expect(wrapper.get('[data-testid="presence-badge-cto-bot"]').text()).toContain('Idle')
+  })
+
+  it('renders typing users for the active channel only', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="typing-indicator"]').text()).toContain('cto-bot is typing')
+
+    await wrapper.get('[data-testid="channel-architecture"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="typing-indicator"]').exists()).toBe(false)
+  })
+
+  it('renders unread badges and clears channel unread state when selected', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="unread-badge-channel-architecture"]').text()).toContain('1')
+
+    await wrapper.get('[data-testid="channel-architecture"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="unread-badge-channel-architecture"]').exists()).toBe(false)
+  })
+
+  it('updates read markers through store-backed mark-read actions', async () => {
+    await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+
+    expect((shell as any).unreadCountForChannel?.('channel-architecture')).toBe(1)
+
+    ;(shell as any).markChannelRead?.('channel-architecture')
+
+    expect((shell as any).unreadCountForChannel?.('channel-architecture')).toBe(0)
+  })
+
   it('sends composed messages from the active channel composer', async () => {
     const wrapper = await mountSuspended(App)
     const input = wrapper.get('[data-testid="message-input"]')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PresenceBadge from './PresenceBadge.vue'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
@@ -15,6 +16,10 @@ const shell = useShellStore()
       <span class="status-dot" aria-hidden="true" />
       <span>{{ member.name }}</span>
       <small>{{ member.status }}</small>
+      <PresenceBadge
+        :user-id="member.name"
+        :status="shell.presenceStatusForUser(member.name)"
+      />
     </div>
   </aside>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import UnreadBadge from './UnreadBadge.vue'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
@@ -41,6 +42,10 @@ onMounted(() => {
       >
         <span>{{ channel.type === 'GUILD_TEXT' ? '#' : 'Voice' }}</span>
         <span>{{ channel.name }}</span>
+        <UnreadBadge
+          :count="shell.unreadCountForChannel(channel.id)"
+          :target-id="channel.id"
+        />
       </button>
     </section>
   </aside>
