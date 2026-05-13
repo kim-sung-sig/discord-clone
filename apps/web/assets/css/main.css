@@ -432,6 +432,32 @@ input {
   border: 1px solid rgba(84, 166, 255, 0.32);
 }
 
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.message-attachment {
+  display: grid;
+  gap: 2px;
+  min-width: 180px;
+  padding: 10px 12px;
+  background: rgba(57, 217, 138, 0.1);
+  border: 1px solid rgba(57, 217, 138, 0.24);
+  border-radius: 14px;
+}
+
+.message-attachment span {
+  color: #dfffea;
+  font-weight: 800;
+}
+
+.message-attachment small {
+  color: var(--muted);
+}
+
 .message-tombstone {
   color: var(--muted);
   font-style: italic;
@@ -443,12 +469,52 @@ input {
 
 .message-composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   width: 100%;
   min-width: 0;
   max-width: 760px;
   margin-top: 18px;
+}
+
+.attachment-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  background:
+    linear-gradient(135deg, rgba(57, 217, 138, 0.14), rgba(84, 166, 255, 0.12)),
+    rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(57, 217, 138, 0.24);
+  border-radius: 16px;
+}
+
+.attachment-preview-image {
+  width: 58px;
+  height: 44px;
+  object-fit: cover;
+  background: rgba(6, 19, 29, 0.58);
+  border-radius: 12px;
+}
+
+.attachment-preview-meta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.attachment-preview-meta strong,
+.attachment-preview-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-preview-meta span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .message-composer input {
@@ -463,6 +529,14 @@ input {
 .message-composer input:focus-visible {
   outline: 3px solid rgba(57, 217, 138, 0.44);
   outline-offset: 2px;
+}
+
+.message-composer .attachment-stage-button {
+  min-height: 46px;
+  padding: 0 14px;
+  color: #dfffea;
+  background: rgba(57, 217, 138, 0.12);
+  border: 1px solid rgba(57, 217, 138, 0.26);
 }
 
 .message-composer button {
@@ -898,6 +972,15 @@ input {
 
   .message-composer {
     grid-template-columns: 1fr;
+  }
+
+  .attachment-preview {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .attachment-preview button {
+    grid-column: 1 / -1;
+    min-height: 38px;
   }
 
   .message-composer button {

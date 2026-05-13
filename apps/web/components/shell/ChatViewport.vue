@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import AttachmentPreview from './AttachmentPreview.vue'
 import TypingIndicator from './TypingIndicator.vue'
 import { useShellStore } from '../../stores/shell'
 
@@ -72,12 +73,38 @@ onMounted(() => {
                 @{{ mention }}
               </span>
             </div>
+            <div v-if="message.attachments.length" class="message-attachments" aria-label="Attachments">
+              <article
+                v-for="attachment in message.attachments"
+                :key="`${message.id}-${attachment.id}`"
+                class="message-attachment"
+                :data-testid="`message-attachment-${attachment.id}`"
+              >
+                <span>{{ attachment.filename }}</span>
+                <small>{{ attachment.contentType }}</small>
+              </article>
+            </div>
           </template>
         </div>
       </article>
     </div>
     <TypingIndicator :user-names="activeTypingUserIds" />
     <form class="message-composer" data-testid="message-composer" @submit.prevent="shell.sendMessage">
+      <AttachmentPreview
+        v-if="shell.stagedAttachment"
+        :attachment="shell.stagedAttachment"
+        removable
+        @remove="shell.clearStagedAttachment"
+      />
+      <button
+        class="attachment-stage-button"
+        type="button"
+        data-testid="attachment-stage-demo"
+        :disabled="!composerReady"
+        @click="shell.stageDemoAttachment"
+      >
+        Attach image
+      </button>
       <input
         v-model="shell.composerBody"
         data-testid="message-input"

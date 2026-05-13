@@ -61,6 +61,21 @@ test('sends a message from the active channel composer', async ({ page }) => {
   await expect(page.getByTestId('message-input')).toHaveValue('')
 })
 
+test('stages and sends a deterministic image attachment from the composer', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('attachment-stage-demo').click()
+  await expect(page.getByTestId('attachment-preview')).toContainText('qa-snapshot.png')
+  await expect(page.getByTestId('attachment-preview')).toContainText('1.2 KB')
+
+  await page.getByTestId('message-input').fill('Playwright attachment smoke')
+  await page.getByTestId('message-send').click()
+
+  await expect(page.getByTestId('attachment-preview')).toHaveCount(0)
+  await expect(page.getByTestId('chat-viewport')).toContainText('Playwright attachment smoke')
+  await expect(page.getByTestId('message-attachment-attachment-demo-image')).toContainText('qa-snapshot.png')
+})
+
 test('selects a text channel and updates active channel content', async ({ page }) => {
   await page.goto('/')
 

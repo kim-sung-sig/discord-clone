@@ -29,6 +29,15 @@ export interface ShellMessage {
   pinned: boolean
   deleted: boolean
   mentions: string[]
+  attachments: ShellAttachment[]
+}
+
+export interface ShellAttachment {
+  id: string
+  filename: string
+  contentType: string
+  sizeBytes: number
+  previewUrl: string
 }
 
 export interface ShellChannelGroup {
@@ -161,6 +170,14 @@ const payloadString = (dispatch: GatewayDispatch, key: string): string | undefin
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
 }
 
+const demoAttachment = (): ShellAttachment => ({
+  id: 'attachment-demo-image',
+  filename: 'qa-snapshot.png',
+  contentType: 'image/png',
+  sizeBytes: 1_234,
+  previewUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lLgNkwAAAABJRU5ErkJggg=='
+})
+
 export const useShellStore = defineStore('shell', {
   state: () => ({
     guild: {
@@ -218,7 +235,8 @@ export const useShellStore = defineStore('shell', {
         edited: true,
         pinned: true,
         deleted: false,
-        mentions: ['cto-bot']
+        mentions: ['cto-bot'],
+        attachments: []
       },
       {
         id: 'message-general-deleted',
@@ -230,7 +248,8 @@ export const useShellStore = defineStore('shell', {
         edited: false,
         pinned: false,
         deleted: true,
-        mentions: []
+        mentions: [],
+        attachments: []
       },
       {
         id: 'message-architecture-notes',
@@ -242,7 +261,8 @@ export const useShellStore = defineStore('shell', {
         edited: false,
         pinned: false,
         deleted: false,
-        mentions: []
+        mentions: [],
+        attachments: []
       }
     ] satisfies ShellMessage[],
     members: [
@@ -388,6 +408,7 @@ export const useShellStore = defineStore('shell', {
     } satisfies ShellPresenceState,
     currentUser: 'vibe-coder',
     composerBody: '',
+    stagedAttachment: null as ShellAttachment | null,
     voiceState: 'voice disconnected'
   }),
   getters: {
@@ -514,6 +535,12 @@ export const useShellStore = defineStore('shell', {
       this.presence.typingByChannel[channelId] = (this.presence.typingByChannel[channelId] ?? [])
         .filter((typing) => typing.userId !== userId)
     },
+    stageDemoAttachment() {
+      this.stagedAttachment = demoAttachment()
+    },
+    clearStagedAttachment() {
+      this.stagedAttachment = null
+    },
     markChannelRead(channelId: string) {
       const lastReadSequence = this.messages
         .filter((message) => message.channelId === channelId && !message.deleted)
@@ -536,8 +563,9 @@ export const useShellStore = defineStore('shell', {
     },
     sendMessage() {
       const body = this.composerBody.trim()
+      const attachment = this.stagedAttachment
 
-      if (!body) {
+      if (!body && !attachment) {
         return
       }
 
@@ -551,9 +579,11 @@ export const useShellStore = defineStore('shell', {
         edited: false,
         pinned: false,
         deleted: false,
-        mentions: extractMentions(body)
+        mentions: extractMentions(body),
+        attachments: attachment ? [{ ...attachment }] : []
       })
       this.composerBody = ''
+      this.stagedAttachment = null
     },
     recordGatewayEvent(event: ShellGatewayEvent): boolean {
       if (event.sequence <= this.gateway.lastSequence) {

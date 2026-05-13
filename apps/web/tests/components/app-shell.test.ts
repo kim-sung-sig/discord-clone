@@ -90,6 +90,30 @@ describe('Discord app shell', () => {
     expect((input.element as HTMLInputElement).value).toBe('')
   })
 
+  it('stages a deterministic image attachment preview from the composer', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="attachment-stage-demo"]').trigger('click')
+
+    const preview = wrapper.get('[data-testid="attachment-preview"]')
+    expect(preview.text()).toContain('qa-snapshot.png')
+    expect(preview.text()).toContain('image/png')
+    expect(preview.text()).toContain('1.2 KB')
+    expect(preview.get('[data-testid="attachment-preview-image"]').attributes('alt')).toBe('Preview qa-snapshot.png')
+  })
+
+  it('sends attachment metadata and clears the staged preview', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="attachment-stage-demo"]').trigger('click')
+    await wrapper.get('[data-testid="message-input"]').setValue('Shipping attachment metadata')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+
+    expect(wrapper.find('[data-testid="attachment-preview"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Shipping attachment metadata')
+    expect(wrapper.get('[data-testid="message-attachment-attachment-demo-image"]').text()).toContain('qa-snapshot.png')
+  })
+
   it('extracts user mentions without matching emails and scopes sends to the active channel', async () => {
     const wrapper = await mountSuspended(App)
 
