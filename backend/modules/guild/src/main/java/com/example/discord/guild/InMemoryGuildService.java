@@ -208,6 +208,34 @@ public final class InMemoryGuildService {
         return canManage(guild(guildId), requesterId, Permission.MANAGE_CHANNELS);
     }
 
+    public synchronized boolean canViewChannel(UUID guildId, UUID channelId, UUID memberId) {
+        return canUseChannelPermission(guildId, channelId, memberId, Permission.VIEW_CHANNEL);
+    }
+
+    public synchronized boolean canSendMessages(UUID guildId, UUID channelId, UUID memberId) {
+        return canViewChannel(guildId, channelId, memberId)
+            && canUseChannelPermission(guildId, channelId, memberId, Permission.SEND_MESSAGES);
+    }
+
+    public synchronized boolean canManageMessages(UUID guildId, UUID channelId, UUID memberId) {
+        return canViewChannel(guildId, channelId, memberId)
+            && canUseChannelPermission(guildId, channelId, memberId, Permission.MANAGE_MESSAGES);
+    }
+
+    public synchronized UUID guildIdForChannel(UUID channelId) {
+        if (channelId == null) {
+            throw new IllegalArgumentException("channelId is required");
+        }
+        for (Guild guild : guilds.values()) {
+            for (Channel channel : guild.channels()) {
+                if (channel.id().equals(channelId)) {
+                    return guild.id();
+                }
+            }
+        }
+        throw new IllegalArgumentException("channel not found");
+    }
+
     private boolean canManage(Guild guild, UUID requesterId, Permission permission) {
         if (requesterId == null) {
             return false;
@@ -220,6 +248,42 @@ public final class InMemoryGuildService {
         } catch (IllegalArgumentException ignored) {
             return false;
         }
+    }
+
+    private boolean canUseChannelPermission(UUID guildId, UUID channelId, UUID memberId, Permission permission) {
+        if (memberId == null) {
+            return false;
+        }
+        Guild guild = guild(guildId);
+        if (guild.ownerId().equals(memberId)) {
+            return true;
+        }
+        try {
+            return channelPermissions(guild, channelId, memberId).allows(permission);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private PermissionSet channelPermissions(Guild guild, UUID channelId, UUID memberId) {
+        Channel channel = guild.channel(channelId);
+        GuildMember member = guild.member(memberId);
+        PermissionSet everyonePermissions = guild.everyoneRole().permissions();
+
+        List<RolePermission> rolePermissions = member.roleIds().stream()
+            .filter(roleId -> !roleId.equals(guild.everyoneRole().id()))
+            .map(roleId -> new RolePermission(roleId, guild.role(roleId).permissions()))
+            .toList();
+        List<PermissionOverwrite> relevantOverwrites = channel.overwrites().stream()
+            .filter(overwrite -> member.roleIds().contains(overwrite.roleId()))
+            .toList();
+
+        return calculator.calculate(
+            everyonePermissions,
+            rolePermissions,
+            relevantOverwrites,
+            guild.everyoneRole().id()
+        );
     }
 
     private PermissionSet guildPermissions(Guild guild, UUID userId) {

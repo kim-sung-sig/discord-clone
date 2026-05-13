@@ -21,6 +21,7 @@ class ArchitectureTest {
                 "..guild..",
                 "..identity..",
                 "..invite..",
+                "..message..",
                 "..permission..",
                 "..user.."
             )
