@@ -36,6 +36,23 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="role-permission-panel"]').exists()).toBe(true)
   })
 
+  it('renders the invite preview modal with limits, role grants, and accept CTA inside the workspace', async () => {
+    const wrapper = await mountSuspended(App)
+    const inviteModal = wrapper.get('[data-testid="invite-modal"]')
+
+    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="invite-modal"]').exists()).toBe(true)
+    expect(inviteModal.attributes('role')).toBe('dialog')
+    expect(inviteModal.attributes('aria-modal')).toBe('true')
+    expect(inviteModal.attributes('tabindex')).toBe('-1')
+    expect(inviteModal.text()).toContain('Join Discord Clone')
+    expect(inviteModal.get('[data-testid="invite-preview"]').text()).toContain('Previewing # general')
+    expect(inviteModal.get('[data-testid="invite-expiry"]').text()).toContain('Expires in 7 days')
+    expect(inviteModal.get('[data-testid="invite-max-uses"]').text()).toContain('12 uses remaining')
+    expect(inviteModal.get('[data-testid="invite-role-grants"]').text()).toContain('Role grants')
+    expect(inviteModal.get('[data-testid="invite-role-grants"]').text()).toContain('Moderator')
+    expect(inviteModal.get('[data-testid="invite-accept"]').text()).toContain('Accept invite')
+  })
+
   it('selects channels with accessible channel buttons and shows channel-specific messages', async () => {
     const wrapper = await mountSuspended(App)
 

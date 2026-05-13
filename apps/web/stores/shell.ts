@@ -38,6 +38,16 @@ export interface ShellPermissionOverwrite {
   deny: string[]
 }
 
+export interface ShellInvitePreview {
+  code: string
+  guildId: string
+  channelId: string
+  expiresIn: string
+  maxUses: number
+  uses: number
+  roleGrantIds: string[]
+}
+
 export interface ShellMember {
   name: string
   status: string
@@ -134,6 +144,15 @@ export const useShellStore = defineStore('shell', {
         deny: ['MANAGE_CHANNELS']
       }
     ] satisfies ShellPermissionOverwrite[],
+    invitePreview: {
+      code: 'discord-clone-t03',
+      guildId: 'guild-discord-clone',
+      channelId: 'channel-general',
+      expiresIn: '7 days',
+      maxUses: 12,
+      uses: 0,
+      roleGrantIds: ['role-moderator']
+    } satisfies ShellInvitePreview,
     currentUser: 'vibe-coder',
     voiceState: 'voice disconnected'
   }),
@@ -165,6 +184,24 @@ export const useShellStore = defineStore('shell', {
             : 'No active channel',
           roleName: state.roles.find((role) => role.id === overwrite.roleId)?.name ?? overwrite.roleId
         }))
+    },
+    invitePreviewSummary: (state) => {
+      const channel = state.channelGroups
+        .flatMap((group) => group.channels)
+        .find((candidate) => candidate.id === state.invitePreview.channelId)
+      const roleNames = state.invitePreview.roleGrantIds.map(
+        (roleId) => state.roles.find((role) => role.id === roleId)?.name ?? roleId
+      )
+
+      return {
+        ...state.invitePreview,
+        channelLabel: channel
+          ? `${channel.type === 'GUILD_TEXT' ? '#' : 'Voice'} ${channel.name}`
+          : 'No channel preview',
+        guildName: state.guild.name,
+        usesRemaining: state.invitePreview.maxUses - state.invitePreview.uses,
+        roleNames
+      }
     }
   },
   actions: {

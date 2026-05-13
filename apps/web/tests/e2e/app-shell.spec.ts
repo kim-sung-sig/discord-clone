@@ -24,6 +24,14 @@ test('loads Discord shell landmarks', async ({ page }) => {
   await expect(page.getByTestId('active-channel-overwrite')).toContainText('Allow SEND_MESSAGES')
   await expect(page.getByTestId('active-channel-overwrite')).toContainText('Deny MANAGE_CHANNELS')
   await expect(page.getByTestId('workspace').getByTestId('role-permission-panel')).toBeVisible()
+  await expect(page.getByTestId('workspace').getByTestId('invite-modal')).toBeVisible()
+  await expect(page.getByTestId('invite-modal')).toContainText('Join Discord Clone')
+  await expect(page.getByTestId('invite-preview')).toContainText('Previewing # general')
+  await expect(page.getByTestId('invite-expiry')).toContainText('Expires in 7 days')
+  await expect(page.getByTestId('invite-max-uses')).toContainText('12 uses remaining')
+  await expect(page.getByTestId('invite-role-grants')).toContainText('Role grants')
+  await expect(page.getByTestId('invite-role-grants')).toContainText('Moderator')
+  await expect(page.getByTestId('invite-accept')).toContainText('Accept invite')
 })
 
 test('selects a text channel and updates active channel content', async ({ page }) => {
