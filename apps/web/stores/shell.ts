@@ -1,4 +1,9 @@
 import { defineStore } from 'pinia'
+import {
+  normalizeGatewayDispatch,
+  toShellGatewayEvent,
+  type GatewayDispatch
+} from '../services/gateway-client'
 
 export type ShellChannelType = 'GUILD_TEXT' | 'GUILD_VOICE'
 
@@ -84,6 +89,11 @@ const extractMentions = (body: string): string[] => {
     mentions.add(match[1].toLowerCase())
   }
   return Array.from(mentions)
+}
+
+const payloadString = (dispatch: GatewayDispatch, key: string): string | undefined => {
+  const value = dispatch.payload[key]
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined
 }
 
 export const useShellStore = defineStore('shell', {
@@ -307,9 +317,9 @@ export const useShellStore = defineStore('shell', {
       })
       this.composerBody = ''
     },
-    recordGatewayEvent(event: ShellGatewayEvent) {
+    recordGatewayEvent(event: ShellGatewayEvent): boolean {
       if (event.sequence <= this.gateway.lastSequence) {
-        return
+        return false
       }
 
       const alreadyRecorded = this.gateway.events.some(
@@ -317,11 +327,55 @@ export const useShellStore = defineStore('shell', {
       )
 
       if (alreadyRecorded) {
-        return
+        return false
       }
 
       this.gateway.events.push(event)
       this.gateway.lastSequence = Math.max(this.gateway.lastSequence, event.sequence)
+      return true
+    },
+    applyGatewayDispatch(dispatch: unknown): boolean {
+      const normalizedDispatch = normalizeGatewayDispatch(dispatch)
+      if (!normalizedDispatch) {
+        return false
+      }
+
+      const accepted = this.recordGatewayEvent(toShellGatewayEvent(normalizedDispatch))
+      if (!accepted) {
+        return false
+      }
+
+      this.applyGatewayDispatchState(normalizedDispatch)
+      return true
+    },
+    applyGatewayDispatchState(dispatch: GatewayDispatch) {
+      const sessionId = payloadString(dispatch, 'sessionId')
+      if (sessionId) {
+        this.gateway.sessionId = sessionId
+      }
+
+      if (dispatch.type === 'READY') {
+        this.gateway.status = 'READY'
+        this.gateway.resumed = false
+        return
+      }
+
+      if (dispatch.type === 'HEARTBEAT_ACK') {
+        this.gateway.status = 'READY'
+        this.gateway.lastHeartbeatAckAt = payloadString(dispatch, 'acknowledgedAt') ?? dispatch.createdAt
+        return
+      }
+
+      if (dispatch.type === 'RESUMED') {
+        this.gateway.status = 'READY'
+        this.gateway.resumed = true
+        return
+      }
+
+      if (dispatch.type === 'DISCONNECTED' || dispatch.type === 'SESSION_CLOSED') {
+        this.gateway.status = 'DISCONNECTED'
+        this.gateway.resumed = false
+      }
     }
   }
 })

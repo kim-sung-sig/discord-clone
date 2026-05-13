@@ -585,23 +585,85 @@ input {
   }
 
   .workspace {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(136px, 40vw) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+    overflow: hidden;
   }
 
   .channel-sidebar {
-    display: none;
+    grid-column: 1;
+    grid-row: 1 / 5;
+    min-width: 0;
+    padding: 16px 10px;
+    overflow-y: auto;
+  }
+
+  .channel-sidebar h1 {
+    font-size: 17px;
+  }
+
+  .channel-group {
+    margin-top: 16px;
+  }
+
+  .channel-group h2 {
+    font-size: 13px;
+  }
+
+  .channel-item {
+    gap: 6px;
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+
+  .chat-viewport {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 16px 12px;
   }
 
   .role-permission-panel {
     display: none;
   }
 
+  .message {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .message-card {
+    padding: 12px;
+  }
+
+  .message-composer {
+    grid-template-columns: 1fr;
+  }
+
+  .message-composer button {
+    min-height: 42px;
+  }
+
   .user-panel {
-    grid-column: 1;
+    grid-column: 2;
+    grid-row: 4;
+    gap: 10px;
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px;
   }
 
   .gateway-status-panel {
-    grid-column: 1;
+    grid-column: 2;
+    grid-row: 2;
+    padding: 12px;
   }
 
   .gateway-status-grid {
@@ -609,7 +671,9 @@ input {
   }
 
   .invite-modal {
-    grid-column: 1;
+    grid-column: 2;
+    grid-row: 3;
     grid-template-columns: 1fr;
+    padding: 12px;
   }
 }
