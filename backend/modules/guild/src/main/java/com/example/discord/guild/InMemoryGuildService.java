@@ -152,6 +152,23 @@ public final class InMemoryGuildService {
         return List.copyOf(visible);
     }
 
+    public synchronized List<UUID> guildIdsForMember(UUID memberId) {
+        if (memberId == null) {
+            return List.of();
+        }
+        return guilds.values().stream()
+            .filter(guild -> isGuildMemberOrOwner(guild, memberId))
+            .map(Guild::id)
+            .toList();
+    }
+
+    public synchronized boolean isGuildMemberOrOwner(UUID guildId, UUID memberId) {
+        if (memberId == null) {
+            return false;
+        }
+        return isGuildMemberOrOwner(guild(guildId), memberId);
+    }
+
     public synchronized boolean canManageRoles(UUID guildId, UUID requesterId) {
         return canManage(guild(guildId), requesterId, Permission.MANAGE_ROLES);
     }
@@ -236,6 +253,15 @@ public final class InMemoryGuildService {
         throw new IllegalArgumentException("channel not found");
     }
 
+    public synchronized boolean channelBelongsToGuild(UUID guildId, UUID channelId) {
+        try {
+            guild(guildId).channel(channelId);
+            return true;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
     private boolean canManage(Guild guild, UUID requesterId, Permission permission) {
         if (requesterId == null) {
             return false;
@@ -245,6 +271,18 @@ public final class InMemoryGuildService {
         }
         try {
             return guildPermissions(guild, requesterId).allows(permission);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isGuildMemberOrOwner(Guild guild, UUID memberId) {
+        if (guild.ownerId().equals(memberId)) {
+            return true;
+        }
+        try {
+            guild.member(memberId);
+            return true;
         } catch (IllegalArgumentException ignored) {
             return false;
         }

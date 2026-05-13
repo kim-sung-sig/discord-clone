@@ -18,6 +18,7 @@ class ArchitectureTest {
     static final ArchRule domainModulesDoNotDependOnBoot =
         noClasses().that().resideInAnyPackage(
                 "..channel..",
+                "..gateway..",
                 "..guild..",
                 "..identity..",
                 "..invite..",
