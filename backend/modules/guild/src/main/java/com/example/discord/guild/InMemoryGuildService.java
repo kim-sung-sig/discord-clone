@@ -54,37 +54,60 @@ public final class InMemoryGuildService {
     }
 
     public synchronized Role createRole(UUID guildId, String name) {
+        return createRole(guildId, name, PermissionSet.empty());
+    }
+
+    public synchronized List<Role> roles(UUID guildId) {
+        return guild(guildId).roles();
+    }
+
+    public synchronized Role createRole(UUID guildId, String name, PermissionSet permissions) {
         Guild guild = guild(guildId);
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("role name is required");
         }
-        Role role = new Role(UUID.randomUUID(), name, PermissionSet.empty());
+        if (permissions == null) {
+            throw new IllegalArgumentException("permissions are required");
+        }
+        Role role = new Role(UUID.randomUUID(), name, permissions);
         guild.putRole(role);
         return role;
     }
 
-    public synchronized void assignRolePermissions(UUID guildId, UUID roleId, PermissionSet permissions) {
+    public synchronized Role assignRolePermissions(UUID guildId, UUID roleId, PermissionSet permissions) {
+        if (permissions == null) {
+            throw new IllegalArgumentException("permissions are required");
+        }
         Guild guild = guild(guildId);
-        guild.putRole(guild.role(roleId).withPermissions(permissions));
+        Role role = guild.role(roleId).withPermissions(permissions);
+        guild.putRole(role);
+        return role;
     }
 
-    public synchronized void assignRoleToMember(UUID guildId, UUID memberId, UUID roleId) {
+    public synchronized GuildMember assignRoleToMember(UUID guildId, UUID memberId, UUID roleId) {
         Guild guild = guild(guildId);
         guild.role(roleId);
-        guild.putMember(guild.member(memberId).withRole(roleId));
+        GuildMember member = guild.member(memberId).withRole(roleId);
+        guild.putMember(member);
+        return member;
     }
 
-    public synchronized void addChannelRoleOverwrite(
+    public synchronized Channel addChannelRoleOverwrite(
         UUID guildId,
         UUID channelId,
         UUID roleId,
         PermissionSet allow,
         PermissionSet deny
     ) {
+        if (allow == null || deny == null) {
+            throw new IllegalArgumentException("overwrite permissions are required");
+        }
         Guild guild = guild(guildId);
         guild.role(roleId);
         Channel channel = guild.channel(channelId);
-        guild.putChannel(channel.withOverwrite(new PermissionOverwrite(roleId, allow, deny)));
+        Channel updated = channel.withOverwrite(new PermissionOverwrite(roleId, allow, deny));
+        guild.putChannel(updated);
+        return updated;
     }
 
     public synchronized List<Channel> visibleChannels(UUID guildId, UUID memberId) {

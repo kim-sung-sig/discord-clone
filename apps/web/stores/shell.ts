@@ -25,6 +25,25 @@ export interface ShellChannelGroup {
   channels: ShellChannel[]
 }
 
+export interface ShellRole {
+  id: string
+  name: string
+  permissions: string[]
+}
+
+export interface ShellPermissionOverwrite {
+  channelId: string
+  roleId: string
+  allow: string[]
+  deny: string[]
+}
+
+export interface ShellMember {
+  name: string
+  status: string
+  roleIds: string[]
+}
+
 export const useShellStore = defineStore('shell', {
   state: () => ({
     guild: {
@@ -86,13 +105,35 @@ export const useShellStore = defineStore('shell', {
     members: [
       {
         name: 'vibe-coder',
-        status: 'online'
+        status: 'online',
+        roleIds: ['role-moderator']
       },
       {
         name: 'cto-bot',
-        status: 'online'
+        status: 'online',
+        roleIds: []
       }
-    ],
+    ] satisfies ShellMember[],
+    roles: [
+      {
+        id: 'role-everyone',
+        name: '@everyone',
+        permissions: ['VIEW_CHANNEL']
+      },
+      {
+        id: 'role-moderator',
+        name: 'Moderator',
+        permissions: ['VIEW_CHANNEL', 'MANAGE_MESSAGES']
+      }
+    ] satisfies ShellRole[],
+    permissionOverwrites: [
+      {
+        channelId: 'channel-general',
+        roleId: 'role-moderator',
+        allow: ['SEND_MESSAGES'],
+        deny: ['MANAGE_CHANNELS']
+      }
+    ] satisfies ShellPermissionOverwrite[],
     currentUser: 'vibe-coder',
     voiceState: 'voice disconnected'
   }),
@@ -102,7 +143,29 @@ export const useShellStore = defineStore('shell', {
         .flatMap((group) => group.channels)
         .find((channel) => channel.id === state.activeChannelId),
     activeMessages: (state): ShellMessage[] =>
-      state.messages.filter((message) => message.channelId === state.activeChannelId)
+      state.messages.filter((message) => message.channelId === state.activeChannelId),
+    memberRoleSummaries: (state) =>
+      state.members.map((member) => ({
+        ...member,
+        roleNames: member.roleIds
+          .map((roleId) => state.roles.find((role) => role.id === roleId)?.name)
+          .filter((roleName): roleName is string => Boolean(roleName))
+      })),
+    activeChannelOverwriteSummaries: (state) => {
+      const activeChannel = state.channelGroups
+        .flatMap((group) => group.channels)
+        .find((channel) => channel.id === state.activeChannelId)
+
+      return state.permissionOverwrites
+        .filter((overwrite) => overwrite.channelId === state.activeChannelId)
+        .map((overwrite) => ({
+          ...overwrite,
+          channelLabel: activeChannel
+            ? `${activeChannel.type === 'GUILD_TEXT' ? '#' : 'Voice'} ${activeChannel.name}`
+            : 'No active channel',
+          roleName: state.roles.find((role) => role.id === overwrite.roleId)?.name ?? overwrite.roleId
+        }))
+    }
   },
   actions: {
     selectChannel(channelId: string) {

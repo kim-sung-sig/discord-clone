@@ -15,6 +15,15 @@ test('loads Discord shell landmarks', async ({ page }) => {
   await expect(page.getByTestId('member-sidebar')).toContainText('Members')
   await expect(page.getByTestId('member-sidebar')).toContainText('online')
   await expect(page.getByTestId('user-panel')).toContainText('vibe-coder')
+  await expect(page.getByTestId('role-permission-panel')).toContainText('Role permissions')
+  await expect(page.getByTestId('role-moderator')).toContainText('Moderator')
+  await expect(page.getByTestId('role-moderator')).toContainText('MANAGE_MESSAGES')
+  await expect(page.getByTestId('member-vibe-coder-roles')).toContainText('vibe-coder')
+  await expect(page.getByTestId('member-vibe-coder-roles')).toContainText('Moderator')
+  await expect(page.getByTestId('active-channel-overwrite')).toContainText('# general')
+  await expect(page.getByTestId('active-channel-overwrite')).toContainText('Allow SEND_MESSAGES')
+  await expect(page.getByTestId('active-channel-overwrite')).toContainText('Deny MANAGE_CHANNELS')
+  await expect(page.getByTestId('workspace').getByTestId('role-permission-panel')).toBeVisible()
 })
 
 test('selects a text channel and updates active channel content', async ({ page }) => {

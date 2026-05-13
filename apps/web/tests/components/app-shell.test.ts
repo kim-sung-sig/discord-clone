@@ -20,6 +20,22 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('vibe-coder')
   })
 
+  it('renders role permissions, member assignments, and active channel overwrites', async () => {
+    const wrapper = await mountSuspended(App)
+
+    expect(wrapper.get('[data-testid="role-permission-panel"]').text()).toContain('Role permissions')
+    expect(wrapper.get('[data-testid="role-moderator"]').text()).toContain('Moderator')
+    expect(wrapper.get('[data-testid="role-moderator"]').text()).toContain('MANAGE_MESSAGES')
+    expect(wrapper.get('[data-testid="role-moderator"]').text()).toContain('VIEW_CHANNEL')
+    expect(wrapper.get('[data-testid="member-vibe-coder-roles"]').text()).toContain('vibe-coder')
+    expect(wrapper.get('[data-testid="member-vibe-coder-roles"]').text()).toContain('Moderator')
+    expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('# general')
+    expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Moderator')
+    expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Allow SEND_MESSAGES')
+    expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Deny MANAGE_CHANNELS')
+    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="role-permission-panel"]').exists()).toBe(true)
+  })
+
   it('selects channels with accessible channel buttons and shows channel-specific messages', async () => {
     const wrapper = await mountSuspended(App)
 
