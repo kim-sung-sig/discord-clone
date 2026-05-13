@@ -2,6 +2,6 @@
   "project": "discord-clone-platform",
   "level": "enterprise",
   "phase": "completed",
-  "currentFeature": "T01-identity-user",
+  "currentFeature": "T02-guild-channel-permission",
   "updatedAt": "2026-05-13"
 }

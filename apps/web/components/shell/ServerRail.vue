@@ -7,6 +7,6 @@ const shell = useShellStore()
 <template>
   <aside class="server-rail" data-testid="server-rail" aria-label="Servers">
     <div class="server-pill">DC</div>
-    <strong class="brand">{{ shell.guildName }}</strong>
+    <strong class="brand">{{ shell.guild.name }}</strong>
   </aside>
 </template>

@@ -95,10 +95,33 @@ input {
   display: flex;
   gap: 8px;
   align-items: center;
+  width: 100%;
   padding: 10px 12px;
   margin-top: 8px;
   color: var(--ink);
+  text-align: left;
+  cursor: pointer;
   background: rgba(255, 255, 255, 0.06);
+  border: 0;
+  border-radius: 12px;
+}
+
+.channel-item:focus-visible {
+  outline: 3px solid rgba(57, 217, 138, 0.44);
+  outline-offset: 2px;
+}
+
+.channel-item:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.channel-loading {
+  margin: 8px 0;
+  padding: 8px 10px;
+  color: #dbeafe;
+  background: rgba(84, 166, 255, 0.14);
+  border: 1px solid rgba(84, 166, 255, 0.28);
   border-radius: 12px;
 }
 
