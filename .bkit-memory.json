@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "completed",
-  "currentFeature": "T08-presence-typing-read-state",
+  "phase": "plan",
+  "currentFeature": "T09-attachments-storage",
   "updatedAt": "2026-05-14"
 }
