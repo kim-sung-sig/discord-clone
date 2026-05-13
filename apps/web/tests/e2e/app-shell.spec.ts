@@ -138,6 +138,24 @@ test('opens a group DM, mutates members, and starts the group call skeleton', as
   await expect(page.getByTestId('group-call-participants')).toContainText('vibe-coder')
 })
 
+test('adds and removes a reaction from the first visible message', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('message-input')).toBeEnabled()
+
+  await page.getByTestId('expression-toggle-message-general-welcome').click()
+  await expect(page.getByTestId('expression-panel-message-general-welcome')).toContainText('Expressions')
+
+  await page.getByTestId('expression-option-message-general-welcome-shipit').click()
+  await expect(page.getByTestId('reaction-chip-message-general-welcome-shipit')).toContainText('1')
+
+  await page.getByTestId('expression-toggle-message-general-welcome').click()
+  await page.getByTestId('expression-option-message-general-welcome-shipit').click()
+  await expect(page.getByTestId('reaction-chip-message-general-welcome-shipit')).toContainText('1')
+
+  await page.getByTestId('reaction-chip-message-general-welcome-shipit').click()
+  await expect(page.getByTestId('reaction-chip-message-general-welcome-shipit')).toHaveCount(0)
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 

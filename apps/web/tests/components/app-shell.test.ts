@@ -262,4 +262,44 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="group-call-status"]').text()).toContain('Call active')
     expect(wrapper.get('[data-testid="group-call-participants"]').text()).toContain('vibe-coder')
   })
+
+  it('renders reaction counts from unique reactors and toggles the current user reaction', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+
+    ;(shell as any).addReaction?.('message-general-welcome', 'wave', 'vibe-coder')
+    ;(shell as any).addReaction?.('message-general-welcome', 'wave', 'vibe-coder')
+    await nextTick()
+
+    const reaction = wrapper.get('[data-testid="reaction-chip-message-general-welcome-wave"]')
+    expect(reaction.text()).toContain('Wave')
+    expect(reaction.text()).toContain('1')
+    expect(reaction.attributes('aria-pressed')).toBe('true')
+
+    await reaction.trigger('click')
+
+    expect(wrapper.find('[data-testid="reaction-chip-message-general-welcome-wave"]').exists()).toBe(false)
+  })
+
+  it('opens the expression panel and adds a selected expression to the message reactions', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="expression-toggle-message-general-welcome"]').trigger('click')
+
+    const panel = wrapper.get('[data-testid="expression-panel-message-general-welcome"]')
+    expect(panel.attributes('role')).toBe('dialog')
+    expect(panel.text()).toContain('Expressions')
+    expect(panel.text()).toContain('Ship It')
+    expect(panel.text()).toContain('Approved sticker')
+
+    await panel.get('[data-testid="expression-option-message-general-welcome-shipit"]').trigger('click')
+
+    const reaction = wrapper.get('[data-testid="reaction-chip-message-general-welcome-shipit"]')
+    expect(reaction.text()).toContain('Ship It')
+    expect(reaction.text()).toContain('1')
+    expect(wrapper.find('[data-testid="expression-panel-message-general-welcome"]').exists()).toBe(false)
+  })
 })

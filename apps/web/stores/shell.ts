@@ -40,6 +40,31 @@ export interface ShellAttachment {
   previewUrl: string
 }
 
+export type ShellExpressionType = 'EMOJI' | 'STICKER'
+
+export interface ShellExpression {
+  key: string
+  label: string
+  type: ShellExpressionType
+  symbol: string
+  description: string
+}
+
+export interface ShellReaction {
+  messageId: string
+  emojiKey: string
+  reactorIds: string[]
+}
+
+export interface ShellReactionSummary {
+  messageId: string
+  emojiKey: string
+  label: string
+  symbol: string
+  count: number
+  reactedByCurrentUser: boolean
+}
+
 export interface ShellChannelGroup {
   id: string
   name: string
@@ -265,6 +290,30 @@ export const useShellStore = defineStore('shell', {
         attachments: []
       }
     ] satisfies ShellMessage[],
+    expressions: [
+      {
+        key: 'wave',
+        label: 'Wave',
+        type: 'EMOJI',
+        symbol: ':wave:',
+        description: 'Friendly greeting emoji'
+      },
+      {
+        key: 'shipit',
+        label: 'Ship It',
+        type: 'EMOJI',
+        symbol: ':shipit:',
+        description: 'Approval emoji for ready changes'
+      },
+      {
+        key: 'approved',
+        label: 'Approved sticker',
+        type: 'STICKER',
+        symbol: '[approved]',
+        description: 'Sticker skeleton for approvals'
+      }
+    ] satisfies ShellExpression[],
+    reactions: [] satisfies ShellReaction[],
     members: [
       {
         name: 'vibe-coder',
@@ -442,6 +491,23 @@ export const useShellStore = defineStore('shell', {
           message.sequence > lastReadSequence
       ).length
     },
+    reactionsForMessage: (state) => (messageId: string): ShellReactionSummary[] =>
+      state.reactions
+        .filter((reaction) => reaction.messageId === messageId && reaction.reactorIds.length > 0)
+        .map((reaction) => {
+          const expression = state.expressions.find(
+            (candidate) => candidate.key === reaction.emojiKey
+          )
+
+          return {
+            messageId: reaction.messageId,
+            emojiKey: reaction.emojiKey,
+            label: expression?.label ?? reaction.emojiKey,
+            symbol: expression?.symbol ?? reaction.emojiKey,
+            count: new Set(reaction.reactorIds).size,
+            reactedByCurrentUser: reaction.reactorIds.includes(state.currentUser)
+          }
+        }),
     memberRoleSummaries: (state) =>
       state.members.map((member) => ({
         ...member,
@@ -540,6 +606,56 @@ export const useShellStore = defineStore('shell', {
     },
     clearStagedAttachment() {
       this.stagedAttachment = null
+    },
+    addReaction(messageId: string, emojiKey: string, userId = this.currentUser): boolean {
+      const messageExists = this.messages.some((message) => message.id === messageId && !message.deleted)
+      if (!messageExists) {
+        return false
+      }
+
+      const reaction = this.reactions.find(
+        (candidate) => candidate.messageId === messageId && candidate.emojiKey === emojiKey
+      )
+
+      if (!reaction) {
+        this.reactions.push({
+          messageId,
+          emojiKey,
+          reactorIds: [userId]
+        })
+        return true
+      }
+
+      if (reaction.reactorIds.includes(userId)) {
+        return false
+      }
+
+      reaction.reactorIds.push(userId)
+      return true
+    },
+    removeReaction(messageId: string, emojiKey: string, userId = this.currentUser): boolean {
+      const reaction = this.reactions.find(
+        (candidate) => candidate.messageId === messageId && candidate.emojiKey === emojiKey
+      )
+
+      if (!reaction || !reaction.reactorIds.includes(userId)) {
+        return false
+      }
+
+      reaction.reactorIds = reaction.reactorIds.filter((candidate) => candidate !== userId)
+      this.reactions = this.reactions.filter((candidate) => candidate.reactorIds.length > 0)
+      return true
+    },
+    toggleReaction(messageId: string, emojiKey: string, userId = this.currentUser): boolean {
+      const reaction = this.reactions.find(
+        (candidate) => candidate.messageId === messageId && candidate.emojiKey === emojiKey
+      )
+
+      if (reaction?.reactorIds.includes(userId)) {
+        return this.removeReaction(messageId, emojiKey, userId)
+      }
+
+      return this.addReaction(messageId, emojiKey, userId)
     },
     markChannelRead(channelId: string) {
       const lastReadSequence = this.messages

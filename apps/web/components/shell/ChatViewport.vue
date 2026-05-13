@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import AttachmentPreview from './AttachmentPreview.vue'
+import ReactionBar from './ReactionBar.vue'
 import TypingIndicator from './TypingIndicator.vue'
 import { useShellStore } from '../../stores/shell'
 
@@ -84,6 +85,7 @@ onMounted(() => {
                 <small>{{ attachment.contentType }}</small>
               </article>
             </div>
+            <ReactionBar :message-id="message.id" />
           </template>
         </div>
       </article>
