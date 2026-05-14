@@ -26,7 +26,7 @@ async function submitLogin() {
     <p class="login-kicker">Welcome back</p>
     <h1 id="login-title">Sign in to Discord Clone</h1>
     <p class="login-copy">
-      Use the local placeholder flow for this frontend slice. No backend server is required.
+      Sign in through the Spring Boot API. Your access token stays in memory only.
     </p>
 
     <form class="login-form" data-testid="login-form" @submit.prevent="submitLogin">
@@ -74,17 +74,17 @@ async function submitLogin() {
       </p>
 
       <p v-if="hasAccessToken" class="login-success" data-testid="login-success" role="status">
-        Signed in locally with a placeholder token.
+        Signed in with backend session.
       </p>
 
       <button
         class="login-submit"
         data-testid="login-submit"
         type="submit"
-        :disabled="!isHydrated"
+        :disabled="!isHydrated || auth.isLoading"
         :aria-describedby="!isHydrated ? 'login-hydration-status' : undefined"
       >
-        Sign in
+        {{ auth.isLoading ? 'Signing in...' : 'Sign in' }}
       </button>
     </form>
 
