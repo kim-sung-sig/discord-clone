@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":backend:modules:identity"))
     implementation(project(":backend:modules:channel"))
     implementation(project(":backend:modules:expression"))
+    implementation(project(":backend:modules:experience"))
     implementation(project(":backend:modules:gateway"))
     implementation(project(":backend:modules:guild"))
     implementation(project(":backend:modules:invite"))
