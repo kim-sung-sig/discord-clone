@@ -227,6 +227,42 @@ test('joins voice, toggles controls, screen shares, and leaves', async ({ page }
   await expect(page.getByTestId('voice-events')).toContainText('VOICE_LEAVE')
 })
 
+test('runs stage, soundboard, and premium skeleton operations', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('experience-panel')).toContainText('Experience')
+  await expect(page.getByTestId('stage-topic')).toContainText('No active stage')
+  await expect(page.getByTestId('premium-gate')).toContainText('Locked')
+
+  await page.getByTestId('stage-start').click()
+  await page.getByTestId('stage-request-speak').click()
+  await expect(page.getByTestId('stage-topic')).toContainText('T14 roadmap live review')
+  await expect(page.getByTestId('stage-pending')).toContainText('vibe-coder')
+  await expect(page.getByTestId('stage-speakers')).toContainText('No speakers')
+
+  await page.getByTestId('stage-approve-vibe-coder').click()
+  await expect(page.getByTestId('stage-speakers')).toContainText('vibe-coder')
+  await expect(page.getByTestId('stage-pending')).toContainText('No pending requests')
+
+  await page.getByTestId('stage-move-audience-vibe-coder').click()
+  await expect(page.getByTestId('stage-speakers')).toContainText('No speakers')
+  await expect(page.getByTestId('stage-audience')).toContainText('vibe-coder')
+
+  await page.getByTestId('soundboard-create-applause').click()
+  await page.getByTestId('soundboard-play-applause').click()
+  await expect(page.getByTestId('soundboard-sounds')).toContainText('Applause')
+  await expect(page.getByTestId('soundboard-last-event')).toContainText('played Applause in war-room')
+
+  await page.getByTestId('premium-check-hd-stream').click()
+  await expect(page.getByTestId('premium-gate')).toContainText('Locked')
+
+  await page.getByTestId('premium-grant-hd-stream').click()
+  await page.getByTestId('premium-check-hd-stream').click()
+  await expect(page.getByTestId('premium-gate')).toContainText('Unlocked')
+  await expect(page.getByTestId('premium-catalog')).toContainText('HD Stream Pack')
+  await expect(page.getByTestId('premium-quests')).toContainText('Stream for 10 minutes')
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 

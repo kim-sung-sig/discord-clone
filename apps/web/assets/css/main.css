@@ -1225,6 +1225,72 @@ input {
   gap: 3px;
 }
 
+.experience-panel {
+  grid-column: 4 / 6;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  color: #eef7ff;
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(245, 158, 11, 0.14)),
+    rgba(7, 16, 24, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 20px;
+}
+
+.experience-panel-header {
+  grid-column: 1 / -1;
+}
+
+.experience-panel-header p,
+.experience-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.experience-panel-header h2 {
+  margin: 4px 0 0;
+  font-size: 19px;
+}
+
+.experience-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+}
+
+.experience-card button {
+  min-height: 34px;
+  padding: 8px 10px;
+  color: #082f2b;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(145deg, #5eead4, #facc15);
+  border: 0;
+  border-radius: 12px;
+}
+
+.experience-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.stage-roster span,
+.experience-card strong,
+.experience-card small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .invite-modal h2,
 .invite-modal p,
 .invite-modal dl,
@@ -1333,6 +1399,11 @@ input {
   .voice-panel {
     grid-column: 4 / 6;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .experience-panel {
+    grid-column: 4 / 6;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1470,6 +1541,10 @@ input {
   }
 
   .voice-panel {
+    display: none;
+  }
+
+  .experience-panel {
     display: none;
   }
 }

@@ -419,4 +419,48 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="voice-participants"]').text()).toContain('No participants')
     expect(wrapper.get('[data-testid="voice-events"]').text()).toContain('VOICE_LEAVE')
   })
+
+  it('runs stage, soundboard, and premium skeleton flows', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    const experiencePanel = wrapper.get('[data-testid="experience-panel"]')
+    expect(experiencePanel.text()).toContain('Experience')
+    expect(experiencePanel.get('[data-testid="stage-topic"]').text()).toContain('No active stage')
+    expect(experiencePanel.get('[data-testid="premium-gate"]').text()).toContain('Locked')
+
+    await wrapper.get('[data-testid="stage-start"]').trigger('click')
+    await wrapper.get('[data-testid="stage-request-speak"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="stage-topic"]').text()).toContain('T14 roadmap live review')
+    expect(wrapper.get('[data-testid="stage-pending"]').text()).toContain('vibe-coder')
+    expect(wrapper.get('[data-testid="stage-speakers"]').text()).toContain('No speakers')
+
+    await wrapper.get('[data-testid="stage-approve-vibe-coder"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="stage-speakers"]').text()).toContain('vibe-coder')
+    expect(wrapper.get('[data-testid="stage-pending"]').text()).toContain('No pending requests')
+
+    await wrapper.get('[data-testid="stage-move-audience-vibe-coder"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="stage-speakers"]').text()).toContain('No speakers')
+    expect(wrapper.get('[data-testid="stage-audience"]').text()).toContain('vibe-coder')
+
+    await wrapper.get('[data-testid="soundboard-create-applause"]').trigger('click')
+    await wrapper.get('[data-testid="soundboard-play-applause"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="soundboard-sounds"]').text()).toContain('Applause')
+    expect(wrapper.get('[data-testid="soundboard-last-event"]').text()).toContain('played Applause in war-room')
+
+    await wrapper.get('[data-testid="premium-check-hd-stream"]').trigger('click')
+    expect(wrapper.get('[data-testid="premium-gate"]').text()).toContain('Locked')
+
+    await wrapper.get('[data-testid="premium-grant-hd-stream"]').trigger('click')
+    await wrapper.get('[data-testid="premium-check-hd-stream"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="premium-gate"]').text()).toContain('Unlocked')
+    expect(wrapper.get('[data-testid="premium-catalog"]').text()).toContain('HD Stream Pack')
+    expect(wrapper.get('[data-testid="premium-quests"]').text()).toContain('Stream for 10 minutes')
+  })
 })

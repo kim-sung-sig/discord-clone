@@ -5,6 +5,7 @@ import ChatViewport from '../components/shell/ChatViewport.vue'
 import ForumPanel from '../components/shell/ForumPanel.vue'
 import ModerationPanel from '../components/shell/ModerationPanel.vue'
 import VoicePanel from '../components/shell/VoicePanel.vue'
+import ExperiencePanel from '../components/shell/ExperiencePanel.vue'
 import InviteModal from '../components/invite/InviteModal.vue'
 import DmSidebar from '../components/social/DmSidebar.vue'
 import MemberSidebar from '../components/shell/MemberSidebar.vue'
@@ -27,6 +28,7 @@ definePageMeta({
       <ForumPanel />
       <ModerationPanel />
       <VoicePanel />
+      <ExperiencePanel />
       <MemberSidebar />
       <RolePermissionPanel />
       <GatewayStatusPanel />

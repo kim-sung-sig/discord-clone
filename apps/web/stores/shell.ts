@@ -248,6 +248,60 @@ export interface ShellVoiceState {
   events: ShellVoiceEvent[]
 }
 
+export interface ShellStageSession {
+  id: string
+  channelId: string
+  topic: string
+  moderators: string[]
+  speakers: string[]
+  audience: string[]
+  pendingRequests: string[]
+}
+
+export interface ShellSoundboardSound {
+  id: string
+  label: string
+  emoji: string
+}
+
+export interface ShellSoundboardPlayEvent {
+  id: string
+  soundId: string
+  soundLabel: string
+  channelId: string
+  channelName: string
+  userId: string
+}
+
+export interface ShellPremiumEntitlement {
+  userId: string
+  featureKey: string
+  grantedAt: string
+}
+
+export interface ShellCatalogItem {
+  id: string
+  featureKey: string
+  label: string
+  priceLabel: string
+}
+
+export interface ShellQuest {
+  id: string
+  title: string
+  rewardFeatureKey: string
+}
+
+export interface ShellExperienceState {
+  stageSession: ShellStageSession | null
+  soundboardSounds: ShellSoundboardSound[]
+  lastSoundboardEvent: ShellSoundboardPlayEvent | null
+  entitlements: ShellPremiumEntitlement[]
+  premiumGate: 'Locked' | 'Unlocked'
+  catalog: ShellCatalogItem[]
+  quests: ShellQuest[]
+}
+
 export type ShellPresenceStatus = 'ONLINE' | 'IDLE' | 'DO_NOT_DISTURB' | 'OFFLINE'
 
 export interface ShellPresenceRecord {
@@ -432,7 +486,7 @@ export const useShellStore = defineStore('shell', {
       {
         id: 'role-moderator',
         name: 'Moderator',
-        permissions: ['VIEW_CHANNEL', 'MANAGE_MESSAGES']
+        permissions: ['VIEW_CHANNEL', 'MANAGE_MESSAGES', 'MANAGE_EXPRESSIONS']
       },
       {
         id: 'role-engineering',
@@ -616,6 +670,28 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellVoiceState,
+    experience: {
+      stageSession: null,
+      soundboardSounds: [],
+      lastSoundboardEvent: null,
+      entitlements: [],
+      premiumGate: 'Locked',
+      catalog: [
+        {
+          id: 'catalog-hd-stream',
+          featureKey: 'HD_STREAM',
+          label: 'HD Stream Pack',
+          priceLabel: 'Skeleton entitlement'
+        }
+      ],
+      quests: [
+        {
+          id: 'quest-stream-10',
+          title: 'Stream for 10 minutes',
+          rewardFeatureKey: 'HD_STREAM'
+        }
+      ]
+    } satisfies ShellExperienceState,
     presence: {
       nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
       users: {
@@ -791,7 +867,17 @@ export const useShellStore = defineStore('shell', {
     activeVoiceChannelName: (state): string =>
       state.channelGroups
         .flatMap((group) => group.channels)
-        .find((channel) => channel.id === state.voice.activeChannelId)?.name ?? 'none'
+        .find((channel) => channel.id === state.voice.activeChannelId)?.name ?? 'none',
+    canManageExpressions: (state): boolean => {
+      const member = state.members.find((candidate) => candidate.name === state.currentUser)
+      if (!member) {
+        return false
+      }
+
+      return member.roleIds
+        .map((roleId) => state.roles.find((role) => role.id === roleId))
+        .some((role) => role?.permissions.includes('MANAGE_EXPRESSIONS'))
+    }
   },
   actions: {
     setPresenceClock(nowMs: number) {
@@ -1221,6 +1307,120 @@ export const useShellStore = defineStore('shell', {
         type,
         detail
       })
+    },
+    startStageSession(channelId = 'channel-war-room', topic = 'T14 roadmap live review'): boolean {
+      const channel = this.channelGroups
+        .flatMap((group) => group.channels)
+        .find((candidate) => candidate.id === channelId && candidate.type === 'GUILD_VOICE')
+      if (!channel) {
+        return false
+      }
+
+      this.experience.stageSession = {
+        id: `stage-${channelId}`,
+        channelId,
+        topic,
+        moderators: [this.currentUser],
+        speakers: [],
+        audience: [],
+        pendingRequests: []
+      }
+      return true
+    },
+    requestToSpeak(userId = this.currentUser): boolean {
+      const session = this.experience.stageSession
+      if (!session) {
+        return false
+      }
+
+      if (!session.audience.includes(userId)) {
+        session.audience.push(userId)
+      }
+      if (!session.speakers.includes(userId) && !session.pendingRequests.includes(userId)) {
+        session.pendingRequests.push(userId)
+      }
+      return true
+    },
+    approveStageSpeaker(userId: string): boolean {
+      const session = this.experience.stageSession
+      if (!session || !session.pendingRequests.includes(userId)) {
+        return false
+      }
+
+      session.pendingRequests = session.pendingRequests.filter((candidate) => candidate !== userId)
+      session.audience = session.audience.filter((candidate) => candidate !== userId)
+      if (!session.speakers.includes(userId)) {
+        session.speakers.push(userId)
+      }
+      return true
+    },
+    moveStageAudience(userId: string): boolean {
+      const session = this.experience.stageSession
+      if (!session) {
+        return false
+      }
+
+      session.speakers = session.speakers.filter((candidate) => candidate !== userId)
+      session.pendingRequests = session.pendingRequests.filter((candidate) => candidate !== userId)
+      if (!session.audience.includes(userId)) {
+        session.audience.push(userId)
+      }
+      return true
+    },
+    createSoundboardSound(): boolean {
+      if (!this.canManageExpressions) {
+        return false
+      }
+
+      if (!this.experience.soundboardSounds.some((sound) => sound.id === 'sound-applause')) {
+        this.experience.soundboardSounds.push({
+          id: 'sound-applause',
+          label: 'Applause',
+          emoji: ':clap:'
+        })
+      }
+      return true
+    },
+    playSoundboardSound(soundId = 'sound-applause', channelId = 'channel-war-room'): boolean {
+      const sound = this.experience.soundboardSounds.find((candidate) => candidate.id === soundId)
+      const channel = this.channelGroups
+        .flatMap((group) => group.channels)
+        .find((candidate) => candidate.id === channelId && candidate.type === 'GUILD_VOICE')
+      if (!sound || !channel) {
+        return false
+      }
+
+      this.experience.lastSoundboardEvent = {
+        id: `sound-play-${Date.now()}`,
+        soundId: sound.id,
+        soundLabel: sound.label,
+        channelId: channel.id,
+        channelName: channel.name,
+        userId: this.currentUser
+      }
+      return true
+    },
+    grantPremiumEntitlement(featureKey = 'HD_STREAM', userId = this.currentUser): boolean {
+      const exists = this.experience.entitlements.some(
+        (entitlement) => entitlement.userId === userId && entitlement.featureKey === featureKey
+      )
+      if (exists) {
+        return false
+      }
+
+      this.experience.entitlements.push({
+        userId,
+        featureKey,
+        grantedAt: new Date().toISOString()
+      })
+      return true
+    },
+    checkPremiumFeature(featureKey = 'HD_STREAM', userId = this.currentUser): boolean {
+      const enabled = this.experience.entitlements.some(
+        (entitlement) => entitlement.userId === userId && entitlement.featureKey === featureKey
+      )
+      this.experience.premiumGate = enabled ? 'Unlocked' : 'Locked'
+      return enabled
     }
   }
 })
