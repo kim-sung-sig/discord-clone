@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public final class InMemoryInviteService {
+public class InMemoryInviteService {
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789".toCharArray();
     private static final int CODE_LENGTH = 8;
 
@@ -22,6 +22,10 @@ public final class InMemoryInviteService {
             throw new IllegalArgumentException("clock is required");
         }
         this.clock = clock;
+    }
+
+    protected synchronized void putInvite(Invite invite) {
+        invites.put(invite.code(), new StoredInvite(invite));
     }
 
     public synchronized Invite create(CreateInviteCommand command) {
@@ -123,6 +127,20 @@ public final class InMemoryInviteService {
             this.temporary = command.temporary();
             this.roleGrantIds = command.roleGrantIds();
             this.createdAt = createdAt;
+        }
+
+        private StoredInvite(Invite invite) {
+            this.code = invite.code();
+            this.guildId = invite.guildId();
+            this.channelId = invite.channelId();
+            this.creatorId = invite.creatorId();
+            this.maxAgeSeconds = invite.maxAgeSeconds();
+            this.maxUses = invite.maxUses();
+            this.temporary = invite.temporary();
+            this.roleGrantIds = invite.roleGrantIds();
+            this.createdAt = invite.createdAt();
+            this.deletedAt = invite.deletedAt();
+            this.acceptedMemberIds.addAll(invite.acceptedMemberIds());
         }
 
         private Invite snapshot() {

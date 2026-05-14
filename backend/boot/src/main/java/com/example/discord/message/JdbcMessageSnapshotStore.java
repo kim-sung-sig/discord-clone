@@ -8,11 +8,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("postgres")
+@DependsOn("postgresFlyway")
 class JdbcMessageSnapshotStore implements MessageSnapshotStore {
     private final DataSource dataSource;
 

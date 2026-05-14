@@ -15,11 +15,13 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("postgres")
+@DependsOn("postgresFlyway")
 class JdbcAuthStore implements AuthStore {
     private final DataSource dataSource;
 

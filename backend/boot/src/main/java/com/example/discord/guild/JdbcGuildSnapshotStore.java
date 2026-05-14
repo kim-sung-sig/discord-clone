@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("postgres")
+@DependsOn("postgresFlyway")
 class JdbcGuildSnapshotStore implements GuildSnapshotStore {
     private final DataSource dataSource;
 
