@@ -302,4 +302,52 @@ describe('Discord app shell', () => {
     expect(reaction.text()).toContain('1')
     expect(wrapper.find('[data-testid="expression-panel-message-general-welcome"]').exists()).toBe(false)
   })
+
+  it('renders forum guidelines, tags, public/private threads, and archive state', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    const forumPanel = wrapper.get('[data-testid="forum-panel"]')
+    expect(forumPanel.text()).toContain('Forum')
+    expect(forumPanel.get('[data-testid="forum-guidelines"]').text()).toContain('Use tags before posting')
+    expect(forumPanel.get('[data-testid="forum-tag-release"]').text()).toContain('release')
+    expect(forumPanel.get('[data-testid="forum-tag-help"]').text()).toContain('help')
+    expect(forumPanel.get('[data-testid="thread-public-release-notes"]').text()).toContain('Public')
+    expect(forumPanel.get('[data-testid="thread-private-mod-review"]').text()).toContain('Private')
+    expect(forumPanel.get('[data-testid="thread-status-thread-archived-incident"]').text()).toContain('Archived')
+  })
+
+  it('prevents archived thread writes until reopened', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="thread-archived-incident"]').trigger('click')
+    await wrapper.get('[data-testid="thread-write-thread-archived-incident"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="thread-write-receipt"]').text()).toContain('Thread is archived')
+
+    await wrapper.get('[data-testid="reopen-thread-thread-archived-incident"]').trigger('click')
+    await wrapper.get('[data-testid="thread-write-thread-archived-incident"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="thread-status-thread-archived-incident"]').text()).toContain('Open')
+    expect(wrapper.get('[data-testid="thread-write-receipt"]').text()).toContain('Thread write accepted')
+  })
+
+  it('requires a forum tag before creating a forum post', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="create-forum-post-without-tag"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="forum-post-error"]').text()).toContain('Select at least one tag')
+
+    await wrapper.get('[data-testid="create-forum-post-release"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="forum-post-error"]').text()).toContain('Ready')
+    expect(wrapper.get('[data-testid="thread-forum-release-plan"]').text()).toContain('Release plan')
+  })
 })

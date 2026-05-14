@@ -156,6 +156,32 @@ test('adds and removes a reaction from the first visible message', async ({ page
   await expect(page.getByTestId('reaction-chip-message-general-welcome-shipit')).toHaveCount(0)
 })
 
+test('manages forum tags and archived thread writes', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('forum-panel')).toContainText('Forum')
+  await expect(page.getByTestId('forum-guidelines')).toContainText('Use tags before posting')
+  await expect(page.getByTestId('thread-public-release-notes')).toContainText('Public')
+  await expect(page.getByTestId('thread-private-mod-review')).toContainText('Private')
+  await expect(page.getByTestId('thread-status-thread-archived-incident')).toContainText('Archived')
+
+  await page.getByTestId('thread-archived-incident').click()
+  await page.getByTestId('thread-write-thread-archived-incident').click()
+  await expect(page.getByTestId('thread-write-receipt')).toContainText('Thread is archived')
+
+  await page.getByTestId('reopen-thread-thread-archived-incident').click()
+  await page.getByTestId('thread-write-thread-archived-incident').click()
+  await expect(page.getByTestId('thread-status-thread-archived-incident')).toContainText('Open')
+  await expect(page.getByTestId('thread-write-receipt')).toContainText('Thread write accepted')
+
+  await page.getByTestId('create-forum-post-without-tag').click()
+  await expect(page.getByTestId('forum-post-error')).toContainText('Select at least one tag')
+
+  await page.getByTestId('create-forum-post-release').click()
+  await expect(page.getByTestId('forum-post-error')).toContainText('Ready')
+  await expect(page.getByTestId('thread-forum-release-plan')).toContainText('Release plan')
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 

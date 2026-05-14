@@ -40,7 +40,7 @@ onMounted(() => {
         :aria-current="channel.id === shell.activeChannelId ? 'page' : undefined"
         @click="shell.selectChannel(channel.id)"
       >
-        <span>{{ channel.type === 'GUILD_TEXT' ? '#' : 'Voice' }}</span>
+        <span>{{ channel.type === 'GUILD_TEXT' ? '#' : channel.type === 'GUILD_FORUM' ? 'Forum' : 'Voice' }}</span>
         <span>{{ channel.name }}</span>
         <UnreadBadge
           :count="shell.unreadCountForChannel(channel.id)"

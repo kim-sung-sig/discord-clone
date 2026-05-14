@@ -2,6 +2,7 @@
 import ServerRail from '../components/shell/ServerRail.vue'
 import ChannelSidebar from '../components/shell/ChannelSidebar.vue'
 import ChatViewport from '../components/shell/ChatViewport.vue'
+import ForumPanel from '../components/shell/ForumPanel.vue'
 import InviteModal from '../components/invite/InviteModal.vue'
 import DmSidebar from '../components/social/DmSidebar.vue'
 import MemberSidebar from '../components/shell/MemberSidebar.vue'
@@ -21,6 +22,7 @@ definePageMeta({
       <ChannelSidebar />
       <DmSidebar />
       <ChatViewport />
+      <ForumPanel />
       <MemberSidebar />
       <RolePermissionPanel />
       <GatewayStatusPanel />

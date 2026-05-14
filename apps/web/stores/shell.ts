@@ -5,7 +5,7 @@ import {
   type GatewayDispatch
 } from '../services/gateway-client'
 
-export type ShellChannelType = 'GUILD_TEXT' | 'GUILD_VOICE'
+export type ShellChannelType = 'GUILD_TEXT' | 'GUILD_VOICE' | 'GUILD_FORUM'
 
 export interface ShellGuild {
   id: string
@@ -156,6 +156,40 @@ export interface ShellSocialState {
   groupDms: ShellGroupDm[]
 }
 
+export type ShellThreadType = 'PUBLIC' | 'PRIVATE'
+
+export interface ShellForumTag {
+  id: string
+  label: string
+  required: boolean
+}
+
+export interface ShellForum {
+  channelId: string
+  guidelines: string
+  layout: 'LIST' | 'GALLERY'
+  tags: ShellForumTag[]
+}
+
+export interface ShellThread {
+  id: string
+  parentChannelId: string
+  title: string
+  type: ShellThreadType
+  tagIds: string[]
+  archived: boolean
+  autoArchiveAt: string
+  writeReceipt: string
+}
+
+export interface ShellForumState {
+  activeForumChannelId: string
+  activeThreadId: string
+  forums: ShellForum[]
+  threads: ShellThread[]
+  postError: string
+}
+
 export type ShellPresenceStatus = 'ONLINE' | 'IDLE' | 'DO_NOT_DISTURB' | 'OFFLINE'
 
 export interface ShellPresenceRecord {
@@ -229,6 +263,11 @@ export const useShellStore = defineStore('shell', {
             id: 'channel-qa-lab',
             name: 'qa-lab',
             type: 'GUILD_TEXT'
+          },
+          {
+            id: 'channel-forum',
+            name: 'forum',
+            type: 'GUILD_FORUM'
           }
         ]
       },
@@ -413,6 +452,62 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellSocialState,
+    forum: {
+      activeForumChannelId: 'channel-forum',
+      activeThreadId: 'thread-public-release-notes',
+      postError: 'Ready',
+      forums: [
+        {
+          channelId: 'channel-forum',
+          guidelines: 'Use tags before posting and keep implementation threads scoped.',
+          layout: 'LIST',
+          tags: [
+            {
+              id: 'release',
+              label: 'release',
+              required: true
+            },
+            {
+              id: 'help',
+              label: 'help',
+              required: false
+            }
+          ]
+        }
+      ],
+      threads: [
+        {
+          id: 'thread-public-release-notes',
+          parentChannelId: 'channel-forum',
+          title: 'Release notes',
+          type: 'PUBLIC',
+          tagIds: ['release'],
+          archived: false,
+          autoArchiveAt: '2026-05-14T15:00:00.000Z',
+          writeReceipt: 'Ready'
+        },
+        {
+          id: 'thread-private-mod-review',
+          parentChannelId: 'channel-forum',
+          title: 'Moderator review',
+          type: 'PRIVATE',
+          tagIds: ['help'],
+          archived: false,
+          autoArchiveAt: '2026-05-14T16:00:00.000Z',
+          writeReceipt: 'Ready'
+        },
+        {
+          id: 'thread-archived-incident',
+          parentChannelId: 'channel-forum',
+          title: 'Archived incident follow-up',
+          type: 'PUBLIC',
+          tagIds: ['help'],
+          archived: true,
+          autoArchiveAt: '2026-05-13T15:00:00.000Z',
+          writeReceipt: 'Thread is archived'
+        }
+      ]
+    } satisfies ShellForumState,
     presence: {
       nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
       users: {
@@ -574,7 +669,15 @@ export const useShellStore = defineStore('shell', {
     },
     activeSocialLabel(): string {
       return this.activeGroupDm?.name ?? this.activeDirectFriend?.name ?? 'No DM selected'
-    }
+    },
+    activeForum: (state): ShellForum | undefined =>
+      state.forum.forums.find((forum) => forum.channelId === state.forum.activeForumChannelId),
+    activeForumThreads: (state): ShellThread[] =>
+      state.forum.threads.filter(
+        (thread) => thread.parentChannelId === state.forum.activeForumChannelId
+      ),
+    activeThread: (state): ShellThread | undefined =>
+      state.forum.threads.find((thread) => thread.id === state.forum.activeThreadId)
   },
   actions: {
     setPresenceClock(nowMs: number) {
@@ -827,6 +930,84 @@ export const useShellStore = defineStore('shell', {
 
       activeGroup.call.active = !activeGroup.call.active
       activeGroup.call.participants = activeGroup.call.active ? [this.currentUser] : []
+      return true
+    },
+    selectThread(threadId: string): boolean {
+      const thread = this.forum.threads.find((candidate) => candidate.id === threadId)
+      if (!thread) {
+        return false
+      }
+
+      this.forum.activeThreadId = threadId
+      return true
+    },
+    reopenThread(threadId: string): boolean {
+      const thread = this.forum.threads.find((candidate) => candidate.id === threadId)
+      if (!thread) {
+        return false
+      }
+
+      thread.archived = false
+      thread.writeReceipt = 'Ready'
+      return true
+    },
+    archiveThread(threadId: string): boolean {
+      const thread = this.forum.threads.find((candidate) => candidate.id === threadId)
+      if (!thread) {
+        return false
+      }
+
+      thread.archived = true
+      thread.writeReceipt = 'Thread is archived'
+      return true
+    },
+    writeThreadMessage(threadId: string): boolean {
+      const thread = this.forum.threads.find((candidate) => candidate.id === threadId)
+      if (!thread) {
+        return false
+      }
+
+      if (thread.archived) {
+        thread.writeReceipt = 'Thread is archived'
+        return false
+      }
+
+      thread.writeReceipt = 'Thread write accepted'
+      this.forum.activeThreadId = thread.id
+      return true
+    },
+    createForumPost(title: string, tagIds: string[]): boolean {
+      const forum = this.activeForum
+      if (!forum) {
+        this.forum.postError = 'Forum unavailable'
+        return false
+      }
+
+      const requiredTagIds = forum.tags.filter((tag) => tag.required).map((tag) => tag.id)
+      const hasRequiredTag =
+        requiredTagIds.length === 0 || requiredTagIds.some((tagId) => tagIds.includes(tagId))
+      if (!hasRequiredTag) {
+        this.forum.postError = 'Select at least one tag'
+        return false
+      }
+
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      const id = `thread-forum-${slug}`
+      if (!this.forum.threads.some((thread) => thread.id === id)) {
+        this.forum.threads.push({
+          id,
+          parentChannelId: forum.channelId,
+          title,
+          type: 'PUBLIC',
+          tagIds,
+          archived: false,
+          autoArchiveAt: '2026-05-14T18:00:00.000Z',
+          writeReceipt: 'Ready'
+        })
+      }
+
+      this.forum.activeThreadId = id
+      this.forum.postError = 'Ready'
       return true
     }
   }
