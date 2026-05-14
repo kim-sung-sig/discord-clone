@@ -1,20 +1,33 @@
 package com.example.discord.experience;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 public final class InMemoryExperienceService {
+    private final Clock clock;
+    private final EntitlementStore entitlementStore;
     private final Map<UUID, StageSession> stageSessions = new LinkedHashMap<>();
     private final Map<UUID, UUID> activeStageSessionIdsByChannel = new LinkedHashMap<>();
     private final Map<UUID, SoundboardSound> sounds = new LinkedHashMap<>();
     private final List<SoundboardPlayEvent> playEvents = new ArrayList<>();
-    private final List<Entitlement> entitlements = new ArrayList<>();
+
+    public InMemoryExperienceService() {
+        this(Clock.systemUTC(), new InMemoryEntitlementStore());
+    }
+
+    public InMemoryExperienceService(Clock clock, EntitlementStore entitlementStore) {
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.entitlementStore = Objects.requireNonNull(entitlementStore, "entitlementStore must not be null");
+    }
 
     public synchronized StageSession startStageSession(UUID guildId, UUID channelId, String topic, UUID moderatorId) {
         requireUuid(guildId, "guildId");
@@ -142,20 +155,63 @@ public final class InMemoryExperienceService {
     }
 
     public synchronized Entitlement grantEntitlement(UUID userId, UUID guildId, String featureKey) {
+        return grantEntitlement(
+            userId,
+            guildId,
+            featureKey,
+            "local_test",
+            "local_test:%s:%s:%s".formatted(userId, guildId, featureKey),
+            null
+        );
+    }
+
+    public synchronized Entitlement grantEntitlement(
+        UUID userId,
+        UUID guildId,
+        String featureKey,
+        String provider,
+        String providerSubscriptionId,
+        Instant expiresAt
+    ) {
         requireUuid(userId, "userId");
         requireUuid(guildId, "guildId");
         requireText(featureKey, "featureKey");
+        requireText(provider, "provider");
+        requireText(providerSubscriptionId, "providerSubscriptionId");
 
-        Entitlement entitlement = new Entitlement(UUID.randomUUID(), userId, guildId, featureKey);
-        entitlements.add(entitlement);
-        return entitlement;
+        return entitlementStore.findByProviderSubscription(provider, providerSubscriptionId)
+            .orElseGet(() -> entitlementStore.save(new Entitlement(
+                UUID.randomUUID(),
+                userId,
+                guildId,
+                featureKey,
+                statusFor(expiresAt),
+                provider,
+                providerSubscriptionId,
+                clock.instant(),
+                expiresAt
+            )));
     }
 
     public synchronized boolean hasEntitlement(UUID userId, String featureKey) {
         requireUuid(userId, "userId");
         requireText(featureKey, "featureKey");
-        return entitlements.stream()
-            .anyMatch(entitlement -> entitlement.userId().equals(userId) && entitlement.featureKey().equals(featureKey));
+        Instant now = clock.instant();
+        return entitlementStore.findByUserAndFeature(userId, featureKey).stream()
+            .anyMatch(entitlement -> entitlement.isActiveAt(now));
+    }
+
+    public synchronized Entitlement cancelEntitlement(UUID entitlementId) {
+        requireUuid(entitlementId, "entitlementId");
+        Entitlement entitlement = entitlementStore.findById(entitlementId)
+            .orElseThrow(() -> new IllegalArgumentException("entitlement not found"));
+        return entitlementStore.save(entitlement.withStatus(EntitlementStatus.CANCELED));
+    }
+
+    public synchronized List<Entitlement> entitlementsForUserFeature(UUID userId, String featureKey) {
+        requireUuid(userId, "userId");
+        requireText(featureKey, "featureKey");
+        return entitlementStore.findByUserAndFeature(userId, featureKey);
     }
 
     public List<CatalogItem> catalog() {
@@ -205,5 +261,12 @@ public final class InMemoryExperienceService {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(label + " is required");
         }
+    }
+
+    private EntitlementStatus statusFor(Instant expiresAt) {
+        if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
+            return EntitlementStatus.EXPIRED;
+        }
+        return EntitlementStatus.ACTIVE;
     }
 }
