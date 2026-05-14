@@ -100,6 +100,7 @@ class AttachmentControllerTest {
         String channelId = createChannel(guildId, "general", owner);
         String attachmentId = requestUpload(channelId, "orphan.png", "image/png", owner);
         markUploaded(attachmentId, owner);
+        Thread.sleep(5);
 
         mockMvc.perform(delete("/api/attachments/orphans")
                 .header("Authorization", owner.bearer()))

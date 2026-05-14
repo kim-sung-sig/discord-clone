@@ -54,6 +54,7 @@ class AuthControllerTest {
             .andExpect(status().isCreated());
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100.10")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -90,6 +91,7 @@ class AuthControllerTest {
 
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", "198.51.100." + (20 + i))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -101,6 +103,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100.22")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -140,6 +143,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.message").value("account already exists"));
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100.30")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -174,6 +178,7 @@ class AuthControllerTest {
             .andExpect(status().isCreated());
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100.40")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -199,6 +204,7 @@ class AuthControllerTest {
     void locksUnknownEmailAfterRepeatedInvalidLoginAttempts() throws Exception {
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", "198.51.100." + (50 + i))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -210,6 +216,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100.52")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
