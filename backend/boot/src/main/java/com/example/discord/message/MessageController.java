@@ -2,6 +2,8 @@ package com.example.discord.message;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.moderation.AutoModDecision;
+import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -29,15 +31,18 @@ import org.springframework.web.server.ResponseStatusException;
 class MessageController {
     private final InMemoryMessageService messageService;
     private final InMemoryGuildService guildService;
+    private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     MessageController(
         InMemoryMessageService messageService,
         InMemoryGuildService guildService,
+        InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.messageService = messageService;
         this.guildService = guildService;
+        this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -53,6 +58,10 @@ class MessageController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "send messages permission required");
         }
         requireRequest(request);
+        AutoModDecision decision = moderationService.evaluateMessage(guildId, channelId, requesterId, request.content());
+        if (decision.blocked()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, decision.reason());
+        }
         Message message = messageService.create(new CreateMessageCommand(guildId, channelId, requesterId, request.content()));
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
     }
