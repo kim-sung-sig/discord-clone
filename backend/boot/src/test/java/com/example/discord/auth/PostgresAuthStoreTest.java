@@ -27,6 +27,12 @@ class PostgresAuthStoreTest {
     void cleanAuthTables() throws Exception {
         try (var connection = dataSource.getConnection();
              var statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM channel_role_overwrites");
+            statement.executeUpdate("DELETE FROM guild_member_roles");
+            statement.executeUpdate("DELETE FROM channels");
+            statement.executeUpdate("DELETE FROM guild_roles");
+            statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM guilds");
             statement.executeUpdate("DELETE FROM auth_revoked_access_tokens");
             statement.executeUpdate("DELETE FROM auth_accounts");
             statement.executeUpdate("DELETE FROM users");

@@ -12,9 +12,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public final class InMemoryGuildService {
+public class InMemoryGuildService {
     private final Map<UUID, Guild> guilds = new LinkedHashMap<>();
     private final EffectivePermissionCalculator calculator = new EffectivePermissionCalculator();
+
+    public InMemoryGuildService() {
+    }
+
+    protected synchronized void putGuild(Guild guild) {
+        guilds.put(guild.id(), guild);
+    }
 
     public synchronized Guild createGuild(String name, UUID ownerId) {
         if (name == null || name.isBlank()) {

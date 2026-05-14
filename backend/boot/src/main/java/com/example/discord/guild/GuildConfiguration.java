@@ -2,6 +2,7 @@ package com.example.discord.guild;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -14,8 +15,15 @@ class GuildConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
-    InMemoryGuildService guildService() {
+    @Profile("!postgres")
+    InMemoryGuildService inMemoryGuildService() {
         return new InMemoryGuildService();
+    }
+
+    @Bean
+    @Profile("postgres")
+    InMemoryGuildService persistentGuildService(GuildSnapshotStore snapshots) {
+        return new PersistentGuildService(snapshots);
     }
 
     @Override
