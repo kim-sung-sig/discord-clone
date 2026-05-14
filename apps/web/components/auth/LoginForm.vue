@@ -77,6 +77,15 @@ async function submitLogin() {
         Signed in with backend session.
       </p>
 
+      <NuxtLink
+        v-if="hasAccessToken"
+        class="login-submit login-workspace-link"
+        data-testid="open-workspace"
+        to="/"
+      >
+        Open workspace
+      </NuxtLink>
+
       <button
         class="login-submit"
         data-testid="login-submit"
@@ -180,6 +189,8 @@ async function submitLogin() {
 }
 
 .login-submit {
+  display: inline-flex;
+  justify-content: center;
   padding: 14px 18px;
   color: #06131d;
   font-weight: 900;
@@ -187,6 +198,7 @@ async function submitLogin() {
   background: linear-gradient(145deg, var(--accent), #54a6ff);
   border: 0;
   border-radius: 16px;
+  text-decoration: none;
 }
 
 .login-field input:disabled,

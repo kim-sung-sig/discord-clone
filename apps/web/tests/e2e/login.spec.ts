@@ -1,16 +1,31 @@
 import { expect, test } from '@playwright/test'
 
-test('logs in locally from the login page', async ({ page }) => {
+test('logs in through the API from the login page without persisting the token', async ({ page }) => {
+  await page.route('**/api/auth/login', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        accessToken: 'backend-e2e-access-token',
+        user: {
+          id: 'user-e2e',
+          username: 'user',
+          displayName: 'User'
+        }
+      })
+    })
+  })
   await page.goto('/login')
 
   await page.getByLabel('Email').fill('user@example.com')
-  await page.getByLabel('Password').fill('correct-password')
+  await page.getByLabel('Password').fill('correct horse battery staple')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  await expect(page.getByTestId('login-success')).toContainText('Signed in locally')
+  await expect(page.getByTestId('login-success')).toContainText('Signed in with backend session')
   await expect(page.getByTestId('login-token-policy')).toContainText(
     'Access token is stored in memory for this frontend slice.'
   )
+  await expect(page.getByTestId('open-workspace')).toBeVisible()
 
   const persistedClientState = await page.evaluate(() => {
     const entriesFor = (storage: Storage) =>
@@ -28,6 +43,6 @@ test('logs in locally from the login page', async ({ page }) => {
   const cookies = await page.context().cookies()
 
   expect(JSON.stringify({ ...persistedClientState, cookies })).not.toContain(
-    'local-placeholder-access-token'
+    'backend-e2e-access-token'
   )
 })
