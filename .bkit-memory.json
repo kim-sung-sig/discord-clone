@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T13-voice-sfu",
+  "phase": "plan",
+  "currentFeature": "T14-stage-soundboard-premium",
   "updatedAt": "2026-05-14"
 }
