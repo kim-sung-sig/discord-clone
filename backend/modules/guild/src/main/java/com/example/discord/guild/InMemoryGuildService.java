@@ -213,6 +213,10 @@ public final class InMemoryGuildService {
         guild(guildId).channel(channelId);
     }
 
+    public synchronized Channel channel(UUID guildId, UUID channelId) {
+        return guild(guildId).channel(channelId);
+    }
+
     public synchronized void requireRoles(UUID guildId, List<UUID> roleIds) {
         Guild guild = guild(guildId);
         List<UUID> requestedRoleIds = roleIds == null ? List.of() : roleIds;

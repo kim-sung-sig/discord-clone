@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":backend:modules:presence"))
     implementation(project(":backend:modules:social"))
     implementation(project(":backend:modules:storage"))
+    implementation(project(":backend:modules:thread"))
     implementation(project(":backend:modules:user"))
     implementation(project(":backend:shared:common"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
