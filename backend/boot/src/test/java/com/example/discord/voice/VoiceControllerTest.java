@@ -1,6 +1,7 @@
 package com.example.discord.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -129,10 +130,89 @@ class VoiceControllerTest {
         });
     }
 
+    @Test
+    void voiceMutationsPublishGatewayEventsOnlyToChannelVisibleSessions() throws Exception {
+        AuthSession owner = signup("voice_gateway_owner");
+        AuthSession hiddenMember = signup("voice_gateway_hidden_member");
+        String guildId = createGuild(owner);
+        String channelId = createVoiceChannel(guildId, "Gateway Voice", owner);
+        addMember(guildId, hiddenMember.userId(), owner);
+        denyEveryoneView(guildId, channelId, owner);
+        GatewaySession ownerGateway = identifyGateway(owner);
+        GatewaySession hiddenGateway = identifyGateway(hiddenMember);
+
+        join(channelId, owner);
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", ownerGateway.sessionId())
+                .header("Authorization", owner.bearer())
+                .param("afterSeq", Long.toString(ownerGateway.readySequence())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].type").value("VOICE_STATE_UPDATE"))
+            .andExpect(jsonPath("$.events[0].guildId").value(guildId))
+            .andExpect(jsonPath("$.events[0].channelId").value(channelId))
+            .andExpect(jsonPath("$.events[0].payload.voiceEventType").value("VOICE_STATE_JOINED"))
+            .andExpect(jsonPath("$.events[0].payload.userId").value(owner.userId().toString()))
+            .andExpect(jsonPath("$.events[0].payload.token").doesNotExist());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", hiddenGateway.sessionId())
+                .header("Authorization", hiddenMember.bearer())
+                .param("afterSeq", Long.toString(hiddenGateway.readySequence())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(0)));
+
+        mockMvc.perform(patch("/api/voice/channels/{channelId}/state", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "muted": true,
+                      "deafened": false,
+                      "speaking": true,
+                      "screenSharing": false
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", ownerGateway.sessionId())
+                .header("Authorization", owner.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].payload.voiceEventType").value("VOICE_STATE_UPDATE"))
+            .andExpect(jsonPath("$.events[0].payload.muted").value(true))
+            .andExpect(jsonPath("$.events[0].payload.speaking").value(true));
+
+        mockMvc.perform(delete("/api/voice/channels/{channelId}/leave", channelId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", ownerGateway.sessionId())
+                .header("Authorization", owner.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].payload.voiceEventType").value("VOICE_STATE_LEFT"))
+            .andExpect(jsonPath("$.events[0].payload.userId").value(owner.userId().toString()));
+    }
+
     private void join(String channelId, AuthSession requester) throws Exception {
         mockMvc.perform(post("/api/voice/channels/{channelId}/join", channelId)
                 .header("Authorization", requester.bearer()))
             .andExpect(status().isOk());
+    }
+
+    private GatewaySession identifyGateway(AuthSession requester) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/gateway/identify")
+                .header("Authorization", requester.bearer()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+        return new GatewaySession(
+            JsonPath.read(body, "$.session.id"),
+            ((Number) JsonPath.read(body, "$.ready.sequence")).longValue()
+        );
     }
 
     private String createGuild(AuthSession owner) throws Exception {
@@ -221,5 +301,8 @@ class VoiceControllerTest {
         String bearer() {
             return "Bearer " + accessToken;
         }
+    }
+
+    private record GatewaySession(String sessionId, long readySequence) {
     }
 }

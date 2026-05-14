@@ -14,7 +14,29 @@ class InMemoryVoiceServiceTest {
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000103");
     private static final Instant NOW = Instant.parse("2026-05-14T00:00:00Z");
 
-    private final InMemoryVoiceService service = new InMemoryVoiceService(Clock.fixed(NOW, ZoneOffset.UTC));
+    private final InMemoryVoiceService service = new InMemoryVoiceService(
+        Clock.fixed(NOW, ZoneOffset.UTC),
+        new SkeletonLiveKitTokenSigner()
+    );
+
+    @Test
+    void skeletonLiveKitSignerIssuesRoomScopedNonProductionToken() {
+        VoiceRoomToken token = new SkeletonLiveKitTokenSigner().sign(new VoiceTokenSigningRequest(
+            GUILD_ID,
+            CHANNEL_ID,
+            USER_ID,
+            NOW,
+            900L
+        ));
+
+        assertThat(token.room()).isEqualTo("voice:%s:%s".formatted(GUILD_ID, CHANNEL_ID));
+        assertThat(token.participant()).isEqualTo(USER_ID.toString());
+        assertThat(token.provider()).isEqualTo("LIVEKIT_SKELETON");
+        assertThat(token.token()).isEqualTo(
+            "NON_PRODUCTION_LIVEKIT_SKELETON:%s:%s:%s".formatted(GUILD_ID, CHANNEL_ID, USER_ID)
+        );
+        assertThat(token.expiresAt()).isEqualTo(NOW.plusSeconds(900));
+    }
 
     @Test
     void joinCreatesParticipantAndDeterministicNonProductionLiveKitSkeletonToken() {

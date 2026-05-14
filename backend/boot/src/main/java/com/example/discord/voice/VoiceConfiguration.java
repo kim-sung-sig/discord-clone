@@ -8,6 +8,6 @@ import org.springframework.context.annotation.Configuration;
 class VoiceConfiguration {
     @Bean
     InMemoryVoiceService voiceService() {
-        return new InMemoryVoiceService(Clock.systemUTC());
+        return new InMemoryVoiceService(Clock.systemUTC(), new SkeletonLiveKitTokenSigner());
     }
 }

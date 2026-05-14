@@ -2,10 +2,12 @@ package com.example.discord.voice;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
+import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.Channel;
 import com.example.discord.guild.InMemoryGuildService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,15 +31,18 @@ import org.springframework.web.server.ResponseStatusException;
 class VoiceController {
     private final InMemoryVoiceService voiceService;
     private final InMemoryGuildService guildService;
+    private final InMemoryGatewayService gatewayService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     VoiceController(
         InMemoryVoiceService voiceService,
         InMemoryGuildService guildService,
+        InMemoryGatewayService gatewayService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.voiceService = voiceService;
         this.guildService = guildService;
+        this.gatewayService = gatewayService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -48,7 +53,9 @@ class VoiceController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireVisibleVoiceChannel(channelId, requesterId);
-        return VoiceJoinResponse.from(voiceService.join(guildId, channelId, requesterId));
+        VoiceJoinResult result = voiceService.join(guildId, channelId, requesterId);
+        publishVoiceState(VoiceStateEvent.JOINED, result.participant());
+        return VoiceJoinResponse.from(result);
     }
 
     @DeleteMapping("/channels/{channelId}/leave")
@@ -58,7 +65,8 @@ class VoiceController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireVoiceChannel(channelId);
-        voiceService.leave(guildId, channelId, requesterId);
+        voiceService.leave(guildId, channelId, requesterId)
+            .ifPresent(participant -> publishVoiceState(VoiceStateEvent.LEFT, participant));
         return ResponseEntity.noContent().build();
     }
 
@@ -71,7 +79,7 @@ class VoiceController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireVisibleVoiceChannel(channelId, requesterId);
         requireRequest(request);
-        return VoiceParticipantResponse.from(voiceService.update(new VoiceStateUpdateCommand(
+        VoiceParticipantState participant = voiceService.update(new VoiceStateUpdateCommand(
             guildId,
             channelId,
             requesterId,
@@ -79,7 +87,9 @@ class VoiceController {
             request.deafened(),
             request.speaking(),
             request.screenSharing()
-        )));
+        ));
+        publishVoiceState(VoiceStateEvent.UPDATED, participant);
+        return VoiceParticipantResponse.from(participant);
     }
 
     @GetMapping("/channels/{channelId}/participants")
@@ -125,6 +135,24 @@ class VoiceController {
         if (request == null) {
             throw new IllegalArgumentException("request body is required");
         }
+    }
+
+    private void publishVoiceState(String voiceEventType, VoiceParticipantState participant) {
+        gatewayService.publish(
+            VoiceStateEvent.UPDATED,
+            participant.guildId(),
+            participant.channelId(),
+            Map.of(
+                "voiceEventType", voiceEventType,
+                "guildId", participant.guildId().toString(),
+                "channelId", participant.channelId().toString(),
+                "userId", participant.userId().toString(),
+                "muted", participant.muted(),
+                "deafened", participant.deafened(),
+                "speaking", participant.speaking(),
+                "screenSharing", participant.screenSharing()
+            )
+        );
     }
 
     record VoiceStateRequest(boolean muted, boolean deafened, boolean speaking, boolean screenSharing) {

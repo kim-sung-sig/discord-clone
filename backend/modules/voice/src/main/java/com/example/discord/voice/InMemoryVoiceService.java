@@ -8,17 +8,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class InMemoryVoiceService {
     private static final long TOKEN_TTL_SECONDS = 900L;
 
     private final Clock clock;
+    private final VoiceTokenSigner tokenSigner;
     private final Map<VoiceKey, VoiceParticipantState> participants = new LinkedHashMap<>();
     private final List<VoiceStateEvent> events = new ArrayList<>();
 
-    public InMemoryVoiceService(Clock clock) {
+    public InMemoryVoiceService(Clock clock, VoiceTokenSigner tokenSigner) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.tokenSigner = Objects.requireNonNull(tokenSigner, "tokenSigner must not be null");
     }
 
     public synchronized VoiceJoinResult join(UUID guildId, UUID channelId, UUID userId) {
@@ -35,14 +38,24 @@ public final class InMemoryVoiceService {
         );
         participants.put(new VoiceKey(guildId, channelId, userId), participant);
         events.add(VoiceStateEvent.from(VoiceStateEvent.JOINED, participant, now));
-        return new VoiceJoinResult(participant, tokenFor(guildId, channelId, userId, now));
+        return new VoiceJoinResult(participant, tokenSigner.sign(new VoiceTokenSigningRequest(
+            guildId,
+            channelId,
+            userId,
+            now,
+            TOKEN_TTL_SECONDS
+        )));
     }
 
-    public synchronized void leave(UUID guildId, UUID channelId, UUID userId) {
+    public synchronized Optional<VoiceParticipantState> leave(UUID guildId, UUID channelId, UUID userId) {
         VoiceParticipantState removed = participants.remove(new VoiceKey(guildId, channelId, userId));
         if (removed != null) {
-            events.add(VoiceStateEvent.from(VoiceStateEvent.LEFT, removed.withState(false, false, false, false, clock.instant()), clock.instant()));
+            Instant now = clock.instant();
+            VoiceParticipantState left = removed.withState(false, false, false, false, now);
+            events.add(VoiceStateEvent.from(VoiceStateEvent.LEFT, left, now));
+            return Optional.of(left);
         }
+        return Optional.empty();
     }
 
     public synchronized VoiceParticipantState update(VoiceStateUpdateCommand command) {
@@ -73,16 +86,6 @@ public final class InMemoryVoiceService {
 
     public synchronized List<VoiceStateEvent> events() {
         return List.copyOf(events);
-    }
-
-    private static VoiceRoomToken tokenFor(UUID guildId, UUID channelId, UUID userId, Instant issuedAt) {
-        return new VoiceRoomToken(
-            "voice:%s:%s".formatted(guildId, channelId),
-            userId.toString(),
-            "NON_PRODUCTION_LIVEKIT_SKELETON:%s:%s:%s".formatted(guildId, channelId, userId),
-            VoiceRoomToken.PROVIDER,
-            issuedAt.plusSeconds(TOKEN_TTL_SECONDS)
-        );
     }
 
     private record VoiceKey(UUID guildId, UUID channelId, UUID userId) {
