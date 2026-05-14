@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-public final class InMemoryMessageService {
+public class InMemoryMessageService {
     private static final Pattern USER_ID_MENTION = Pattern.compile("<@([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})>");
     private static final Pattern USERNAME_MENTION = Pattern.compile("(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})");
     private static final Comparator<Message> NEWEST_FIRST = Comparator
@@ -32,6 +32,10 @@ public final class InMemoryMessageService {
 
     public InMemoryMessageService(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+    }
+
+    protected synchronized void putMessage(Message message) {
+        messages.put(message.id(), message);
     }
 
     public synchronized Message create(CreateMessageCommand command) {

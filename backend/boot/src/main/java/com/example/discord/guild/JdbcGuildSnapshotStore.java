@@ -42,7 +42,10 @@ class JdbcGuildSnapshotStore implements GuildSnapshotStore {
                     .filter(role -> "@everyone".equals(role.name()))
                     .map(Role::id)
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("guild missing @everyone role"));
+                    .orElse(null);
+                if (everyoneRoleId == null) {
+                    continue;
+                }
                 guilds.add(new Guild(
                     guildId,
                     resultSet.getString("name"),
