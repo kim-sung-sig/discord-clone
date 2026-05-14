@@ -35,6 +35,39 @@ describe('Discord shell API and Gateway contracts', () => {
     expect(calls[0]?.init?.body).toBe(JSON.stringify({ body: 'hello' }))
   })
 
+  it('sends provided request ids for REST correlation', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push({ input, init })
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    const client = createDiscordRestClient({ fetcher })
+    await client.get('/api/premium/catalog', { requestId: 'qa-request-123' })
+
+    expect((calls[0]?.init?.headers as Record<string, string>)['X-Request-Id']).toBe('qa-request-123')
+  })
+
+  it('generates request ids when the caller omits one', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push({ input, init })
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    const client = createDiscordRestClient({ fetcher })
+    await client.get('/api/premium/catalog')
+
+    const requestId = (calls[0]?.init?.headers as Record<string, string>)['X-Request-Id']
+    expect(requestId).toMatch(/^web-[a-z0-9._-]{8,64}$/)
+  })
+
   it('validates and maps gateway dispatches into shell gateway events', () => {
     const dispatch = {
       sequence: 43,

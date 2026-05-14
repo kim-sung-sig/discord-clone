@@ -8,6 +8,7 @@ export interface DiscordRestClientOptions {
 
 export interface DiscordRequestOptions {
   bearerToken?: string
+  requestId?: string
 }
 
 export class DiscordRestError extends Error {
@@ -109,8 +110,16 @@ const joinUrl = (baseUrl: string | undefined, path: string): string => {
   return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
+const createRequestId = (): string => {
+  const timePart = Date.now().toString(36)
+  const randomPart = Math.random().toString(36).slice(2, 12)
+  return `web-${timePart}-${randomPart}`
+}
+
 const headersFor = (options: DiscordRequestOptions, hasBody: boolean): Record<string, string> => {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = {
+    'X-Request-Id': options.requestId ?? createRequestId()
+  }
   if (options.bearerToken) {
     headers.Authorization = `Bearer ${options.bearerToken}`
   }
