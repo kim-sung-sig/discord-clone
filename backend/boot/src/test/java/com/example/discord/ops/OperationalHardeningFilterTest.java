@@ -2,6 +2,7 @@ package com.example.discord.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,5 +58,18 @@ class OperationalHardeningFilterTest {
         assertThat(result.getResponse().getHeader(REQUEST_ID_HEADER))
             .isNotEqualTo(unsafeRequestId)
             .matches(SAFE_REQUEST_ID_PATTERN);
+    }
+
+    @Test
+    void apiPreflightAllowsLocalNuxtDevelopmentOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "http://127.0.0.1:3000")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "content-type, x-request-id"))
+            .andExpect(status().isNoContent())
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:3000"))
+            .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+            .andExpect(header().string("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-Id"))
+            .andExpect(header().string("Vary", "Origin"));
     }
 }
