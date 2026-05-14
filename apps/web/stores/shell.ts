@@ -190,6 +190,41 @@ export interface ShellForumState {
   postError: string
 }
 
+export interface ShellOnboardingAnswer {
+  id: string
+  label: string
+  roleId: string
+  roleName: string
+}
+
+export interface ShellOnboardingQuestion {
+  id: string
+  prompt: string
+  answers: ShellOnboardingAnswer[]
+}
+
+export interface ShellAutoModRule {
+  id: string
+  keyword: string
+  enabled: boolean
+}
+
+export interface ShellAuditLogEntry {
+  id: string
+  action: string
+  detail: string
+  createdAt: string
+}
+
+export interface ShellModerationState {
+  onboardingQuestion: ShellOnboardingQuestion
+  selectedAnswerId: string | null
+  assignedRoleName: string
+  automodRules: ShellAutoModRule[]
+  decision: string
+  auditLogs: ShellAuditLogEntry[]
+}
+
 export type ShellPresenceStatus = 'ONLINE' | 'IDLE' | 'DO_NOT_DISTURB' | 'OFFLINE'
 
 export interface ShellPresenceRecord {
@@ -375,6 +410,11 @@ export const useShellStore = defineStore('shell', {
         id: 'role-moderator',
         name: 'Moderator',
         permissions: ['VIEW_CHANNEL', 'MANAGE_MESSAGES']
+      },
+      {
+        id: 'role-engineering',
+        name: 'Engineering',
+        permissions: ['VIEW_CHANNEL']
       }
     ] satisfies ShellRole[],
     permissionOverwrites: [
@@ -508,6 +548,38 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellForumState,
+    moderation: {
+      onboardingQuestion: {
+        id: 'onboarding-squad',
+        prompt: 'Choose your squad',
+        answers: [
+          {
+            id: 'engineering',
+            label: 'Engineering squad',
+            roleId: 'role-engineering',
+            roleName: 'Engineering'
+          }
+        ]
+      },
+      selectedAnswerId: null,
+      assignedRoleName: 'Unassigned',
+      automodRules: [
+        {
+          id: 'keyword-leak',
+          keyword: 'leak',
+          enabled: true
+        }
+      ],
+      decision: 'Ready',
+      auditLogs: [
+        {
+          id: 'audit-rule-created',
+          action: 'AUDIT_RULE_CREATED',
+          detail: 'Keyword leak rule created',
+          createdAt: '2026-05-14T12:00:00.000Z'
+        }
+      ]
+    } satisfies ShellModerationState,
     presence: {
       nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
       users: {
@@ -1009,6 +1081,46 @@ export const useShellStore = defineStore('shell', {
       this.forum.activeThreadId = id
       this.forum.postError = 'Ready'
       return true
+    },
+    submitOnboardingAnswer(answerId: string): boolean {
+      const answer = this.moderation.onboardingQuestion.answers.find(
+        (candidate) => candidate.id === answerId
+      )
+      if (!answer) {
+        return false
+      }
+
+      this.moderation.selectedAnswerId = answer.id
+      this.moderation.assignedRoleName = answer.roleName
+      const member = this.members.find((candidate) => candidate.name === this.currentUser)
+      if (member && !member.roleIds.includes(answer.roleId)) {
+        member.roleIds.push(answer.roleId)
+      }
+      this.appendAuditLog('ONBOARDING_ROLE_ASSIGNED', `${answer.roleName} assigned to ${this.currentUser}`)
+      return true
+    },
+    simulateAutoModBlock(): boolean {
+      const content = 'leak the release token'
+      const matchedRule = this.moderation.automodRules.find(
+        (rule) => rule.enabled && content.toLowerCase().includes(rule.keyword.toLowerCase())
+      )
+
+      if (!matchedRule) {
+        this.moderation.decision = 'Allowed'
+        return false
+      }
+
+      this.moderation.decision = 'Blocked before persist'
+      this.appendAuditLog('AUTOMOD_MESSAGE_BLOCKED', `Blocked keyword ${matchedRule.keyword}`)
+      return true
+    },
+    appendAuditLog(action: string, detail: string) {
+      this.moderation.auditLogs.unshift({
+        id: `audit-${Date.now()}-${this.moderation.auditLogs.length}`,
+        action,
+        detail,
+        createdAt: new Date().toISOString()
+      })
     }
   }
 })

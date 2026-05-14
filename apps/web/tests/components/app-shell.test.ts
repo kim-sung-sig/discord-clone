@@ -350,4 +350,33 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="forum-post-error"]').text()).toContain('Ready')
     expect(wrapper.get('[data-testid="thread-forum-release-plan"]').text()).toContain('Release plan')
   })
+
+  it('renders moderation onboarding, automod, and audit state', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    const moderationPanel = wrapper.get('[data-testid="moderation-panel"]')
+    expect(moderationPanel.text()).toContain('Moderation')
+    expect(moderationPanel.get('[data-testid="onboarding-question"]').text()).toContain('Choose your squad')
+    expect(moderationPanel.get('[data-testid="automod-rule-keyword-leak"]').text()).toContain('leak')
+    expect(moderationPanel.get('[data-testid="audit-log"]').text()).toContain('AUDIT_RULE_CREATED')
+  })
+
+  it('submits onboarding answers, blocks AutoMod content, and appends audit entries', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="submit-onboarding-answer-engineering"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="onboarding-assigned-role"]').text()).toContain('Engineering')
+    expect(wrapper.get('[data-testid="audit-log"]').text()).toContain('ONBOARDING_ROLE_ASSIGNED')
+
+    await wrapper.get('[data-testid="simulate-automod-block"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="automod-decision"]').text()).toContain('Blocked before persist')
+    expect(wrapper.get('[data-testid="audit-log"]').text()).toContain('AUTOMOD_MESSAGE_BLOCKED')
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('leak the release token')
+  })
 })

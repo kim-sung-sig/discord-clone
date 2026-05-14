@@ -182,6 +182,24 @@ test('manages forum tags and archived thread writes', async ({ page }) => {
   await expect(page.getByTestId('thread-forum-release-plan')).toContainText('Release plan')
 })
 
+test('runs onboarding, AutoMod, and audit log moderation flow', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('moderation-panel')).toContainText('Moderation')
+  await expect(page.getByTestId('onboarding-question')).toContainText('Choose your squad')
+  await expect(page.getByTestId('automod-rule-keyword-leak')).toContainText('leak')
+  await expect(page.getByTestId('audit-log')).toContainText('AUDIT_RULE_CREATED')
+
+  await page.getByTestId('submit-onboarding-answer-engineering').click()
+  await expect(page.getByTestId('onboarding-assigned-role')).toContainText('Engineering')
+  await expect(page.getByTestId('audit-log')).toContainText('ONBOARDING_ROLE_ASSIGNED')
+
+  await page.getByTestId('simulate-automod-block').click()
+  await expect(page.getByTestId('automod-decision')).toContainText('Blocked before persist')
+  await expect(page.getByTestId('audit-log')).toContainText('AUTOMOD_MESSAGE_BLOCKED')
+  await expect(page.getByTestId('chat-viewport')).not.toContainText('leak the release token')
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 
