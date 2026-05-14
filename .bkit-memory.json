@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T16-persistence-postgresql",
+  "phase": "design",
+  "currentFeature": "T23-frontend-real-api-integration",
   "updatedAt": "2026-05-14"
 }
