@@ -91,7 +91,13 @@ public final class InMemoryModerationService {
         return List.copyOf(entries);
     }
 
-    private void appendAudit(UUID guildId, AuditLogAction action, UUID actorId, UUID targetId, String reason) {
+    public synchronized void appendAudit(UUID guildId, AuditLogAction action, UUID actorId, UUID targetId, String reason) {
+        require(guildId, "guildId");
+        require(actorId, "actorId");
+        require(targetId, "targetId");
+        if (action == null) {
+            throw new IllegalArgumentException("action is required");
+        }
         AuditLogEntry entry = new AuditLogEntry(UUID.randomUUID(), guildId, action, actorId, targetId, reason, Instant.now());
         auditLogsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(entry);
     }

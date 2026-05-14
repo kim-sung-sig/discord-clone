@@ -207,6 +207,25 @@ class ExperienceControllerTest {
     }
 
     @Test
+    void premiumGrantEmitsAuditLogEntry() throws Exception {
+        AuthSession owner = signup("experience_premium_audit_owner");
+        String guildId = createGuild(owner);
+
+        MvcResult entitlement = grantPremium(owner, guildId, "hd_streaming", "sub-audit", null)
+            .andExpect(status().isCreated())
+            .andReturn();
+        String entitlementId = JsonPath.read(entitlement.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(get("/api/guilds/{guildId}/audit-logs", guildId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].action").value("PREMIUM_ENTITLEMENT_GRANTED"))
+            .andExpect(jsonPath("$[0].actorId").value(owner.userId().toString()))
+            .andExpect(jsonPath("$[0].targetId").value(entitlementId))
+            .andExpect(jsonPath("$[0].reason").value("premium entitlement granted"));
+    }
+
+    @Test
     void stageMutationsPublishGatewayEventsToVisibleChannelSessions() throws Exception {
         AuthSession owner = signup("experience_gateway_stage_owner");
         AuthSession member = signup("experience_gateway_stage_member");

@@ -2,6 +2,8 @@ package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.moderation.AuditLogAction;
+import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,17 +26,20 @@ class PremiumController {
     private final InMemoryExperienceService experienceService;
     private final InMemoryGuildService guildService;
     private final BillingProvider billingProvider;
+    private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     PremiumController(
         InMemoryExperienceService experienceService,
         InMemoryGuildService guildService,
         BillingProvider billingProvider,
+        InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;
         this.guildService = guildService;
         this.billingProvider = billingProvider;
+        this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -80,6 +85,13 @@ class PremiumController {
             checkout.provider(),
             checkout.providerSubscriptionId(),
             checkout.expiresAt()
+        );
+        moderationService.appendAudit(
+            request.guildId(),
+            AuditLogAction.PREMIUM_ENTITLEMENT_GRANTED,
+            requesterId,
+            entitlement.id(),
+            "premium entitlement granted"
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(EntitlementResponse.from(entitlement));
     }
