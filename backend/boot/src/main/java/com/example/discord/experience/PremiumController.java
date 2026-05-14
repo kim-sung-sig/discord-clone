@@ -2,6 +2,7 @@ package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -22,15 +23,18 @@ import org.springframework.web.server.ResponseStatusException;
 class PremiumController {
     private final InMemoryExperienceService experienceService;
     private final InMemoryGuildService guildService;
+    private final BillingProvider billingProvider;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     PremiumController(
         InMemoryExperienceService experienceService,
         InMemoryGuildService guildService,
+        BillingProvider billingProvider,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;
         this.guildService = guildService;
+        this.billingProvider = billingProvider;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -58,7 +62,25 @@ class PremiumController {
         if (!guildService.isGuildMemberOrOwner(request.guildId(), requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "guild membership required");
         }
-        Entitlement entitlement = experienceService.grantEntitlement(userId, request.guildId(), request.featureKey());
+        BillingCheckoutResult checkout = billingProvider.confirm(new BillingCheckoutCommand(
+            userId,
+            request.guildId(),
+            request.featureKey(),
+            providerSubscriptionId(userId, request),
+            request.expiresAt(),
+            request.simulateProviderFailure()
+        ));
+        if (!checkout.successful()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "billing provider failed");
+        }
+        Entitlement entitlement = experienceService.grantEntitlement(
+            userId,
+            request.guildId(),
+            request.featureKey(),
+            checkout.provider(),
+            checkout.providerSubscriptionId(),
+            checkout.expiresAt()
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(EntitlementResponse.from(entitlement));
     }
 
@@ -81,16 +103,42 @@ class PremiumController {
         }
     }
 
-    record GrantEntitlementRequest(UUID guildId, String featureKey) {
+    private static String providerSubscriptionId(UUID userId, GrantEntitlementRequest request) {
+        if (request.providerSubscriptionId() != null && !request.providerSubscriptionId().isBlank()) {
+            return request.providerSubscriptionId();
+        }
+        return "local_test:%s:%s:%s".formatted(userId, request.guildId(), request.featureKey());
     }
 
-    record EntitlementResponse(UUID id, UUID userId, UUID guildId, String featureKey) {
+    record GrantEntitlementRequest(
+        UUID guildId,
+        String featureKey,
+        String providerSubscriptionId,
+        Instant expiresAt,
+        boolean simulateProviderFailure
+    ) {
+    }
+
+    record EntitlementResponse(
+        UUID id,
+        UUID userId,
+        UUID guildId,
+        String featureKey,
+        EntitlementStatus status,
+        String provider,
+        String providerSubscriptionId,
+        Instant expiresAt
+    ) {
         static EntitlementResponse from(Entitlement entitlement) {
             return new EntitlementResponse(
                 entitlement.id(),
                 entitlement.userId(),
                 entitlement.guildId(),
-                entitlement.featureKey()
+                entitlement.featureKey(),
+                entitlement.status(),
+                entitlement.provider(),
+                entitlement.providerSubscriptionId(),
+                entitlement.expiresAt()
             );
         }
     }

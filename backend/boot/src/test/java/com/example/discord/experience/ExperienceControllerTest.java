@@ -1,5 +1,6 @@
 package com.example.discord.experience;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -146,6 +147,63 @@ class ExperienceControllerTest {
                 .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.enabled").value(true));
+    }
+
+    @Test
+    void premiumProviderFailureDoesNotUnlockFeature() throws Exception {
+        AuthSession owner = signup("experience_premium_failure_owner");
+        String guildId = createGuild(owner);
+
+        mockMvc.perform(post("/api/premium/users/{userId}/entitlements", owner.userId())
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "guildId": "%s",
+                      "featureKey": "hd_streaming",
+                      "providerSubscriptionId": "sub-provider-failure",
+                      "simulateProviderFailure": true
+                    }
+                    """.formatted(guildId)))
+            .andExpect(status().isBadGateway());
+
+        mockMvc.perform(get("/api/premium/users/{userId}/features/{featureKey}", owner.userId(), "hd_streaming")
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    @Test
+    void premiumDuplicateGrantIsIdempotentByProviderSubscription() throws Exception {
+        AuthSession owner = signup("experience_premium_duplicate_owner");
+        String guildId = createGuild(owner);
+
+        MvcResult first = grantPremium(owner, guildId, "hd_streaming", "sub-duplicate", null)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("ACTIVE"))
+            .andReturn();
+        MvcResult second = grantPremium(owner, guildId, "hd_streaming", "sub-duplicate", null)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("ACTIVE"))
+            .andReturn();
+
+        assertThat(JsonPath.read(second.getResponse().getContentAsString(), "$.id").toString())
+            .isEqualTo(JsonPath.read(first.getResponse().getContentAsString(), "$.id").toString());
+    }
+
+    @Test
+    void premiumExpiredEntitlementDoesNotUnlockFeature() throws Exception {
+        AuthSession owner = signup("experience_premium_expired_owner");
+        String guildId = createGuild(owner);
+
+        grantPremium(owner, guildId, "hd_streaming", "sub-expired-controller", "2026-05-14T00:00:00Z")
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("EXPIRED"));
+
+        mockMvc.perform(get("/api/premium/users/{userId}/features/{featureKey}", owner.userId(), "hd_streaming")
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
     }
 
     @Test
@@ -358,6 +416,27 @@ class ExperienceControllerTest {
         return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
     }
 
+    private org.springframework.test.web.servlet.ResultActions grantPremium(
+        AuthSession requester,
+        String guildId,
+        String featureKey,
+        String providerSubscriptionId,
+        String expiresAt
+    ) throws Exception {
+        String expiresAtJson = expiresAt == null ? "null" : "\"" + expiresAt + "\"";
+        return mockMvc.perform(post("/api/premium/users/{userId}/entitlements", requester.userId())
+            .header("Authorization", requester.bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "guildId": "%s",
+                  "featureKey": "%s",
+                  "providerSubscriptionId": "%s",
+                  "expiresAt": %s
+                }
+                """.formatted(guildId, featureKey, providerSubscriptionId, expiresAtJson)));
+    }
+
     private GatewaySession identifyGateway(AuthSession requester) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/gateway/identify")
                 .header("Authorization", requester.bearer()))
@@ -372,6 +451,7 @@ class ExperienceControllerTest {
     }
 
     private AuthSession signup(String username) throws Exception {
+        String uniqueUsername = "exp_%s".formatted(UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -381,7 +461,7 @@ class ExperienceControllerTest {
                       "displayName": "%s",
                       "password": "correct horse battery staple"
                     }
-                    """.formatted(username, username, username)))
+                    """.formatted(uniqueUsername, uniqueUsername, uniqueUsername)))
             .andExpect(status().isCreated())
             .andReturn();
 

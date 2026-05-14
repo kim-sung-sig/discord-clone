@@ -9,4 +9,9 @@ class ExperienceConfiguration {
     InMemoryExperienceService experienceService() {
         return new InMemoryExperienceService();
     }
+
+    @Bean
+    BillingProvider billingProvider() {
+        return new LocalTestBillingProvider();
+    }
 }
