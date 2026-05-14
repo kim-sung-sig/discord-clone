@@ -8,6 +8,12 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
@@ -32,15 +38,18 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         "(?i)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=/|$)"
     );
     private static final Pattern NUMERIC_PATH_SEGMENT = Pattern.compile("/\\d+(?=/|$)");
+    private static final Pattern INVITE_ACCEPT_PATH = Pattern.compile("^/api/invites/[^/]+/accept$");
     private static final Set<String> LOCAL_DEVELOPMENT_ORIGINS = Set.of(
         "http://127.0.0.1:3000",
         "http://localhost:3000"
     );
 
     private final MeterRegistry meterRegistry;
+    private final RateLimitStore rateLimitStore;
 
-    public OperationalHardeningFilter(MeterRegistry meterRegistry) {
+    public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore) {
         this.meterRegistry = meterRegistry;
+        this.rateLimitStore = rateLimitStore;
     }
 
     @Override
@@ -75,6 +84,19 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
             if (HttpMethod.OPTIONS.matches(method)) {
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                 return;
+            }
+
+            Optional<RateLimitPolicy> policy = ApiRateLimitPolicy.forRequest(method, normalizedPath);
+            if (policy.isPresent()) {
+                RateLimitDecision decision = rateLimitStore.consume(
+                    new RateLimitKey(policy.get().id(), rateLimitSubjectFor(request, policy.get())),
+                    policy.get(),
+                    Instant.now()
+                );
+                if (!decision.allowed()) {
+                    writeRateLimitResponse(response, decision);
+                    return;
+                }
             }
 
             filterChain.doFilter(request, response);
@@ -147,8 +169,50 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     }
 
     private static String normalizedPath(String requestUri) {
+        if (INVITE_ACCEPT_PATH.matcher(requestUri).matches()) {
+            return "/api/invites/{token}/accept";
+        }
         String withoutUuids = UUID_PATH_SEGMENT.matcher(requestUri).replaceAll("/{uuid}");
         return NUMERIC_PATH_SEGMENT.matcher(withoutUuids).replaceAll("/{number}");
+    }
+
+    private static String rateLimitSubjectFor(HttpServletRequest request, RateLimitPolicy policy) {
+        if ("auth-login".equals(policy.id())) {
+            return ipSubject(request);
+        }
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            return "token:" + sha256(authorization.substring("Bearer ".length()));
+        }
+        return ipSubject(request);
+    }
+
+    private static String ipSubject(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String ip = forwardedFor == null || forwardedFor.isBlank()
+            ? request.getRemoteAddr()
+            : forwardedFor.split(",", 2)[0].trim();
+        return "ip:" + sha256(ip);
+    }
+
+    private static String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", exception);
+        }
+    }
+
+    private static void writeRateLimitResponse(HttpServletResponse response, RateLimitDecision decision) throws IOException {
+        long retryAfterSeconds = Math.max(1, (decision.retryAfter().toMillis() + 999) / 1000);
+        response.setStatus(429);
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
+        response.setHeader("X-RateLimit-Limit", Integer.toString(decision.limit()));
+        response.setHeader("X-RateLimit-Remaining", Integer.toString(decision.remaining()));
+        response.getWriter().write("{\"message\":\"rate limit exceeded\"}");
     }
 
     private static void clearMdc() {

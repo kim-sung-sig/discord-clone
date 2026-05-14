@@ -35,7 +35,7 @@ Production parity:
 
 | Policy | Matcher | Subject | Limit |
 | --- | --- | --- | --- |
-| `auth-login` | `POST /api/auth/login` | client IP | 5 / minute |
+| `auth-login` | `POST /api/auth/login` | client IP | 2 / minute |
 | `invite-accept` | `POST /api/invites/{code}/accept` | authenticated user id or client IP | 10 / minute |
 | `message-create` | `POST /api/channels/{uuid}/messages` | authenticated user id or client IP | 30 / minute |
 | `gateway-identify` | `POST /api/gateway/identify` | authenticated user id or client IP | 10 / minute |

@@ -138,6 +138,92 @@ class OperationalHardeningFilterTest {
             .isGreaterThan(0);
     }
 
+    @Test
+    void authLoginRateLimitRejectsByClientIpBeforeLockoutAbuse() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", "203.0.113.19")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "email": "rate-limit-auth@example.com",
+                          "password": "wrong password"
+                        }
+                        """))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "203.0.113.19")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "rate-limit-auth@example.com",
+                      "password": "wrong password"
+                    }
+                    """))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().exists("Retry-After"))
+            .andExpect(header().string("X-RateLimit-Limit", "2"))
+            .andExpect(header().string("X-RateLimit-Remaining", "0"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
+    void messageCreateRateLimitUsesBearerSubjectAndNormalizesChannelId() throws Exception {
+        String channelA = "28b67f6d-b715-4e36-9259-b8c61237f8af";
+        String channelB = "9d8a0e21-d39f-4a3d-8200-73e329d5e215";
+
+        for (int i = 0; i < 30; i++) {
+            mockMvc.perform(post("/api/channels/{channelId}/messages", i % 2 == 0 ? channelA : channelB)
+                    .header("Authorization", "Bearer same-rate-subject")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "content": "spam attempt"
+                        }
+                        """))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/channels/{channelId}/messages", channelB)
+                .header("Authorization", "Bearer same-rate-subject")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "spam attempt"
+                    }
+                    """))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "30"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
+    void inviteAcceptAndGatewayIdentifyBurstsAreThrottled() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/invites/{code}/accept", "code" + i)
+                    .header("Authorization", "Bearer invite-burst-subject"))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/invites/{code}/accept", "different-code")
+                .header("Authorization", "Bearer invite-burst-subject"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "10"));
+
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/gateway/identify")
+                    .header("X-Forwarded-For", "203.0.113.88"))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/gateway/identify")
+                .header("X-Forwarded-For", "203.0.113.88"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "10"));
+    }
+
     private double timerCount(String name, String method, String path, String status) {
         var timer = meterRegistry.find(name)
             .tag("method", method)
