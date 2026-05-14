@@ -15,14 +15,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class AuthService {
-    private final InMemoryAuthStore store;
+    private final AuthStore store;
     private final PasswordHasher passwordHasher;
     private final AccessTokenService accessTokenService;
     private final LoginFailureTracker loginFailures;
     private final Clock clock;
 
     AuthService(
-        InMemoryAuthStore store,
+        AuthStore store,
         PasswordHasher passwordHasher,
         AccessTokenService accessTokenService,
         LoginFailureTracker loginFailures,
@@ -43,7 +43,7 @@ class AuthService {
             request.displayName(),
             clock.instant()
         );
-        InMemoryAuthStore.AuthAccount account = new InMemoryAuthStore.AuthAccount(
+        AuthAccount account = new AuthAccount(
             email,
             passwordHasher.hash(request.password()),
             profile
@@ -60,7 +60,7 @@ class AuthService {
             throw new LoginLockedException();
         }
 
-        InMemoryAuthStore.AuthAccount account = store.findByEmail(email).orElse(null);
+        AuthAccount account = store.findByEmail(email).orElse(null);
         if (account == null) {
             recordLoginFailure(email);
             throw new InvalidCredentialsException();

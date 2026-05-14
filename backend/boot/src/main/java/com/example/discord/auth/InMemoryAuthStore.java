@@ -6,15 +6,18 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
-class InMemoryAuthStore {
+@Profile("!postgres")
+class InMemoryAuthStore implements AuthStore {
     private final ConcurrentMap<String, AuthAccount> accountsByEmail = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, AuthAccount> accountsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Boolean> revokedAccessTokens = new ConcurrentHashMap<>();
 
-    boolean saveIfAbsent(AuthAccount account) {
+    @Override
+    public boolean saveIfAbsent(AuthAccount account) {
         AuthAccount existing = accountsByEmail.putIfAbsent(account.email().value(), account);
         if (existing != null) {
             return false;
@@ -23,22 +26,23 @@ class InMemoryAuthStore {
         return true;
     }
 
-    Optional<AuthAccount> findByEmail(EmailAddress email) {
+    @Override
+    public Optional<AuthAccount> findByEmail(EmailAddress email) {
         return Optional.ofNullable(accountsByEmail.get(email.value()));
     }
 
-    Optional<UserProfile> findById(UUID id) {
+    @Override
+    public Optional<UserProfile> findById(UUID id) {
         return Optional.ofNullable(accountsById.get(id)).map(AuthAccount::profile);
     }
 
-    void revokeAccessToken(String token) {
+    @Override
+    public void revokeAccessToken(String token) {
         revokedAccessTokens.put(token, true);
     }
 
-    boolean isAccessTokenRevoked(String token) {
+    @Override
+    public boolean isAccessTokenRevoked(String token) {
         return revokedAccessTokens.containsKey(token);
-    }
-
-    record AuthAccount(EmailAddress email, String passwordHash, UserProfile profile) {
     }
 }

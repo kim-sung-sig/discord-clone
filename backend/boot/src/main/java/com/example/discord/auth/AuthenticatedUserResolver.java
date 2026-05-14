@@ -10,10 +10,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public final class AuthenticatedUserResolver {
-    private final InMemoryAuthStore store;
+    private final AuthStore store;
     private final AccessTokenService accessTokenService;
 
-    AuthenticatedUserResolver(InMemoryAuthStore store, AccessTokenService accessTokenService) {
+    AuthenticatedUserResolver(AuthStore store, AccessTokenService accessTokenService) {
         this.store = store;
         this.accessTokenService = accessTokenService;
     }
