@@ -44,6 +44,16 @@ input {
   min-width: 0;
 }
 
+.shell-api-error {
+  grid-column: 1 / -1;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  color: #ffe3e3;
+  background: rgba(255, 107, 107, 0.16);
+  border: 1px solid rgba(255, 107, 107, 0.32);
+  border-radius: 16px;
+}
+
 .server-rail {
   display: flex;
   flex-direction: column;

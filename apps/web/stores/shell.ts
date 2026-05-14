@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { useRuntimeConfig } from '#app'
+import { DiscordRestError, createDiscordRestClient, discordApiPaths } from '../services/discord-api'
 import {
   normalizeGatewayDispatch,
   toShellGatewayEvent,
@@ -16,6 +18,47 @@ export interface ShellChannel {
   id: string
   name: string
   type: ShellChannelType
+}
+
+interface BackendGuildResponse {
+  id: string
+  name: string
+}
+
+interface BackendChannelResponse {
+  id: string
+  name: string
+  type: ShellChannelType
+}
+
+interface BackendMessageResponse {
+  id: string
+  channelId: string
+  authorId: string
+  content: string
+  mentions: string[]
+  pinned: boolean
+  deleted: boolean
+  edited: boolean
+  createdAt: string
+}
+
+interface BackendVoiceJoinResponse {
+  participant: ShellVoiceParticipant
+  token: {
+    token: string | null
+    provider: 'LIVEKIT_SKELETON'
+  }
+}
+
+interface BackendStageSessionResponse {
+  id: string
+  channelId: string
+  topic: string
+  moderatorIds: string[]
+  speakerIds: string[]
+  audienceIds: string[]
+  pendingSpeakerIds: string[]
 }
 
 export interface ShellMessage {
@@ -349,8 +392,17 @@ const demoAttachment = (): ShellAttachment => ({
   previewUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lLgNkwAAAABJRU5ErkJggg=='
 })
 
+const backendErrorMessage = (error: unknown): string => {
+  if (error instanceof DiscordRestError) {
+    return `Discord API rejected the request (${error.status}).`
+  }
+  return 'Discord API is unavailable. Try again.'
+}
+
 export const useShellStore = defineStore('shell', {
   state: () => ({
+    apiError: null as string | null,
+    apiBusy: false,
     guild: {
       id: 'guild-discord-clone',
       name: 'Discord Clone'
@@ -1003,6 +1055,146 @@ export const useShellStore = defineStore('shell', {
       })
       this.composerBody = ''
       this.stagedAttachment = null
+    },
+    async createBackendGuild(name: string, bearerToken: string): Promise<ShellGuild | null> {
+      return this.withBackendRequest(async (client) => {
+        const guild = await client.post<BackendGuildResponse>(
+          discordApiPaths.guild.create(),
+          { name },
+          { bearerToken }
+        )
+        this.guild = {
+          id: guild.id,
+          name: guild.name
+        }
+        return this.guild
+      })
+    },
+    async createBackendChannel(
+      guildId: string,
+      name: string,
+      type: ShellChannelType,
+      bearerToken: string
+    ): Promise<ShellChannel | null> {
+      return this.withBackendRequest(async (client) => {
+        const channel = await client.post<BackendChannelResponse>(
+          discordApiPaths.guild.createChannel(guildId),
+          { name, type, parentId: null },
+          { bearerToken }
+        )
+        const shellChannel: ShellChannel = {
+          id: channel.id,
+          name: channel.name,
+          type: channel.type
+        }
+        const targetGroupId = channel.type === 'GUILD_VOICE' ? 'voice-channels' : 'text-channels'
+        let group = this.channelGroups.find((candidate) => candidate.id === targetGroupId)
+        if (!group) {
+          group = {
+            id: targetGroupId,
+            name: channel.type === 'GUILD_VOICE' ? 'Voice Channels' : 'Text Channels',
+            channels: []
+          }
+          this.channelGroups.push(group)
+        }
+        group.channels = [
+          ...group.channels.filter((candidate) => candidate.id !== shellChannel.id),
+          shellChannel
+        ]
+        if (channel.type !== 'GUILD_VOICE') {
+          this.activeChannelId = channel.id
+        }
+        return shellChannel
+      })
+    },
+    async sendBackendMessage(channelId: string, content: string, bearerToken: string): Promise<ShellMessage | null> {
+      return this.withBackendRequest(async (client) => {
+        const message = await client.post<BackendMessageResponse>(
+          discordApiPaths.channel.messages(channelId),
+          { content },
+          { bearerToken }
+        )
+        const shellMessage: ShellMessage = {
+          id: message.id,
+          channelId: message.channelId,
+          sequence: this.messages.reduce((highest, candidate) => Math.max(highest, candidate.sequence), 0) + 1,
+          author: message.authorId,
+          body: message.content,
+          createdAt: message.createdAt,
+          edited: message.edited,
+          pinned: message.pinned,
+          deleted: message.deleted,
+          mentions: message.mentions,
+          attachments: []
+        }
+        this.messages = [
+          ...this.messages.filter((candidate) => candidate.id !== shellMessage.id),
+          shellMessage
+        ]
+        this.composerBody = ''
+        this.stagedAttachment = null
+        return shellMessage
+      })
+    },
+    async joinBackendVoice(channelId: string, bearerToken: string): Promise<BackendVoiceJoinResponse | null> {
+      return this.withBackendRequest(async (client) => {
+        const response = await client.post<BackendVoiceJoinResponse>(
+          `/api/voice/channels/${encodeURIComponent(channelId)}/join`,
+          undefined,
+          { bearerToken }
+        )
+        this.voice.activeChannelId = response.participant.channelId
+        this.voice.token = response.token.token
+        this.voice.tokenProvider = response.token.provider
+        this.voice.participants = [
+          ...this.voice.participants.filter((candidate) => candidate.userId !== response.participant.userId),
+          response.participant
+        ]
+        this.voiceState = `Voice connected: ${this.activeVoiceChannelName}`
+        this.appendVoiceEvent('VOICE_JOIN', `${response.participant.userId} joined ${this.activeVoiceChannelName}`)
+        return response
+      })
+    },
+    async startBackendStage(
+      channelId: string,
+      topic: string,
+      bearerToken: string
+    ): Promise<ShellStageSession | null> {
+      return this.withBackendRequest(async (client) => {
+        const session = await client.post<BackendStageSessionResponse>(
+          `/api/stage/channels/${encodeURIComponent(channelId)}/sessions`,
+          { topic },
+          { bearerToken }
+        )
+        this.experience.stageSession = {
+          id: session.id,
+          channelId: session.channelId,
+          topic: session.topic,
+          moderators: session.moderatorIds,
+          speakers: session.speakerIds,
+          audience: session.audienceIds,
+          pendingRequests: session.pendingSpeakerIds
+        }
+        return this.experience.stageSession
+      })
+    },
+    async withBackendRequest<T>(
+      operation: (client: ReturnType<typeof createDiscordRestClient>) => Promise<T>
+    ): Promise<T | null> {
+      this.apiError = null
+      this.apiBusy = true
+      try {
+        const config = useRuntimeConfig()
+        return await operation(createDiscordRestClient({
+          baseUrl: config.public.apiBaseUrl,
+          fetcher: globalThis.fetch
+        }))
+      } catch (error) {
+        this.apiError = backendErrorMessage(error)
+        return null
+      } finally {
+        this.apiBusy = false
+      }
     },
     recordGatewayEvent(event: ShellGatewayEvent): boolean {
       if (event.sequence <= this.gateway.lastSequence) {

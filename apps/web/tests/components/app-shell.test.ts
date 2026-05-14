@@ -1,10 +1,20 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { nextTick } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../../app.vue'
 import { useShellStore } from '../../stores/shell'
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  })
+
 describe('Discord app shell', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('renders guild, grouped channels, active channel, member sidebar, and user panel', async () => {
     const wrapper = await mountSuspended(App)
 
@@ -88,6 +98,97 @@ describe('Discord app shell', () => {
 
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Shipping T04 from the composer')
     expect((input.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('applies real-backend guild, channel, message, voice, and stage responses after API success', async () => {
+    await mountSuspended(App)
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (path.endsWith('/api/guilds')) {
+        return jsonResponse({ id: 'guild-live', name: body.name, ownerId: 'user-1' })
+      }
+      if (path.endsWith('/api/guilds/guild-live/channels') && body.type === 'GUILD_TEXT') {
+        return jsonResponse({ id: 'channel-live-text', name: body.name, type: 'GUILD_TEXT', parentId: null })
+      }
+      if (path.endsWith('/api/guilds/guild-live/channels') && body.type === 'GUILD_VOICE') {
+        return jsonResponse({ id: 'channel-live-voice', name: body.name, type: 'GUILD_VOICE', parentId: null })
+      }
+      if (path.endsWith('/api/channels/channel-live-text/messages')) {
+        return jsonResponse({
+          id: 'message-live',
+          guildId: 'guild-live',
+          channelId: 'channel-live-text',
+          authorId: 'user-1',
+          content: body.content,
+          mentions: ['user-1'],
+          pinned: false,
+          deleted: false,
+          edited: false,
+          editHistory: [],
+          createdAt: '2026-05-14T00:00:00.000Z',
+          updatedAt: '2026-05-14T00:00:00.000Z'
+        })
+      }
+      if (path.endsWith('/api/voice/channels/channel-live-voice/join')) {
+        return jsonResponse({
+          participant: {
+            userId: 'user-1',
+            channelId: 'channel-live-voice',
+            muted: false,
+            deafened: false,
+            speaking: false,
+            screenSharing: false
+          },
+          token: { provider: 'LIVEKIT_SKELETON', token: 'voice-token' }
+        })
+      }
+      if (path.endsWith('/api/stage/channels/channel-live-voice/sessions')) {
+        return jsonResponse({
+          id: 'stage-live',
+          guildId: 'guild-live',
+          channelId: 'channel-live-voice',
+          topic: body.topic,
+          moderatorIds: ['user-1'],
+          speakerIds: [],
+          audienceIds: [],
+          pendingSpeakerIds: []
+        })
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+    const shell = useShellStore()
+    shell.$reset()
+
+    const guild = await shell.createBackendGuild('Live Guild', 'access-token')
+    const text = await shell.createBackendChannel(guild!.id, 'live-text', 'GUILD_TEXT', 'access-token')
+    const voice = await shell.createBackendChannel(guild!.id, 'live-voice', 'GUILD_VOICE', 'access-token')
+    const message = await shell.sendBackendMessage(text!.id, 'backend hello', 'access-token')
+    await shell.joinBackendVoice(voice!.id, 'access-token')
+    await shell.startBackendStage(voice!.id, 'Backend stage', 'access-token')
+
+    expect(shell.guild).toEqual({ id: 'guild-live', name: 'Live Guild' })
+    expect(shell.activeChannelId).toBe('channel-live-text')
+    expect(shell.messages.find((candidate) => candidate.id === message?.id)?.body).toBe('backend hello')
+    expect(shell.voice.token).toBe('voice-token')
+    expect(shell.experience.stageSession?.topic).toBe('Backend stage')
+    expect(calls.every((call) => (call.init?.headers as Record<string, string>).Authorization === 'Bearer access-token')).toBe(true)
+    expect(shell.apiError).toBeNull()
+  })
+
+  it('does not mutate shell state when a real-backend action is rejected', async () => {
+    await mountSuspended(App)
+    vi.stubGlobal('fetch', async () => jsonResponse({ message: 'forbidden' }, 403))
+    const shell = useShellStore()
+    shell.$reset()
+    const originalGuild = { ...shell.guild }
+
+    await expect(shell.createBackendGuild('Rejected Guild', 'bad-token')).resolves.toBeNull()
+
+    expect(shell.guild).toEqual(originalGuild)
+    expect(shell.apiError).toContain('Discord API rejected the request')
   })
 
   it('stages a deterministic image attachment preview from the composer', async () => {
