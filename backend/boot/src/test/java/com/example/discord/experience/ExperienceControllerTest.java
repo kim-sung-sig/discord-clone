@@ -233,6 +233,38 @@ class ExperienceControllerTest {
             .andExpect(jsonPath("$.events[0].payload.objectKey").doesNotExist());
     }
 
+    @Test
+    void stageAndSoundboardGatewayEventsAreNotDeliveredToHiddenChannelSessions() throws Exception {
+        AuthSession owner = signup("experience_gateway_hidden_owner");
+        AuthSession hiddenMember = signup("experience_gateway_hidden_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "hidden-media", "GUILD_VOICE", owner);
+        addMember(guildId, hiddenMember.userId(), owner);
+        denyEveryoneView(guildId, channelId, owner);
+        String soundId = createSound(guildId, "secret", owner);
+        GatewaySession hiddenGateway = identifyGateway(hiddenMember);
+
+        mockMvc.perform(post("/api/stage/channels/{channelId}/sessions", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "topic": "Hidden stage"
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/soundboard/channels/{channelId}/sounds/{soundId}/play", channelId, soundId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", hiddenGateway.sessionId())
+                .header("Authorization", hiddenMember.bearer())
+                .param("afterSeq", Long.toString(hiddenGateway.readySequence())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(0)));
+    }
+
     private String createGuild(AuthSession owner) throws Exception {
         MvcResult guildResult = mockMvc.perform(post("/api/guilds")
                 .header("Authorization", owner.bearer())
@@ -266,6 +298,29 @@ class ExperienceControllerTest {
     private void addMember(String guildId, UUID memberId, AuthSession owner) throws Exception {
         mockMvc.perform(put("/api/guilds/{guildId}/members/{memberId}", guildId, memberId)
                 .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+    }
+
+    private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String everyoneRoleId = JsonPath.read(rolesResult.getResponse().getContentAsString(), "$[0].id");
+        mockMvc.perform(put(
+                "/api/guilds/{guildId}/channels/{channelId}/overwrites/roles/{roleId}",
+                guildId,
+                channelId,
+                everyoneRoleId
+            )
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "allow": [],
+                      "deny": ["VIEW_CHANNEL"]
+                    }
+                    """))
             .andExpect(status().isOk());
     }
 
