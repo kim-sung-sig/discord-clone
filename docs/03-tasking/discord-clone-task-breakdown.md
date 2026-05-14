@@ -423,6 +423,33 @@
 - audience가 승인 없이 speak 가능
 - premium feature gate 우회
 
+### T15. Operational Hardening/E2E Stabilization
+
+예상: 4.0 MM
+
+범위:
+
+- request correlation id
+- security response headers
+- API cache-control baseline
+- frontend API request id propagation
+- regression QA evidence stabilization
+
+성공 기준:
+
+- every API response has `X-Request-Id`
+- trusted incoming request id is echoed after sanitization
+- security headers are present on API responses
+- frontend API client sends request id
+- full backend/frontend/e2e QA remains green
+
+실패 기준:
+
+- response lacks correlation id
+- unsafe request id is reflected
+- security headers are missing on API responses
+- frontend request id behavior is untested
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:
