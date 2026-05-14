@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T17-observability-structured-logging",
+  "phase": "design",
+  "currentFeature": "T19-deployment-security-abuse-controls",
   "updatedAt": "2026-05-14"
 }
