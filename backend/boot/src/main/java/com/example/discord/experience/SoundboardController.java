@@ -1,8 +1,10 @@
 package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
+import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -22,15 +24,18 @@ import org.springframework.web.server.ResponseStatusException;
 class SoundboardController {
     private final InMemoryExperienceService experienceService;
     private final InMemoryGuildService guildService;
+    private final InMemoryGatewayService gatewayService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     SoundboardController(
         InMemoryExperienceService experienceService,
         InMemoryGuildService guildService,
+        InMemoryGatewayService gatewayService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;
         this.guildService = guildService;
+        this.gatewayService = gatewayService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -78,7 +83,19 @@ class SoundboardController {
         if (!sound.guildId().equals(guildId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "sound not found");
         }
-        return SoundboardPlayEventResponse.from(experienceService.playSound(channelId, soundId, requesterId));
+        SoundboardPlayEvent event = experienceService.playSound(channelId, soundId, requesterId);
+        gatewayService.publish(
+            "SOUNDBOARD_SOUND_PLAY",
+            guildId,
+            channelId,
+            Map.of(
+                "eventId", event.id().toString(),
+                "channelId", event.channelId().toString(),
+                "soundId", event.soundId().toString(),
+                "userId", event.userId().toString()
+            )
+        );
+        return SoundboardPlayEventResponse.from(event);
     }
 
     private static void requireRequest(Object request) {

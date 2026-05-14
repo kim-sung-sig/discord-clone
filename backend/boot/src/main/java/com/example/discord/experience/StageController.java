@@ -1,7 +1,10 @@
 package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
+import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -23,15 +26,18 @@ import org.springframework.web.server.ResponseStatusException;
 class StageController {
     private final InMemoryExperienceService experienceService;
     private final InMemoryGuildService guildService;
+    private final InMemoryGatewayService gatewayService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     StageController(
         InMemoryExperienceService experienceService,
         InMemoryGuildService guildService,
+        InMemoryGatewayService gatewayService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;
         this.guildService = guildService;
+        this.gatewayService = gatewayService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -46,6 +52,7 @@ class StageController {
         requireStageModerator(guildId, requesterId);
         requireRequest(request);
         StageSession session = experienceService.startStageSession(guildId, channelId, request.topic(), requesterId);
+        publishStageSession("STAGE_SESSION_CREATED", session);
         return ResponseEntity.status(HttpStatus.CREATED).body(StageSessionResponse.from(session));
     }
 
@@ -57,7 +64,9 @@ class StageController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         StageSession session = experienceService.stageSession(sessionId);
         requireViewChannel(session.guildId(), session.channelId(), requesterId);
-        return StageSessionResponse.from(experienceService.requestToSpeak(sessionId, requesterId));
+        StageSession updated = experienceService.requestToSpeak(sessionId, requesterId);
+        publishStageSession("STAGE_REQUEST_TO_SPEAK", updated);
+        return StageSessionResponse.from(updated);
     }
 
     @PutMapping("/api/stage/sessions/{sessionId}/speakers/{userId}")
@@ -69,7 +78,9 @@ class StageController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         StageSession session = experienceService.stageSession(sessionId);
         requireStageModerator(session.guildId(), requesterId);
-        return StageSessionResponse.from(experienceService.approveSpeaker(sessionId, userId));
+        StageSession updated = experienceService.approveSpeaker(sessionId, userId);
+        publishStageSession("STAGE_SPEAKER_APPROVED", updated);
+        return StageSessionResponse.from(updated);
     }
 
     @PutMapping("/api/stage/sessions/{sessionId}/audience/{userId}")
@@ -81,7 +92,9 @@ class StageController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         StageSession session = experienceService.stageSession(sessionId);
         requireStageModerator(session.guildId(), requesterId);
-        return StageSessionResponse.from(experienceService.moveToAudience(sessionId, userId));
+        StageSession updated = experienceService.moveToAudience(sessionId, userId);
+        publishStageSession("STAGE_AUDIENCE_MOVED", updated);
+        return StageSessionResponse.from(updated);
     }
 
     @GetMapping("/api/stage/channels/{channelId}/sessions/active")
@@ -111,6 +124,30 @@ class StageController {
         if (request == null) {
             throw new IllegalArgumentException("request body is required");
         }
+    }
+
+    private void publishStageSession(String stageEventType, StageSession session) {
+        gatewayService.publish(
+            "STAGE_SESSION_UPDATE",
+            session.guildId(),
+            session.channelId(),
+            Map.of(
+                "stageEventType", stageEventType,
+                "sessionId", session.id().toString(),
+                "topic", session.topic(),
+                "moderatorIds", ids(session.moderatorIds()),
+                "speakerIds", ids(session.speakerIds()),
+                "audienceIds", ids(session.audienceIds()),
+                "pendingSpeakerIds", ids(session.pendingSpeakerIds())
+            )
+        );
+    }
+
+    private static List<String> ids(Set<UUID> values) {
+        return values.stream()
+            .map(UUID::toString)
+            .sorted()
+            .toList();
     }
 
     record StartStageSessionRequest(String topic) {

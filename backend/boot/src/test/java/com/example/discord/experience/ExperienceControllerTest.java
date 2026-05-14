@@ -1,5 +1,6 @@
 package com.example.discord.experience;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -147,6 +148,91 @@ class ExperienceControllerTest {
             .andExpect(jsonPath("$.enabled").value(true));
     }
 
+    @Test
+    void stageMutationsPublishGatewayEventsToVisibleChannelSessions() throws Exception {
+        AuthSession owner = signup("experience_gateway_stage_owner");
+        AuthSession member = signup("experience_gateway_stage_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "stage-gateway", "GUILD_VOICE", owner);
+        addMember(guildId, member.userId(), owner);
+        GatewaySession memberGateway = identifyGateway(member);
+
+        MvcResult sessionResult = mockMvc.perform(post("/api/stage/channels/{channelId}/sessions", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "topic": "Gateway stage"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        String sessionId = JsonPath.read(sessionResult.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", memberGateway.sessionId())
+                .header("Authorization", member.bearer())
+                .param("afterSeq", Long.toString(memberGateway.readySequence())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].type").value("STAGE_SESSION_UPDATE"))
+            .andExpect(jsonPath("$.events[0].guildId").value(guildId))
+            .andExpect(jsonPath("$.events[0].channelId").value(channelId))
+            .andExpect(jsonPath("$.events[0].payload.stageEventType").value("STAGE_SESSION_CREATED"))
+            .andExpect(jsonPath("$.events[0].payload.sessionId").value(sessionId))
+            .andExpect(jsonPath("$.events[0].payload.topic").value("Gateway stage"));
+
+        mockMvc.perform(post("/api/stage/sessions/{sessionId}/request-to-speak", sessionId)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", memberGateway.sessionId())
+                .header("Authorization", member.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].payload.stageEventType").value("STAGE_REQUEST_TO_SPEAK"))
+            .andExpect(jsonPath("$.events[0].payload.pendingSpeakerIds[0]").value(member.userId().toString()));
+
+        mockMvc.perform(put("/api/stage/sessions/{sessionId}/speakers/{userId}", sessionId, member.userId())
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", memberGateway.sessionId())
+                .header("Authorization", member.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].payload.stageEventType").value("STAGE_SPEAKER_APPROVED"))
+            .andExpect(jsonPath("$.events[0].payload.speakerIds[0]").value(member.userId().toString()));
+    }
+
+    @Test
+    void soundboardPlayPublishesGatewayEventToVisibleChannelSessions() throws Exception {
+        AuthSession owner = signup("experience_gateway_sound_owner");
+        AuthSession member = signup("experience_gateway_sound_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "sound-gateway", "GUILD_VOICE", owner);
+        addMember(guildId, member.userId(), owner);
+        String soundId = createSound(guildId, "rimshot", owner);
+        GatewaySession memberGateway = identifyGateway(member);
+
+        mockMvc.perform(post("/api/soundboard/channels/{channelId}/sounds/{soundId}/play", channelId, soundId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", memberGateway.sessionId())
+                .header("Authorization", member.bearer())
+                .param("afterSeq", Long.toString(memberGateway.readySequence())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.events", hasSize(1)))
+            .andExpect(jsonPath("$.events[0].type").value("SOUNDBOARD_SOUND_PLAY"))
+            .andExpect(jsonPath("$.events[0].guildId").value(guildId))
+            .andExpect(jsonPath("$.events[0].channelId").value(channelId))
+            .andExpect(jsonPath("$.events[0].payload.soundId").value(soundId))
+            .andExpect(jsonPath("$.events[0].payload.userId").value(owner.userId().toString()))
+            .andExpect(jsonPath("$.events[0].payload.objectKey").doesNotExist());
+    }
+
     private String createGuild(AuthSession owner) throws Exception {
         MvcResult guildResult = mockMvc.perform(post("/api/guilds")
                 .header("Authorization", owner.bearer())
@@ -217,6 +303,19 @@ class ExperienceControllerTest {
         return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
     }
 
+    private GatewaySession identifyGateway(AuthSession requester) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/gateway/identify")
+                .header("Authorization", requester.bearer()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+        return new GatewaySession(
+            JsonPath.read(body, "$.session.id"),
+            ((Number) JsonPath.read(body, "$.ready.sequence")).longValue()
+        );
+    }
+
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -242,5 +341,8 @@ class ExperienceControllerTest {
         String bearer() {
             return "Bearer " + accessToken;
         }
+    }
+
+    private record GatewaySession(String sessionId, long readySequence) {
     }
 }
