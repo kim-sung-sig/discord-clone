@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T23-frontend-real-api-integration",
+  "phase": "design",
+  "currentFeature": "T17-observability-structured-logging",
   "updatedAt": "2026-05-14"
 }
