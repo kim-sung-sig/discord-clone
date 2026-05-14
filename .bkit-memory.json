@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T15-operational-hardening",
+  "phase": "plan",
+  "currentFeature": "T16-persistence-postgresql",
   "updatedAt": "2026-05-14"
 }

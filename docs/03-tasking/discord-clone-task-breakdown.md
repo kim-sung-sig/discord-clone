@@ -450,6 +450,201 @@
 - security headers are missing on API responses
 - frontend request id behavior is untested
 
+### T16. Persistence/PostgreSQL Migration
+
+예상: 6.0 MM
+
+범위:
+
+- PostgreSQL schema/migration baseline
+- repository ports/adapters for auth, guild, channel, message, invite
+- transaction boundary and unique constraints
+- Testcontainers/PostgreSQL integration tests
+- local Docker Compose DB bootstrap using `dev_user` / `dev_password`
+
+성공 기준:
+
+- auth/guild/message/invite critical paths survive application restart
+- message cursor pagination remains deterministic on PostgreSQL
+- reaction/thread uniqueness is enforced by database constraints
+- repository integration tests run against PostgreSQL, not in-memory only
+- `qa/api-smoke.ps1` passes against persistence-backed backend
+
+실패 기준:
+
+- in-memory state remains the source of truth for persisted entities
+- no migration rollback/forward strategy exists
+- repository tests use mocks instead of PostgreSQL
+- duplicate messages/reactions/roles are possible under concurrency
+
+### T17. Observability/Structured Logging
+
+예상: 2.0 MM
+
+범위:
+
+- `X-Request-Id` mapped to logging MDC
+- structured JSON log baseline
+- API error logs with request/user/guild context where safe
+- lightweight metrics for API latency and auth failures
+- runtime smoke evidence with correlation id
+
+성공 기준:
+
+- every API log line can be correlated by request id
+- unsafe or sensitive data is not logged
+- auth failures and forbidden actions are observable
+- tests prove MDC is populated/cleared per request
+
+실패 기준:
+
+- request id is only returned to clients but absent from logs
+- tokens/passwords/message bodies are logged in plaintext
+- MDC leaks across requests
+
+### T18. Realtime Media/Gateway Broadcast Integration
+
+예상: 7.0 MM
+
+범위:
+
+- replace voice token skeleton with real LiveKit-compatible signing boundary
+- voice state gateway broadcast
+- soundboard play event broadcast to voice participants
+- stage speaker/audience event fanout
+- two-browser Playwright realtime smoke where feasible
+
+성공 기준:
+
+- LiveKit token signer is isolated behind a provider interface
+- unauthorized users cannot receive voice/stage/soundboard events
+- soundboard/stage state changes publish gateway events
+- two-browser smoke validates event propagation
+
+실패 기준:
+
+- real media secrets leak into code/tests
+- Spring attempts to handle SFU media plane directly
+- hidden-channel users receive voice/stage events
+
+### T19. Deployment Security/Abuse Controls
+
+예상: 3.0 MM
+
+범위:
+
+- Nuxt HTML CSP/deployment headers
+- rate limiting for auth, invite accept, message create, and gateway identify
+- abuse-oriented error response policy
+- Redis-backed limiter design for production parity
+
+성공 기준:
+
+- API and HTML responses both have documented security headers
+- brute-force auth attempts are rate-limited before lockout abuse
+- message spam and invite accept bursts are throttled
+- rate limit tests cover user/IP/key dimensions
+
+실패 기준:
+
+- security headers apply only to JSON API responses
+- rate limit counters are only local process memory for production path
+- limiter bypass is possible by changing endpoint shape
+
+### T20. Premium Billing/Entitlement Persistence
+
+예상: 4.0 MM
+
+범위:
+
+- persistent entitlement model
+- feature flag policy
+- billing provider port skeleton
+- subscription lifecycle states
+- premium audit events
+
+성공 기준:
+
+- premium gate uses persisted entitlements and expiry
+- duplicate entitlement grants are idempotent
+- billing provider failures do not unlock features
+- entitlement changes emit audit events
+
+실패 기준:
+
+- client can self-grant premium outside test profile
+- expired entitlement remains active
+- catalog/shop API implies real payment without provider boundary
+
+### T21. Audit/Security Actions Expansion
+
+예상: 3.0 MM
+
+범위:
+
+- audit coverage for guild/channel/role/message/invite/expression/stage actions
+- Activity Alerts skeleton
+- Security Actions skeleton for suspicious behavior
+- admin audit search/filter API
+
+성공 기준:
+
+- privileged writes produce audit entries
+- AutoMod, role assignment, invite delete, message moderation, and stage moderation are searchable
+- security action tests prove alert generation without false persistence mutation
+
+실패 기준:
+
+- admin action can mutate state without audit trace
+- audit entries omit actor/target/action/time
+- alerts are generated after unsafe mutation instead of before/around policy decision
+
+### T22. Toolchain/Build Maintenance
+
+예상: 1.5 MM
+
+범위:
+
+- Gradle 9 deprecation cleanup
+- Nuxt sourcemap warning triage
+- Vue package export deprecation tracking
+- CI warning budget/report
+
+성공 기준:
+
+- Gradle test/build runs without deprecation warnings under `--warning-mode all`
+- frontend build warnings are either fixed or pinned with upstream issue references
+- CI exposes warning regression as a visible artifact
+
+실패 기준:
+
+- warnings remain only as tribal knowledge in reports
+- build upgrades break without prior warning inventory
+
+### T23. Frontend Real API Integration Stabilization
+
+예상: 4.0 MM
+
+범위:
+
+- replace deterministic Pinia-only shell actions with REST-backed flows incrementally
+- auth token handling policy in browser
+- API error display and retry policy
+- runtime Playwright flow against real backend
+
+성공 기준:
+
+- login -> create guild/channel -> send message -> voice/stage smoke runs through real backend
+- frontend request ids are visible in backend logs after T17
+- API errors are surfaced accessibly in UI
+- mocked and real-backend tests are clearly separated
+
+실패 기준:
+
+- UI can show success while backend rejected the action
+- access tokens are persisted insecurely
+- Playwright only validates local store mutations
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:
