@@ -225,6 +225,29 @@ export interface ShellModerationState {
   auditLogs: ShellAuditLogEntry[]
 }
 
+export interface ShellVoiceParticipant {
+  userId: string
+  channelId: string
+  muted: boolean
+  deafened: boolean
+  speaking: boolean
+  screenSharing: boolean
+}
+
+export interface ShellVoiceEvent {
+  id: string
+  type: string
+  detail: string
+}
+
+export interface ShellVoiceState {
+  activeChannelId: string | null
+  tokenProvider: 'LIVEKIT_SKELETON'
+  token: string | null
+  participants: ShellVoiceParticipant[]
+  events: ShellVoiceEvent[]
+}
+
 export type ShellPresenceStatus = 'ONLINE' | 'IDLE' | 'DO_NOT_DISTURB' | 'OFFLINE'
 
 export interface ShellPresenceRecord {
@@ -580,6 +603,19 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellModerationState,
+    voice: {
+      activeChannelId: null,
+      tokenProvider: 'LIVEKIT_SKELETON',
+      token: null,
+      participants: [],
+      events: [
+        {
+          id: 'voice-ready',
+          type: 'VOICE_READY',
+          detail: 'Voice signaling skeleton ready'
+        }
+      ]
+    } satisfies ShellVoiceState,
     presence: {
       nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
       users: {
@@ -749,7 +785,13 @@ export const useShellStore = defineStore('shell', {
         (thread) => thread.parentChannelId === state.forum.activeForumChannelId
       ),
     activeThread: (state): ShellThread | undefined =>
-      state.forum.threads.find((thread) => thread.id === state.forum.activeThreadId)
+      state.forum.threads.find((thread) => thread.id === state.forum.activeThreadId),
+    activeVoiceParticipant: (state): ShellVoiceParticipant | undefined =>
+      state.voice.participants.find((participant) => participant.userId === state.currentUser),
+    activeVoiceChannelName: (state): string =>
+      state.channelGroups
+        .flatMap((group) => group.channels)
+        .find((channel) => channel.id === state.voice.activeChannelId)?.name ?? 'none'
   },
   actions: {
     setPresenceClock(nowMs: number) {
@@ -1120,6 +1162,64 @@ export const useShellStore = defineStore('shell', {
         action,
         detail,
         createdAt: new Date().toISOString()
+      })
+    },
+    joinVoiceChannel(channelId: string): boolean {
+      const channel = this.channelGroups
+        .flatMap((group) => group.channels)
+        .find((candidate) => candidate.id === channelId && candidate.type === 'GUILD_VOICE')
+      if (!channel) {
+        return false
+      }
+
+      const participant = {
+        userId: this.currentUser,
+        channelId,
+        muted: false,
+        deafened: false,
+        speaking: false,
+        screenSharing: false
+      }
+      this.voice.activeChannelId = channelId
+      this.voice.token = `livekit-skeleton-${channelId}-${this.currentUser}`
+      this.voice.participants = [
+        ...this.voice.participants.filter((candidate) => candidate.userId !== this.currentUser),
+        participant
+      ]
+      this.voiceState = `Voice connected: ${channel.name}`
+      this.appendVoiceEvent('VOICE_JOIN', `${this.currentUser} joined ${channel.name}`)
+      return true
+    },
+    leaveVoiceChannel(): boolean {
+      if (!this.voice.activeChannelId) {
+        return false
+      }
+
+      const channelName = this.activeVoiceChannelName
+      this.voice.participants = this.voice.participants.filter(
+        (participant) => participant.userId !== this.currentUser
+      )
+      this.voice.activeChannelId = null
+      this.voice.token = null
+      this.voiceState = 'voice disconnected'
+      this.appendVoiceEvent('VOICE_LEAVE', `${this.currentUser} left ${channelName}`)
+      return true
+    },
+    toggleVoiceFlag(flag: 'muted' | 'deafened' | 'speaking' | 'screenSharing'): boolean {
+      const participant = this.activeVoiceParticipant
+      if (!participant) {
+        return false
+      }
+
+      participant[flag] = !participant[flag]
+      this.appendVoiceEvent('VOICE_STATE_UPDATE', `${flag}=${participant[flag]}`)
+      return true
+    },
+    appendVoiceEvent(type: string, detail: string) {
+      this.voice.events.unshift({
+        id: `voice-event-${Date.now()}-${this.voice.events.length}`,
+        type,
+        detail
       })
     }
   }

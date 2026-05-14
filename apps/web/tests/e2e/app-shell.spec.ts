@@ -200,6 +200,33 @@ test('runs onboarding, AutoMod, and audit log moderation flow', async ({ page })
   await expect(page.getByTestId('chat-viewport')).not.toContainText('leak the release token')
 })
 
+test('joins voice, toggles controls, screen shares, and leaves', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('voice-panel')).toContainText('Voice')
+  await expect(page.getByTestId('voice-token-provider')).toContainText('LIVEKIT_SKELETON')
+  await expect(page.getByTestId('voice-participants')).toContainText('No participants')
+
+  await page.getByTestId('voice-join-channel-war-room').click()
+  await expect(page.getByTestId('user-panel')).toContainText('Voice connected: war-room')
+  await expect(page.getByTestId('voice-participants')).toContainText('vibe-coder')
+  await expect(page.getByTestId('voice-events')).toContainText('VOICE_JOIN')
+
+  await page.getByTestId('voice-toggle-mute').click()
+  await page.getByTestId('voice-toggle-deaf').click()
+  await page.getByTestId('voice-toggle-speaking').click()
+  await page.getByTestId('voice-toggle-screen-share').click()
+  await expect(page.getByTestId('voice-local-state')).toContainText('Muted')
+  await expect(page.getByTestId('voice-local-state')).toContainText('Deafened')
+  await expect(page.getByTestId('voice-local-state')).toContainText('Speaking')
+  await expect(page.getByTestId('voice-local-state')).toContainText('Screen sharing')
+
+  await page.getByTestId('voice-leave').click()
+  await expect(page.getByTestId('user-panel')).toContainText('voice disconnected')
+  await expect(page.getByTestId('voice-participants')).toContainText('No participants')
+  await expect(page.getByTestId('voice-events')).toContainText('VOICE_LEAVE')
+})
+
 test('uses Nuxt routing for unknown routes instead of rendering the app shell', async ({ page }) => {
   await page.goto('/definitely-not-a-real-route')
 

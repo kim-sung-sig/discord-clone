@@ -379,4 +379,44 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="audit-log"]').text()).toContain('AUTOMOD_MESSAGE_BLOCKED')
     expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('leak the release token')
   })
+
+  it('renders voice token provider, participants, controls, and event records', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    const voicePanel = wrapper.get('[data-testid="voice-panel"]')
+    expect(voicePanel.text()).toContain('Voice')
+    expect(voicePanel.get('[data-testid="voice-token-provider"]').text()).toContain('LIVEKIT_SKELETON')
+    expect(voicePanel.get('[data-testid="voice-participants"]').text()).toContain('No participants')
+    expect(voicePanel.get('[data-testid="voice-events"]').text()).toContain('VOICE_READY')
+  })
+
+  it('joins voice, toggles local voice state, screen shares, and leaves cleanly', async () => {
+    const wrapper = await mountSuspended(App)
+    useShellStore().$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="voice-join-channel-war-room"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('Voice connected: war-room')
+    expect(wrapper.get('[data-testid="voice-participants"]').text()).toContain('vibe-coder')
+    expect(wrapper.get('[data-testid="voice-events"]').text()).toContain('VOICE_JOIN')
+
+    await wrapper.get('[data-testid="voice-toggle-mute"]').trigger('click')
+    await wrapper.get('[data-testid="voice-toggle-deaf"]').trigger('click')
+    await wrapper.get('[data-testid="voice-toggle-speaking"]').trigger('click')
+    await wrapper.get('[data-testid="voice-toggle-screen-share"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="voice-local-state"]').text()).toContain('Muted')
+    expect(wrapper.get('[data-testid="voice-local-state"]').text()).toContain('Deafened')
+    expect(wrapper.get('[data-testid="voice-local-state"]').text()).toContain('Speaking')
+    expect(wrapper.get('[data-testid="voice-local-state"]').text()).toContain('Screen sharing')
+
+    await wrapper.get('[data-testid="voice-leave"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('voice disconnected')
+    expect(wrapper.get('[data-testid="voice-participants"]').text()).toContain('No participants')
+    expect(wrapper.get('[data-testid="voice-events"]').text()).toContain('VOICE_LEAVE')
+  })
 })

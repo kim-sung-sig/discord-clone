@@ -1122,10 +1122,10 @@ input {
 }
 
 .invite-modal {
-  grid-column: 3 / 7;
+  grid-column: 3 / 5;
   grid-row: 3;
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1fr) minmax(160px, auto) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, auto);
   gap: 16px;
   align-items: center;
   padding: 16px 22px;
@@ -1133,6 +1133,96 @@ input {
     linear-gradient(120deg, rgba(57, 217, 138, 0.18), rgba(84, 166, 255, 0.12)),
     rgba(17, 24, 39, 0.98);
   border-top: 1px solid rgba(57, 217, 138, 0.26);
+}
+
+.voice-panel {
+  grid-column: 5 / 7;
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(160px, 1fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 18px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(84, 166, 255, 0.18), transparent 14rem),
+    rgba(17, 24, 39, 0.98);
+  border-top: 1px solid rgba(84, 166, 255, 0.26);
+  border-left: 1px solid rgba(84, 166, 255, 0.18);
+}
+
+.voice-panel-header,
+.voice-card {
+  min-width: 0;
+}
+
+.voice-panel-header p,
+.voice-panel-header h2,
+.voice-panel-header small,
+.voice-card p,
+.voice-card span,
+.voice-card strong,
+.voice-card small {
+  margin: 0;
+}
+
+.voice-panel-header p,
+.voice-card p {
+  color: #54a6ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.voice-panel-header small,
+.voice-card span,
+.voice-card small {
+  color: var(--muted);
+}
+
+.voice-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.voice-card button {
+  padding: 8px 10px;
+  color: #06131d;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  background: linear-gradient(145deg, #54a6ff, var(--accent));
+  border: 0;
+  border-radius: 12px;
+}
+
+.voice-card button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.voice-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.voice-controls p {
+  grid-column: 1 / -1;
+}
+
+.voice-events {
+  max-height: 150px;
+  overflow: auto;
+}
+
+.voice-events article {
+  display: grid;
+  gap: 3px;
 }
 
 .invite-modal h2,
@@ -1236,7 +1326,12 @@ input {
   }
 
   .invite-modal {
-    grid-column: 3 / 6;
+    grid-column: 3 / 4;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .voice-panel {
+    grid-column: 4 / 6;
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -1372,5 +1467,9 @@ input {
     grid-row: 3;
     grid-template-columns: 1fr;
     padding: 12px;
+  }
+
+  .voice-panel {
+    display: none;
   }
 }
