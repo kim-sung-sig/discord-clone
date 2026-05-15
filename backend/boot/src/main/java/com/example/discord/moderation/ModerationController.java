@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -105,11 +106,25 @@ class ModerationController {
     @GetMapping("/audit-logs")
     List<AuditLogEntryResponse> auditLogs(
         @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestParam(required = false) AuditLogAction action,
+        @RequestParam(required = false) UUID actorId,
+        @RequestParam(required = false) UUID targetId
+    ) {
+        requireManageMessages(guildId, authorization);
+        return moderationService.auditLogs(guildId, action, actorId, targetId).stream()
+            .map(AuditLogEntryResponse::from)
+            .toList();
+    }
+
+    @GetMapping("/security-alerts")
+    List<SecurityAlertResponse> securityAlerts(
+        @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         requireManageMessages(guildId, authorization);
-        return moderationService.auditLogs(guildId).stream()
-            .map(AuditLogEntryResponse::from)
+        return moderationService.securityAlerts(guildId).stream()
+            .map(SecurityAlertResponse::from)
             .toList();
     }
 
@@ -205,6 +220,30 @@ class ModerationController {
                 entry.targetId(),
                 entry.reason(),
                 entry.createdAt()
+            );
+        }
+    }
+
+    record SecurityAlertResponse(
+        UUID id,
+        UUID guildId,
+        UUID actorId,
+        UUID targetId,
+        String type,
+        String severity,
+        String reason,
+        Instant createdAt
+    ) {
+        static SecurityAlertResponse from(SecurityAlert alert) {
+            return new SecurityAlertResponse(
+                alert.id(),
+                alert.guildId(),
+                alert.actorId(),
+                alert.targetId(),
+                alert.type(),
+                alert.severity(),
+                alert.reason(),
+                alert.createdAt()
             );
         }
     }

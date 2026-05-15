@@ -2,6 +2,8 @@ package com.example.discord.guild;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
+import com.example.discord.moderation.AuditLogAction;
+import com.example.discord.moderation.InMemoryModerationService;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
 import java.util.Arrays;
@@ -28,10 +30,16 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/guilds")
 class GuildController {
     private final InMemoryGuildService guildService;
+    private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    GuildController(InMemoryGuildService guildService, AuthenticatedUserResolver authenticatedUserResolver) {
+    GuildController(
+        InMemoryGuildService guildService,
+        InMemoryModerationService moderationService,
+        AuthenticatedUserResolver authenticatedUserResolver
+    ) {
         this.guildService = guildService;
+        this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -123,7 +131,9 @@ class GuildController {
     ) {
         UUID requesterId = requireManageRoles(guildId, authorization);
         requireAssignableRole(guildId, requesterId, roleId);
-        return MemberRoleResponse.from(guildService.assignRoleToMember(guildId, memberId, roleId));
+        GuildMember member = guildService.assignRoleToMember(guildId, memberId, roleId);
+        moderationService.appendAudit(guildId, AuditLogAction.ROLE_ASSIGNED, requesterId, memberId, "role assigned");
+        return MemberRoleResponse.from(member);
     }
 
     @PutMapping("/{guildId}/channels/{channelId}/overwrites/roles/{roleId}")

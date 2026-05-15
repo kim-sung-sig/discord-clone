@@ -1,6 +1,8 @@
 package com.example.discord.moderation;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -90,6 +92,42 @@ class ModerationControllerTest {
     }
 
     @Test
+    void autoModBlockCreatesSecurityAlertWithoutPersistingMessage() throws Exception {
+        AuthSession owner = signup("moderation_alert_owner");
+        AuthSession member = signup("moderation_alert_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "alerts", owner);
+        addMember(guildId, member.userId(), owner);
+        grantRole(guildId, member.userId(), "alert-sender", "SEND_MESSAGES", owner);
+        createKeywordRule(guildId, "malware", owner);
+
+        mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "malware link"
+                    }
+                    """))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/guilds/{guildId}/security-alerts", guildId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].type").value("AUTOMOD_BLOCK"))
+            .andExpect(jsonPath("$[0].severity").value("MEDIUM"))
+            .andExpect(jsonPath("$[0].actorId").value(member.userId().toString()))
+            .andExpect(jsonPath("$[0].targetId").exists())
+            .andExpect(jsonPath("$[0].createdAt").exists());
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.messages").isEmpty());
+    }
+
+    @Test
     void autoModRuleCreationAppendsAuditLog() throws Exception {
         AuthSession owner = signup("moderation_audit_owner");
         String guildId = createGuild(owner);
@@ -103,6 +141,53 @@ class ModerationControllerTest {
             .andExpect(jsonPath("$[0].action").value("AUTOMOD_RULE_CREATED"))
             .andExpect(jsonPath("$[0].actorId").value(owner.userId().toString()))
             .andExpect(jsonPath("$[0].targetId").value(ruleId));
+    }
+
+    @Test
+    void privilegedActionsAreSearchableInAuditLog() throws Exception {
+        AuthSession owner = signup("moderation_search_owner");
+        AuthSession member = signup("moderation_search_member");
+        String guildId = createGuild(owner);
+        String textChannelId = createChannel(guildId, "audit-general", "GUILD_TEXT", owner);
+        String voiceChannelId = createChannel(guildId, "audit-stage", "GUILD_VOICE", owner);
+        addMember(guildId, member.userId(), owner);
+
+        String roleId = createRole(guildId, "audit-role", owner);
+        mockMvc.perform(put("/api/guilds/{guildId}/members/{memberId}/roles/{roleId}", guildId, member.userId(), roleId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+
+        String inviteCode = createInvite(guildId, textChannelId, owner);
+        mockMvc.perform(delete("/api/invites/{code}", inviteCode)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isNoContent());
+
+        String messageId = createMessage(textChannelId, "moderate me", owner);
+        mockMvc.perform(delete("/api/channels/{channelId}/messages/{messageId}", textChannelId, messageId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isNoContent());
+
+        String stageSessionId = startStageSession(voiceChannelId, owner);
+        mockMvc.perform(post("/api/stage/sessions/{sessionId}/request-to-speak", stageSessionId)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isOk());
+        mockMvc.perform(put("/api/stage/sessions/{sessionId}/speakers/{userId}", stageSessionId, member.userId())
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+
+        assertAuditAction(guildId, owner, "ROLE_ASSIGNED", member.userId().toString());
+        assertAuditAction(guildId, owner, "INVITE_DELETED", textChannelId);
+        assertAuditAction(guildId, owner, "MESSAGE_DELETED", messageId);
+        assertAuditAction(guildId, owner, "STAGE_SPEAKER_APPROVED", member.userId().toString());
+
+        mockMvc.perform(get("/api/guilds/{guildId}/audit-logs", guildId)
+                .header("Authorization", owner.bearer())
+                .param("actorId", owner.userId().toString())
+                .param("action", "MESSAGE_DELETED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].action").value("MESSAGE_DELETED"))
+            .andExpect(jsonPath("$[0].actorId").value(owner.userId().toString()));
     }
 
     private MvcResult createKeywordRule(String guildId, String keyword, AuthSession requester) throws Exception {
@@ -136,16 +221,20 @@ class ModerationControllerTest {
     }
 
     private String createChannel(String guildId, String name, AuthSession requester) throws Exception {
+        return createChannel(guildId, name, "GUILD_TEXT", requester);
+    }
+
+    private String createChannel(String guildId, String name, String type, AuthSession requester) throws Exception {
         MvcResult channelResult = mockMvc.perform(post("/api/guilds/{guildId}/channels", guildId)
                 .header("Authorization", requester.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
                       "name": "%s",
-                      "type": "GUILD_TEXT",
+                      "type": "%s",
                       "parentId": null
                     }
-                    """.formatted(name)))
+                    """.formatted(name, type)))
             .andExpect(status().isCreated())
             .andReturn();
 
@@ -166,6 +255,68 @@ class ModerationControllerTest {
             .andReturn();
 
         return JsonPath.read(roleResult.getResponse().getContentAsString(), "$.id");
+    }
+
+    private String createInvite(String guildId, String channelId, AuthSession requester) throws Exception {
+        MvcResult inviteResult = mockMvc.perform(post("/api/guilds/{guildId}/invites", guildId)
+                .header("Authorization", requester.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "channelId": "%s",
+                      "maxAgeSeconds": 3600,
+                      "maxUses": 10,
+                      "temporary": false,
+                      "roleGrantIds": []
+                    }
+                    """.formatted(channelId)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        return JsonPath.read(inviteResult.getResponse().getContentAsString(), "$.code");
+    }
+
+    private String createMessage(String channelId, String content, AuthSession requester) throws Exception {
+        MvcResult messageResult = mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", requester.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "%s"
+                    }
+                    """.formatted(content)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        return JsonPath.read(messageResult.getResponse().getContentAsString(), "$.id");
+    }
+
+    private String startStageSession(String channelId, AuthSession requester) throws Exception {
+        MvcResult sessionResult = mockMvc.perform(post("/api/stage/channels/{channelId}/sessions", channelId)
+                .header("Authorization", requester.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "topic": "Audit stage"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        return JsonPath.read(sessionResult.getResponse().getContentAsString(), "$.id");
+    }
+
+    private void assertAuditAction(String guildId, AuthSession requester, String action, String targetId) throws Exception {
+        mockMvc.perform(get("/api/guilds/{guildId}/audit-logs", guildId)
+                .header("Authorization", requester.bearer())
+                .param("action", action)
+                .param("targetId", targetId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].action").value(action))
+            .andExpect(jsonPath("$[0].actorId").value(requester.userId().toString()))
+            .andExpect(jsonPath("$[0].targetId").value(targetId))
+            .andExpect(jsonPath("$[0].createdAt").exists());
     }
 
     private void grantRole(String guildId, UUID memberId, String roleName, String permission, AuthSession owner) throws Exception {
@@ -194,6 +345,7 @@ class ModerationControllerTest {
     }
 
     private AuthSession signup(String username) throws Exception {
+        String uniqueUsername = "mod_%s".formatted(UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -203,7 +355,7 @@ class ModerationControllerTest {
                       "displayName": "%s",
                       "password": "correct horse battery staple"
                     }
-                    """.formatted(username, username, username)))
+                    """.formatted(uniqueUsername, uniqueUsername, uniqueUsername)))
             .andExpect(status().isCreated())
             .andReturn();
 

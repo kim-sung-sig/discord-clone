@@ -4,6 +4,8 @@ import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.Guild;
 import com.example.discord.guild.GuildMember;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.moderation.AuditLogAction;
+import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -27,15 +29,18 @@ import org.springframework.web.server.ResponseStatusException;
 class InviteController {
     private final InMemoryInviteService inviteService;
     private final InMemoryGuildService guildService;
+    private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     InviteController(
         InMemoryInviteService inviteService,
         InMemoryGuildService guildService,
+        InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.inviteService = inviteService;
         this.guildService = guildService;
+        this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -100,6 +105,7 @@ class InviteController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage channels permission required");
         }
         inviteService.delete(code);
+        moderationService.appendAudit(invite.guildId(), AuditLogAction.INVITE_DELETED, requesterId, invite.channelId(), "invite deleted: " + code);
         return ResponseEntity.noContent().build();
     }
 

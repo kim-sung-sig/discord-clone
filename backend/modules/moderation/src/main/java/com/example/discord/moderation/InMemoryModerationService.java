@@ -12,6 +12,7 @@ public final class InMemoryModerationService {
     private final Map<UUID, List<OnboardingQuestion>> onboardingQuestionsByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<AutoModRule>> autoModRulesByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<AuditLogEntry>> auditLogsByGuild = new LinkedHashMap<>();
+    private final Map<UUID, List<SecurityAlert>> securityAlertsByGuild = new LinkedHashMap<>();
 
     public synchronized OnboardingQuestion createOnboardingQuestion(
         UUID guildId,
@@ -70,6 +71,7 @@ public final class InMemoryModerationService {
                 continue;
             }
             if (rule.type() == AutoModRuleType.KEYWORD && containsKeyword(normalizedContent, rule.keywords())) {
+                appendSecurityAlert(guildId, authorId, channelId, "AUTOMOD_BLOCK", "MEDIUM", "keyword automod block");
                 appendAudit(guildId, AuditLogAction.AUTOMOD_MESSAGE_BLOCKED, authorId, rule.id(), "keyword automod block");
                 return AutoModDecision.blocked(rule.id(), "message blocked by AutoMod");
             }
@@ -86,9 +88,27 @@ public final class InMemoryModerationService {
     }
 
     public synchronized List<AuditLogEntry> auditLogs(UUID guildId) {
+        return auditLogs(guildId, null, null, null);
+    }
+
+    public synchronized List<AuditLogEntry> auditLogs(
+        UUID guildId,
+        AuditLogAction action,
+        UUID actorId,
+        UUID targetId
+    ) {
         List<AuditLogEntry> entries = new ArrayList<>(auditLogsByGuild.getOrDefault(guildId, List.of()));
+        entries.removeIf(entry -> action != null && entry.action() != action);
+        entries.removeIf(entry -> actorId != null && !entry.actorId().equals(actorId));
+        entries.removeIf(entry -> targetId != null && !entry.targetId().equals(targetId));
         entries.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
         return List.copyOf(entries);
+    }
+
+    public synchronized List<SecurityAlert> securityAlerts(UUID guildId) {
+        List<SecurityAlert> alerts = new ArrayList<>(securityAlertsByGuild.getOrDefault(guildId, List.of()));
+        alerts.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
+        return List.copyOf(alerts);
     }
 
     public synchronized void appendAudit(UUID guildId, AuditLogAction action, UUID actorId, UUID targetId, String reason) {
@@ -100,6 +120,11 @@ public final class InMemoryModerationService {
         }
         AuditLogEntry entry = new AuditLogEntry(UUID.randomUUID(), guildId, action, actorId, targetId, reason, Instant.now());
         auditLogsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(entry);
+    }
+
+    private void appendSecurityAlert(UUID guildId, UUID actorId, UUID targetId, String type, String severity, String reason) {
+        SecurityAlert alert = new SecurityAlert(UUID.randomUUID(), guildId, actorId, targetId, type, severity, reason, Instant.now());
+        securityAlertsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(alert);
     }
 
     private static boolean containsKeyword(String normalizedContent, List<String> keywords) {

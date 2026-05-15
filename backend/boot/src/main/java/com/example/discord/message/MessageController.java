@@ -2,6 +2,7 @@ package com.example.discord.message;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.moderation.AuditLogAction;
 import com.example.discord.moderation.AutoModDecision;
 import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Instant;
@@ -115,6 +116,7 @@ class MessageController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage messages permission required");
         }
         messageService.delete(guildId, channelId, messageId);
+        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_DELETED, requesterId, messageId, "message deleted");
         return ResponseEntity.noContent().build();
     }
 
@@ -126,7 +128,9 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireManageMessages(channelId, requesterId);
-        return MessageResponse.from(messageService.pin(guildId, channelId, messageId));
+        Message message = messageService.pin(guildId, channelId, messageId);
+        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_PINNED, requesterId, messageId, "message pinned");
+        return MessageResponse.from(message);
     }
 
     @DeleteMapping("/{messageId}/pin")
@@ -137,7 +141,9 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireManageMessages(channelId, requesterId);
-        return MessageResponse.from(messageService.unpin(guildId, channelId, messageId));
+        Message message = messageService.unpin(guildId, channelId, messageId);
+        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_UNPINNED, requesterId, messageId, "message unpinned");
+        return MessageResponse.from(message);
     }
 
     @GetMapping("/search")

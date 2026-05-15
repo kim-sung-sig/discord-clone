@@ -3,6 +3,8 @@ package com.example.discord.experience;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.moderation.AuditLogAction;
+import com.example.discord.moderation.InMemoryModerationService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,17 +29,20 @@ class StageController {
     private final InMemoryExperienceService experienceService;
     private final InMemoryGuildService guildService;
     private final InMemoryGatewayService gatewayService;
+    private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     StageController(
         InMemoryExperienceService experienceService,
         InMemoryGuildService guildService,
         InMemoryGatewayService gatewayService,
+        InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;
         this.guildService = guildService;
         this.gatewayService = gatewayService;
+        this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -80,6 +85,7 @@ class StageController {
         requireStageModerator(session.guildId(), requesterId);
         StageSession updated = experienceService.approveSpeaker(sessionId, userId);
         publishStageSession("STAGE_SPEAKER_APPROVED", updated);
+        moderationService.appendAudit(session.guildId(), AuditLogAction.STAGE_SPEAKER_APPROVED, requesterId, userId, "stage speaker approved");
         return StageSessionResponse.from(updated);
     }
 
@@ -94,6 +100,7 @@ class StageController {
         requireStageModerator(session.guildId(), requesterId);
         StageSession updated = experienceService.moveToAudience(sessionId, userId);
         publishStageSession("STAGE_AUDIENCE_MOVED", updated);
+        moderationService.appendAudit(session.guildId(), AuditLogAction.STAGE_AUDIENCE_MOVED, requesterId, userId, "stage moved to audience");
         return StageSessionResponse.from(updated);
     }
 
