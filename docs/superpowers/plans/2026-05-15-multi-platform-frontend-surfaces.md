@@ -281,8 +281,13 @@ git commit -m "feat: add pwa mobile shell baseline"
 
 **Files:**
 - Modify: `package.json`
+- Modify: `package-lock.json`
 - Create: `apps/desktop/package.json`
 - Create: `apps/desktop/src-tauri/tauri.conf.json`
+- Create: `apps/desktop/src-tauri/Cargo.toml`
+- Create: `apps/desktop/src-tauri/build.rs`
+- Create: `apps/desktop/src-tauri/src/main.rs`
+- Create: `apps/desktop/src-tauri/capabilities/default.json`
 - Create: `apps/desktop/src/capabilities.ts`
 - Create: `apps/desktop/tests/desktop-shell.contract.test.ts`
 
@@ -296,11 +301,11 @@ Change root workspaces to include:
 
 - [ ] **Step 2: Add desktop shell package**
 
-Create `apps/desktop/package.json` with scripts for `dev`, `build`, and `test`. The `dev` script should start Tauri against the Nuxt dev server, and `build` should package against the Nuxt production build.
+Create `apps/desktop/package.json` with scripts for `dev`, `build`, and `test`, and include `@tauri-apps/cli` as a dev dependency. The `dev` script should start Tauri against the Nuxt dev server, and `build` should package against the Nuxt production build.
 
 - [ ] **Step 3: Add minimal Tauri config**
 
-Create `apps/desktop/src-tauri/tauri.conf.json` with the app identifier, window title, and minimal permissions. Do not enable filesystem or shell permissions unless a task explicitly proves the need.
+Create `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml`, `build.rs`, `src/main.rs`, and `capabilities/default.json` with the app identifier, window title, Nuxt frontend output path, and minimal permissions. Do not enable filesystem or shell permissions unless a task explicitly proves the need.
 
 - [ ] **Step 4: Add capability boundary test**
 

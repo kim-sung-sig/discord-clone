@@ -1,0 +1,20 @@
+{
+  "name": "@discord-clone/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo Requires Tauri CLI and Rust toolchain. && tauri dev",
+    "build": "echo Requires Tauri CLI and Rust toolchain. && tauri build",
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@discord-clone/platform-shell": "0.1.0",
+    "@discord-clone/ui-contracts": "0.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.9.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
+  }
+}
