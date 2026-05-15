@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T25-ci-qa-harness-wiring",
+  "phase": "design",
+  "currentFeature": "T26-nuxt-ssr-csp-nonce-hardening",
   "updatedAt": "2026-05-15"
 }

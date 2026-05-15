@@ -694,6 +694,30 @@
 - QA scripts remain Windows-only
 - CI failures lose backend/Playwright/warning logs
 
+### T26. Nuxt SSR CSP Nonce Hardening
+
+예상: 1.0 MM
+
+범위:
+
+- Nuxt HTML script CSP nonce generation
+- SSR inline script nonce injection
+- removal of script `unsafe-inline`
+- frontend hydration and real-backend QA regression
+
+성공 기준:
+
+- HTML CSP uses `script-src 'self' 'nonce-...'`
+- script `unsafe-inline` is not present in CSP
+- rendered script tags carry the matching nonce
+- login/app-shell/real-backend Playwright remains green
+
+실패 기준:
+
+- hydration breaks
+- arbitrary inline script remains allowed
+- CSP nonce and script tag nonce diverge
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:

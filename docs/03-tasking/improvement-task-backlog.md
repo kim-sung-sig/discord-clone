@@ -17,6 +17,7 @@
 | T23 | Frontend Real API Integration Stabilization | P0 | runtime review, common task failure criterion: UI/API mismatch |
 | T24 | Real Backend QA Orchestration | P0 | T23 residual risk: real-backend Playwright requires manual backend/database/env setup |
 | T25 | CI QA Harness Wiring | P0 | T22/T24 residual risks: warning artifacts and real-backend harness are not wired to CI |
+| T26 | Nuxt SSR CSP Nonce Hardening | P1 | T24/T25 residual risk: Nuxt script CSP currently uses `unsafe-inline` for hydration |
 
 ## Source Clusters
 
@@ -106,6 +107,15 @@ Sources:
 
 Promoted task: T25.
 
+### CSP Hardening Cluster
+
+Sources:
+
+- T24 residual risk: Nuxt CSP permits inline scripts for hydration compatibility.
+- T25 residual risk: Nuxt inline-script CSP remains production-hardening follow-up.
+
+Promoted task: T26.
+
 ## Recommended Execution Order
 
 1. T16 Persistence/PostgreSQL Migration
@@ -118,6 +128,7 @@ Promoted task: T25.
 8. T22 Toolchain/Build Maintenance
 9. T24 Real Backend QA Orchestration
 10. T25 CI QA Harness Wiring
+11. T26 Nuxt SSR CSP Nonce Hardening
 
 Reasoning:
 
@@ -127,3 +138,4 @@ Reasoning:
 - Media and premium are larger capability expansions and should use the hardened/persistent foundation.
 - Real-backend QA orchestration closes the remaining repeatability gap after frontend/backend integration exists.
 - CI wiring promotes the now-repeatable local QA harnesses into automated quality gates.
+- CSP nonce hardening should follow CI wiring so runtime hydration regressions remain visible while tightening browser policy.
