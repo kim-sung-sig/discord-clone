@@ -399,9 +399,16 @@ const backendErrorMessage = (error: unknown): string => {
   return 'Discord API is unavailable. Try again.'
 }
 
+const createShellRequestId = (): string => {
+  const timePart = Date.now().toString(36)
+  const randomPart = Math.random().toString(36).slice(2, 10)
+  return `web-shell-${timePart}-${randomPart}`
+}
+
 export const useShellStore = defineStore('shell', {
   state: () => ({
     apiError: null as string | null,
+    apiLastRequestId: null as string | null,
     apiBusy: false,
     guild: {
       id: 'guild-discord-clone',
@@ -1057,11 +1064,11 @@ export const useShellStore = defineStore('shell', {
       this.stagedAttachment = null
     },
     async createBackendGuild(name: string, bearerToken: string): Promise<ShellGuild | null> {
-      return this.withBackendRequest(async (client) => {
+      return this.withBackendRequest(async (client, requestId) => {
         const guild = await client.post<BackendGuildResponse>(
           discordApiPaths.guild.create(),
           { name },
-          { bearerToken }
+          { bearerToken, requestId }
         )
         this.guild = {
           id: guild.id,
@@ -1076,11 +1083,11 @@ export const useShellStore = defineStore('shell', {
       type: ShellChannelType,
       bearerToken: string
     ): Promise<ShellChannel | null> {
-      return this.withBackendRequest(async (client) => {
+      return this.withBackendRequest(async (client, requestId) => {
         const channel = await client.post<BackendChannelResponse>(
           discordApiPaths.guild.createChannel(guildId),
           { name, type, parentId: null },
-          { bearerToken }
+          { bearerToken, requestId }
         )
         const shellChannel: ShellChannel = {
           id: channel.id,
@@ -1108,11 +1115,11 @@ export const useShellStore = defineStore('shell', {
       })
     },
     async sendBackendMessage(channelId: string, content: string, bearerToken: string): Promise<ShellMessage | null> {
-      return this.withBackendRequest(async (client) => {
+      return this.withBackendRequest(async (client, requestId) => {
         const message = await client.post<BackendMessageResponse>(
           discordApiPaths.channel.messages(channelId),
           { content },
-          { bearerToken }
+          { bearerToken, requestId }
         )
         const shellMessage: ShellMessage = {
           id: message.id,
@@ -1137,11 +1144,11 @@ export const useShellStore = defineStore('shell', {
       })
     },
     async joinBackendVoice(channelId: string, bearerToken: string): Promise<BackendVoiceJoinResponse | null> {
-      return this.withBackendRequest(async (client) => {
+      return this.withBackendRequest(async (client, requestId) => {
         const response = await client.post<BackendVoiceJoinResponse>(
           `/api/voice/channels/${encodeURIComponent(channelId)}/join`,
           undefined,
-          { bearerToken }
+          { bearerToken, requestId }
         )
         this.voice.activeChannelId = response.participant.channelId
         this.voice.token = response.token.token
@@ -1160,11 +1167,11 @@ export const useShellStore = defineStore('shell', {
       topic: string,
       bearerToken: string
     ): Promise<ShellStageSession | null> {
-      return this.withBackendRequest(async (client) => {
+      return this.withBackendRequest(async (client, requestId) => {
         const session = await client.post<BackendStageSessionResponse>(
           `/api/stage/channels/${encodeURIComponent(channelId)}/sessions`,
           { topic },
-          { bearerToken }
+          { bearerToken, requestId }
         )
         this.experience.stageSession = {
           id: session.id,
@@ -1179,18 +1186,20 @@ export const useShellStore = defineStore('shell', {
       })
     },
     async withBackendRequest<T>(
-      operation: (client: ReturnType<typeof createDiscordRestClient>) => Promise<T>
+      operation: (client: ReturnType<typeof createDiscordRestClient>, requestId: string) => Promise<T>
     ): Promise<T | null> {
       this.apiError = null
+      const requestId = createShellRequestId()
+      this.apiLastRequestId = requestId
       this.apiBusy = true
       try {
         const config = useRuntimeConfig()
         return await operation(createDiscordRestClient({
           baseUrl: config.public.apiBaseUrl,
           fetcher: globalThis.fetch
-        }))
+        }), requestId)
       } catch (error) {
-        this.apiError = backendErrorMessage(error)
+        this.apiError = `${backendErrorMessage(error)} Request id: ${requestId}`
         return null
       } finally {
         this.apiBusy = false

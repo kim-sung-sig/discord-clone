@@ -175,6 +175,8 @@ describe('Discord app shell', () => {
     expect(shell.voice.token).toBe('voice-token')
     expect(shell.experience.stageSession?.topic).toBe('Backend stage')
     expect(calls.every((call) => (call.init?.headers as Record<string, string>).Authorization === 'Bearer access-token')).toBe(true)
+    expect(calls.every((call) => (call.init?.headers as Record<string, string>)['X-Request-Id']?.startsWith('web-shell-'))).toBe(true)
+    expect(shell.apiLastRequestId).toMatch(/^web-shell-[a-z0-9-]+$/)
     expect(shell.apiError).toBeNull()
   })
 
@@ -189,6 +191,7 @@ describe('Discord app shell', () => {
 
     expect(shell.guild).toEqual(originalGuild)
     expect(shell.apiError).toContain('Discord API rejected the request')
+    expect(shell.apiError).toContain(shell.apiLastRequestId)
   })
 
   it('stages a deterministic image attachment preview from the composer', async () => {
