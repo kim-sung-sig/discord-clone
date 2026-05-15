@@ -12,6 +12,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dev_user -d discord"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -23,6 +37,10 @@ jobs:
         run: chmod +x ./gradlew
       - name: Backend tests
         run: ./gradlew test
+        env:
+          POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
 
   frontend:
     runs-on: ubuntu-latest
@@ -77,6 +95,10 @@ jobs:
         run: pwsh qa/real-backend-e2e.contract.ps1
       - name: Real backend smoke
         run: pwsh qa/real-backend-e2e.ps1
+        env:
+          POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
       - name: Upload real backend artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -87,6 +109,20 @@ jobs:
 
   qa-toolchain:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dev_user -d discord"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -104,6 +140,10 @@ jobs:
         run: chmod +x ./gradlew
       - name: Toolchain warning scan
         run: pwsh qa/toolchain-warning-scan.ps1
+        env:
+          POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
       - name: Upload toolchain artifacts
         if: always()
         uses: actions/upload-artifact@v4

@@ -26,9 +26,11 @@ $requiredSnippets = @(
   'actions/setup-node@v4',
   'node-version: ''22''',
   'postgres:',
+  'services:',
   'POSTGRES_DB: discord',
   'POSTGRES_USER: dev_user',
   'POSTGRES_PASSWORD: dev_password',
+  'POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord',
   'npx playwright install --with-deps chromium',
   'pwsh qa/real-backend-e2e.contract.ps1',
   'pwsh qa/real-backend-e2e.ps1',
@@ -45,5 +47,8 @@ $requiredSnippets = @(
 foreach ($snippet in $requiredSnippets) {
   Assert ($content.Contains($snippet)) "CI workflow is missing required snippet: $snippet"
 }
+
+$postgresServiceCount = ([regex]::Matches($content, 'postgres:\s*\r?\n\s*image: postgres:17')).Count
+Assert ($postgresServiceCount -ge 3) "CI workflow should provision PostgreSQL for backend, qa-runtime, and qa-toolchain jobs"
 
 Write-Output 'CI_WORKFLOW_CONTRACT_PASS'

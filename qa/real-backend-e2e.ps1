@@ -22,6 +22,7 @@ $backendLog = Join-Path $runDir 'backend-bootRun.log'
 $backendErrorLog = Join-Path $runDir 'backend-bootRun.err.log'
 $apiSmokeLog = Join-Path $runDir 'api-smoke.log'
 $playwrightLog = Join-Path $runDir 'real-backend-playwright.log'
+$metadataLog = Join-Path $runDir 'run-metadata.txt'
 $backendProcess = $null
 
 function Test-IsWindows {
@@ -40,6 +41,13 @@ function Get-NpmCommand {
     return 'npm.cmd'
   }
   return 'npm'
+}
+
+function Get-PowerShellCommand {
+  if (Test-IsWindows) {
+    return 'powershell'
+  }
+  return 'pwsh'
 }
 
 function Write-Step($message) {
@@ -142,6 +150,13 @@ function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $work
 
 try {
   Write-Step "artifacts=$runDir"
+  @(
+    "timestamp=$stamp"
+    "backend_url=$backendBaseUrl"
+    "postgres_jdbc_url=$PostgresJdbcUrl"
+    "is_windows=$(Test-IsWindows)"
+  ) | Set-Content -Path $metadataLog
+
   if (Test-BackendHealth) {
     Write-Step "reusing existing backend: $healthUrl"
   } elseif ($SkipServiceStart) {
@@ -153,7 +168,7 @@ try {
 
   Invoke-LoggedCommand `
     'API smoke' `
-    'powershell' `
+    (Get-PowerShellCommand) `
     @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'qa/api-smoke.ps1'), '-BaseUrl', $backendBaseUrl) `
     $repoRoot `
     $apiSmokeLog
