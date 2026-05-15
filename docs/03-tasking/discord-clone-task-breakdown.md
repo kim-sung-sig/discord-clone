@@ -669,6 +669,31 @@
 - harness kills a backend it did not start
 - PostgreSQL 5432 dev convention is ignored
 
+### T25. CI QA Harness Wiring
+
+예상: 1.0 MM
+
+범위:
+
+- GitHub Actions workflow baseline
+- backend/frontend unit/build jobs
+- real-backend QA harness job with PostgreSQL service
+- toolchain warning scan job with artifact upload
+- cross-platform PowerShell QA script portability
+
+성공 기준:
+
+- CI workflow runs backend tests, frontend tests/build, real-backend smoke, and warning scan
+- PostgreSQL service uses `discord` / `dev_user` / `dev_password`
+- QA artifacts are uploaded on success or failure
+- workflow structure is covered by a local contract test
+
+실패 기준:
+
+- CI only runs compile/build without runtime smoke
+- QA scripts remain Windows-only
+- CI failures lose backend/Playwright/warning logs
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:

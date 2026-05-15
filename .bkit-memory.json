@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T24-real-backend-qa-orchestration",
+  "phase": "design",
+  "currentFeature": "T25-ci-qa-harness-wiring",
   "updatedAt": "2026-05-15"
 }

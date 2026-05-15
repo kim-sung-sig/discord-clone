@@ -16,6 +16,7 @@
 | T22 | Toolchain/Build Maintenance | P2 | repeated Gradle/Nuxt/Vue warning notes |
 | T23 | Frontend Real API Integration Stabilization | P0 | runtime review, common task failure criterion: UI/API mismatch |
 | T24 | Real Backend QA Orchestration | P0 | T23 residual risk: real-backend Playwright requires manual backend/database/env setup |
+| T25 | CI QA Harness Wiring | P0 | T22/T24 residual risks: warning artifacts and real-backend harness are not wired to CI |
 
 ## Source Clusters
 
@@ -96,6 +97,15 @@ Sources:
 
 Promoted task: T24.
 
+### CI Quality Gate Cluster
+
+Sources:
+
+- T22 residual risk: warning regression is visible locally, but CI artifact upload is not wired.
+- T24 residual risk: CI workflow integration remains future work.
+
+Promoted task: T25.
+
 ## Recommended Execution Order
 
 1. T16 Persistence/PostgreSQL Migration
@@ -107,6 +117,7 @@ Promoted task: T24.
 7. T20 Premium Billing/Entitlement Persistence
 8. T22 Toolchain/Build Maintenance
 9. T24 Real Backend QA Orchestration
+10. T25 CI QA Harness Wiring
 
 Reasoning:
 
@@ -115,3 +126,4 @@ Reasoning:
 - Observability and security controls become more valuable once real runtime flows exist.
 - Media and premium are larger capability expansions and should use the hardened/persistent foundation.
 - Real-backend QA orchestration closes the remaining repeatability gap after frontend/backend integration exists.
+- CI wiring promotes the now-repeatable local QA harnesses into automated quality gates.
