@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T20-premium-billing-entitlement-persistence",
+  "phase": "design",
+  "currentFeature": "T21-audit-security-actions-expansion",
   "updatedAt": "2026-05-15"
 }
