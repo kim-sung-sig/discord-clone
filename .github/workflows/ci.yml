@@ -93,12 +93,49 @@ jobs:
         run: chmod +x ./gradlew
       - name: Real backend harness contract
         run: pwsh qa/real-backend-e2e.contract.ps1
+      - name: Start backend for runtime QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa/artifacts/real-backend-e2e/ci
+          ./gradlew :backend:boot:bootRun \
+            > qa/artifacts/real-backend-e2e/ci/backend-bootRun.log \
+            2> qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log &
+          echo "$!" > qa/artifacts/real-backend-e2e/ci/backend.pid
+
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/actuator/health > qa/artifacts/real-backend-e2e/ci/health.json; then
+              exit 0
+            fi
+            if ! kill -0 "$(cat qa/artifacts/real-backend-e2e/ci/backend.pid)" 2>/dev/null; then
+              cat qa/artifacts/real-backend-e2e/ci/backend-bootRun.log || true
+              cat qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          cat qa/artifacts/real-backend-e2e/ci/backend-bootRun.log || true
+          cat qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log || true
+          exit 1
+        env:
+          SPRING_PROFILES_ACTIVE: postgres
+          POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
+          POSTGRES_USER: dev_user
+          POSTGRES_PASSWORD: dev_password
       - name: Real backend smoke
-        run: pwsh qa/real-backend-e2e.ps1
+        run: pwsh qa/real-backend-e2e.ps1 -SkipServiceStart
         env:
           POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
           POSTGRES_USER: dev_user
           POSTGRES_PASSWORD: dev_password
+      - name: Stop runtime backend
+        if: always()
+        shell: bash
+        run: |
+          if [ -f qa/artifacts/real-backend-e2e/ci/backend.pid ]; then
+            kill "$(cat qa/artifacts/real-backend-e2e/ci/backend.pid)" 2>/dev/null || true
+          fi
       - name: Upload real backend artifacts
         if: always()
         uses: actions/upload-artifact@v4
