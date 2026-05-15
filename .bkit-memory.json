@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T21-audit-security-actions-expansion",
+  "phase": "design",
+  "currentFeature": "T22-toolchain-build-maintenance",
   "updatedAt": "2026-05-15"
 }
