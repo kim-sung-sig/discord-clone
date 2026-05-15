@@ -24,6 +24,24 @@ $apiSmokeLog = Join-Path $runDir 'api-smoke.log'
 $playwrightLog = Join-Path $runDir 'real-backend-playwright.log'
 $backendProcess = $null
 
+function Test-IsWindows {
+  return [System.Environment]::OSVersion.Platform -eq 'Win32NT'
+}
+
+function Get-GradleWrapper {
+  if (Test-IsWindows) {
+    return Join-Path $repoRoot 'gradlew.bat'
+  }
+  return Join-Path $repoRoot 'gradlew'
+}
+
+function Get-NpmCommand {
+  if (Test-IsWindows) {
+    return 'npm.cmd'
+  }
+  return 'npm'
+}
+
 function Write-Step($message) {
   Write-Output "[real-backend-e2e] $message"
 }
@@ -53,7 +71,7 @@ function Restore-TemporaryEnvironment($previous) {
 }
 
 function Start-BackendService {
-  $gradlePath = Join-Path $repoRoot 'gradlew.bat'
+  $gradlePath = Get-GradleWrapper
   if (-not (Test-Path $gradlePath)) {
     throw "Gradle wrapper not found: $gradlePath"
   }
@@ -67,13 +85,19 @@ function Start-BackendService {
   $previous = Set-TemporaryEnvironment $environment
   try {
     Write-Step "starting backend with :backend:boot:bootRun; logs=$backendLog"
-    return Start-Process -FilePath $gradlePath `
-      -ArgumentList ':backend:boot:bootRun' `
-      -WorkingDirectory $repoRoot `
-      -RedirectStandardOutput $backendLog `
-      -RedirectStandardError $backendErrorLog `
-      -PassThru `
-      -WindowStyle Hidden
+    $isWindows = Test-IsWindows
+    $startParams = @{
+      FilePath = if ($isWindows) { 'cmd.exe' } else { $gradlePath }
+      ArgumentList = if ($isWindows) { @('/c', $gradlePath, ':backend:boot:bootRun') } else { ':backend:boot:bootRun' }
+      WorkingDirectory = $repoRoot
+      RedirectStandardOutput = $backendLog
+      RedirectStandardError = $backendErrorLog
+      PassThru = $true
+    }
+    if ($isWindows) {
+      $startParams.WindowStyle = 'Hidden'
+    }
+    return Start-Process @startParams
   } finally {
     Restore-TemporaryEnvironment $previous
   }
@@ -101,6 +125,8 @@ function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $work
   Write-Step "running $label; log=$logPath"
   $previous = Set-TemporaryEnvironment $environment
   Push-Location $workingDirectory
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
   try {
     & $filePath @argumentList *>&1 | Tee-Object -FilePath $logPath
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
@@ -108,6 +134,7 @@ function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $work
       throw "$label failed with exit code $exitCode. See $logPath"
     }
   } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
     Pop-Location
     Restore-TemporaryEnvironment $previous
   }
@@ -133,7 +160,7 @@ try {
 
   Invoke-LoggedCommand `
     'real-backend Playwright' `
-    'npm.cmd' `
+    (Get-NpmCommand) `
     @('run', 'e2e', '--', 'tests/e2e/real-backend.spec.ts') `
     (Join-Path $repoRoot 'apps/web') `
     $playwrightLog `
