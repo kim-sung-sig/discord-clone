@@ -95,8 +95,8 @@ function Start-BackendService {
     Write-Step "starting backend with :backend:boot:bootRun; logs=$backendLog"
     $isWindows = Test-IsWindows
     $startParams = @{
-      FilePath = if ($isWindows) { 'cmd.exe' } else { $gradlePath }
-      ArgumentList = if ($isWindows) { @('/c', $gradlePath, ':backend:boot:bootRun') } else { ':backend:boot:bootRun' }
+      FilePath = if ($isWindows) { 'cmd.exe' } else { 'bash' }
+      ArgumentList = if ($isWindows) { @('/c', $gradlePath, ':backend:boot:bootRun') } else { @('-lc', './gradlew :backend:boot:bootRun') }
       WorkingDirectory = $repoRoot
       RedirectStandardOutput = $backendLog
       RedirectStandardError = $backendErrorLog
