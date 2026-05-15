@@ -1,0 +1,150 @@
+param(
+  [string] $BackendUrl = 'http://127.0.0.1:8080',
+  [string] $PostgresJdbcUrl = 'jdbc:postgresql://127.0.0.1:5432/discord',
+  [string] $PostgresUser = 'dev_user',
+  [string] $PostgresPassword = 'dev_password',
+  [string] $ArtifactsDir = 'qa/artifacts/real-backend-e2e',
+  [int] $BackendStartupTimeoutSeconds = 120,
+  [switch] $SkipServiceStart
+)
+
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$backendBaseUrl = $BackendUrl.TrimEnd('/')
+$healthUrl = "$backendBaseUrl/actuator/health"
+$artifactRoot = if ([System.IO.Path]::IsPathRooted($ArtifactsDir)) { $ArtifactsDir } else { Join-Path $repoRoot $ArtifactsDir }
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$runDir = Join-Path $artifactRoot $stamp
+New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+
+$backendLog = Join-Path $runDir 'backend-bootRun.log'
+$backendErrorLog = Join-Path $runDir 'backend-bootRun.err.log'
+$apiSmokeLog = Join-Path $runDir 'api-smoke.log'
+$playwrightLog = Join-Path $runDir 'real-backend-playwright.log'
+$backendProcess = $null
+
+function Write-Step($message) {
+  Write-Output "[real-backend-e2e] $message"
+}
+
+function Test-BackendHealth {
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -Method GET -TimeoutSec 3
+    return [int] $response.StatusCode -ge 200 -and [int] $response.StatusCode -lt 500
+  } catch {
+    return $false
+  }
+}
+
+function Set-TemporaryEnvironment($environment) {
+  $previous = @{}
+  foreach ($key in $environment.Keys) {
+    $previous[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+    [Environment]::SetEnvironmentVariable($key, [string] $environment[$key], 'Process')
+  }
+  return $previous
+}
+
+function Restore-TemporaryEnvironment($previous) {
+  foreach ($key in $previous.Keys) {
+    [Environment]::SetEnvironmentVariable($key, $previous[$key], 'Process')
+  }
+}
+
+function Start-BackendService {
+  $gradlePath = Join-Path $repoRoot 'gradlew.bat'
+  if (-not (Test-Path $gradlePath)) {
+    throw "Gradle wrapper not found: $gradlePath"
+  }
+
+  $environment = @{
+    SPRING_PROFILES_ACTIVE = 'postgres'
+    POSTGRES_JDBC_URL = $PostgresJdbcUrl
+    POSTGRES_USER = $PostgresUser
+    POSTGRES_PASSWORD = $PostgresPassword
+  }
+  $previous = Set-TemporaryEnvironment $environment
+  try {
+    Write-Step "starting backend with :backend:boot:bootRun; logs=$backendLog"
+    return Start-Process -FilePath $gradlePath `
+      -ArgumentList ':backend:boot:bootRun' `
+      -WorkingDirectory $repoRoot `
+      -RedirectStandardOutput $backendLog `
+      -RedirectStandardError $backendErrorLog `
+      -PassThru `
+      -WindowStyle Hidden
+  } finally {
+    Restore-TemporaryEnvironment $previous
+  }
+}
+
+function Wait-BackendHealth {
+  $deadline = (Get-Date).AddSeconds($BackendStartupTimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-BackendHealth) {
+      Write-Step "backend health is ready: $healthUrl"
+      return
+    }
+
+    if ($null -ne $backendProcess -and $backendProcess.HasExited) {
+      throw "Backend process exited before health became ready. See $backendLog and $backendErrorLog"
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  throw "Backend health did not become ready within $BackendStartupTimeoutSeconds seconds at $healthUrl. See $backendLog and $backendErrorLog"
+}
+
+function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $workingDirectory, $logPath, $environment = @{}) {
+  Write-Step "running $label; log=$logPath"
+  $previous = Set-TemporaryEnvironment $environment
+  try {
+    & $filePath @argumentList *>&1 | Tee-Object -FilePath $logPath
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+    if ($exitCode -ne 0) {
+      throw "$label failed with exit code $exitCode. See $logPath"
+    }
+  } finally {
+    Restore-TemporaryEnvironment $previous
+  }
+}
+
+try {
+  Write-Step "artifacts=$runDir"
+  if (Test-BackendHealth) {
+    Write-Step "reusing existing backend: $healthUrl"
+  } elseif ($SkipServiceStart) {
+    throw "Backend is not healthy at $healthUrl and -SkipServiceStart was set"
+  } else {
+    $backendProcess = Start-BackendService
+    Wait-BackendHealth
+  }
+
+  Invoke-LoggedCommand `
+    'API smoke' `
+    'powershell' `
+    @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'qa/api-smoke.ps1'), '-BaseUrl', $backendBaseUrl) `
+    $repoRoot `
+    $apiSmokeLog
+
+  Invoke-LoggedCommand `
+    'real-backend Playwright' `
+    'npm.cmd' `
+    @('run', 'e2e', '--', 'tests/e2e/real-backend.spec.ts') `
+    (Join-Path $repoRoot 'apps/web') `
+    $playwrightLog `
+    @{
+      REAL_BACKEND_E2E = '1'
+      REAL_BACKEND_BASE_URL = $backendBaseUrl
+      NUXT_PUBLIC_API_BASE_URL = $backendBaseUrl
+    }
+
+  Write-Output "REAL_BACKEND_E2E_PASS artifacts=$runDir"
+} finally {
+  if ($null -ne $backendProcess -and -not $backendProcess.HasExited) {
+    Write-Step "stopping backend process $($backendProcess.Id)"
+    Stop-Process -Id $backendProcess.Id -Force
+  }
+}
