@@ -14,7 +14,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -39,9 +38,8 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     );
     private static final Pattern NUMERIC_PATH_SEGMENT = Pattern.compile("/\\d+(?=/|$)");
     private static final Pattern INVITE_ACCEPT_PATH = Pattern.compile("^/api/invites/[^/]+/accept$");
-    private static final Set<String> LOCAL_DEVELOPMENT_ORIGINS = Set.of(
-        "http://127.0.0.1:3000",
-        "http://localhost:3000"
+    private static final Pattern LOCAL_DEVELOPMENT_ORIGIN = Pattern.compile(
+        "^http://(127\\.0\\.0\\.1|localhost):\\d{2,5}$"
     );
 
     private final MeterRegistry meterRegistry;
@@ -111,7 +109,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
 
     private static void applyCors(HttpServletRequest request, HttpServletResponse response) {
         String origin = request.getHeader("Origin");
-        if (origin == null || !LOCAL_DEVELOPMENT_ORIGINS.contains(origin)) {
+        if (origin == null || !LOCAL_DEVELOPMENT_ORIGIN.matcher(origin).matches()) {
             return;
         }
         response.setHeader("Access-Control-Allow-Origin", origin);

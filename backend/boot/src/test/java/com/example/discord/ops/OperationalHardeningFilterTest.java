@@ -87,6 +87,16 @@ class OperationalHardeningFilterTest {
     }
 
     @Test
+    void apiPreflightAllowsLocalNuxtOverridePortForPlaywright() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "http://127.0.0.1:3010")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "content-type, x-request-id"))
+            .andExpect(status().isNoContent())
+            .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:3010"));
+    }
+
+    @Test
     void apiRequestIdIsAvailableInMdcAndClearedAfterRequest() throws Exception {
         mockMvc.perform(get("/api/observability/mdc")
                 .header(REQUEST_ID_HEADER, "t17-request-123"))

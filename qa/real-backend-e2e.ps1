@@ -100,6 +100,7 @@ function Wait-BackendHealth {
 function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $workingDirectory, $logPath, $environment = @{}) {
   Write-Step "running $label; log=$logPath"
   $previous = Set-TemporaryEnvironment $environment
+  Push-Location $workingDirectory
   try {
     & $filePath @argumentList *>&1 | Tee-Object -FilePath $logPath
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
@@ -107,6 +108,7 @@ function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $work
       throw "$label failed with exit code $exitCode. See $logPath"
     }
   } finally {
+    Pop-Location
     Restore-TemporaryEnvironment $previous
   }
 }
@@ -139,6 +141,8 @@ try {
       REAL_BACKEND_E2E = '1'
       REAL_BACKEND_BASE_URL = $backendBaseUrl
       NUXT_PUBLIC_API_BASE_URL = $backendBaseUrl
+      NUXT_DEV_PORT = '3010'
+      PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:3010'
     }
 
   Write-Output "REAL_BACKEND_E2E_PASS artifacts=$runDir"

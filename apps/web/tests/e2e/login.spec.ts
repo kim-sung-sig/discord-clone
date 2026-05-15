@@ -16,6 +16,8 @@ test('logs in through the API from the login page without persisting the token',
     })
   })
   await page.goto('/login')
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByTestId('login-submit')).toBeEnabled()
 
   await page.getByLabel('Email').fill('user@example.com')
   await page.getByLabel('Password').fill('correct horse battery staple')

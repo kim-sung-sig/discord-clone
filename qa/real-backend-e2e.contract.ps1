@@ -30,7 +30,12 @@ $requiredSnippets = @(
   'REAL_BACKEND_E2E',
   'REAL_BACKEND_BASE_URL',
   'NUXT_PUBLIC_API_BASE_URL',
+  'NUXT_DEV_PORT',
+  'PLAYWRIGHT_BASE_URL',
+  'http://127.0.0.1:3010',
   'tests/e2e/real-backend.spec.ts',
+  'Push-Location $workingDirectory',
+  'Pop-Location',
   'Stop-Process -Id $backendProcess.Id'
 )
 

@@ -22,6 +22,8 @@ test('runs login, guild/channel/message, voice, and stage through the real backe
   expect(signup.ok()).toBeTruthy()
 
   await page.goto('/login')
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByTestId('login-submit')).toBeEnabled()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()

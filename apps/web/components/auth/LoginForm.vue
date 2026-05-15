@@ -30,15 +30,6 @@ async function submitLogin() {
     </p>
 
     <form class="login-form" data-testid="login-form" @submit.prevent="submitLogin">
-      <p
-        v-if="!isHydrated"
-        id="login-hydration-status"
-        class="login-loading"
-        role="status"
-      >
-        Sign-in controls will be enabled after the page finishes loading.
-      </p>
-
       <label class="login-field" for="login-email">
         Email
         <input
@@ -48,8 +39,6 @@ async function submitLogin() {
           name="email"
           type="email"
           autocomplete="email"
-          :disabled="!isHydrated"
-          :aria-describedby="!isHydrated ? 'login-hydration-status' : undefined"
           required
         >
       </label>
@@ -63,8 +52,6 @@ async function submitLogin() {
           name="password"
           type="password"
           autocomplete="current-password"
-          :disabled="!isHydrated"
-          :aria-describedby="!isHydrated ? 'login-hydration-status' : undefined"
           required
         >
       </label>
@@ -91,7 +78,6 @@ async function submitLogin() {
         data-testid="login-submit"
         type="submit"
         :disabled="!isHydrated || auth.isLoading"
-        :aria-describedby="!isHydrated ? 'login-hydration-status' : undefined"
       >
         {{ auth.isLoading ? 'Signing in...' : 'Sign in' }}
       </button>
@@ -163,8 +149,7 @@ async function submitLogin() {
 }
 
 .login-error,
-.login-success,
-.login-loading {
+.login-success {
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
@@ -180,12 +165,6 @@ async function submitLogin() {
   color: #d8ffea;
   background: rgba(57, 217, 138, 0.16);
   border: 1px solid rgba(57, 217, 138, 0.32);
-}
-
-.login-loading {
-  color: #dbeafe;
-  background: rgba(84, 166, 255, 0.14);
-  border: 1px solid rgba(84, 166, 255, 0.28);
 }
 
 .login-submit {
