@@ -24,7 +24,12 @@
 | Phase 8 | premium entitlement/shop/quests skeleton | 3.0 |
 | Phase 9 | hardening/performance/security/e2e stabilization | 4.0 |
 | Phase 10 | PWA/desktop/native-mobile frontend surfaces | 7.0 |
-| 합계 | Enterprise-grade V1~V3 + multi-platform frontend | 48.5 MM |
+| Phase 11 | release gate/supply-chain/account/runtime security | 6.5 |
+| Phase 12 | production realtime/media transport | 11.0 |
+| Phase 13 | browser security/recovery/API contract | 4.5 |
+| Phase 14 | product parity: notifications/search/admin/bot/events | 13.5 |
+| Phase 15 | upload safety/accessibility quality pass | 4.0 |
+| 합계 | Enterprise-grade V1~V3 + multi-platform frontend + post-T30 hardening/product expansion | 88.0 MM |
 
 현실적 1인 바이브 코딩 기준:
 
@@ -817,19 +822,461 @@
 - web/PWA와 native가 API contract를 공유하지 못함
 - push/background/media 같은 native-only 요구가 분석되지 않음
 
+### T31. Remote CI Verification & Release Gate
+
+예상: 0.5 MM
+
+범위:
+
+- GitHub Actions 원격 실행 검증
+- backend/frontend/qa-runtime/qa-toolchain job 결과 확인
+- runner-specific shell/path/service 문제 수정
+- CI artifact upload와 failure triage 문서화
+
+성공 기준:
+
+- 원격 CI가 backend, frontend, real-backend QA, warning scan을 모두 실행함
+- 실패 시 backend/Playwright/toolchain artifact가 업로드됨
+- 로컬 contract와 원격 runner 결과 차이가 문서화되고 해소됨
+
+실패 기준:
+
+- 로컬 contract만 통과하고 원격 CI 실행이 검증되지 않음
+- CI 실패 원인을 artifact 없이 추적해야 함
+
+### T32. Dependency, SBOM & Vulnerability Gate
+
+예상: 1.0 MM
+
+범위:
+
+- Gradle dependency vulnerability scan
+- npm dependency audit 또는 동등 scanner
+- SBOM artifact 생성
+- high/critical 취약점 threshold 정책
+- false positive allowlist와 만료일 정책
+
+성공 기준:
+
+- CI가 dependency scan과 SBOM artifact를 생성함
+- high/critical 취약점은 명시적 allowlist 없이는 실패함
+- allowlist에는 근거, owner, 만료일이 기록됨
+
+실패 기준:
+
+- 취약점 스캔이 수동 로컬 작업으로만 남음
+- allowlist가 영구 예외로 방치됨
+
+### T33. Production Secret & Config Baseline
+
+예상: 1.0 MM
+
+범위:
+
+- `.env.example`과 profile별 required config 정리
+- CI/local/prod secret contract 문서화
+- production profile boot-time config validation
+- secret redaction test
+- JWT/LiveKit/database secret rotation guide
+
+성공 기준:
+
+- 필수 운영 secret 누락 시 production profile이 명확한 오류로 실패함
+- 테스트 fixture secret과 production secret이 분리됨
+- 로그와 QA artifact에 token/password/secret 값이 노출되지 않음
+
+실패 기준:
+
+- 기본값 secret으로 production profile이 기동됨
+- CI artifact에 민감값이 출력됨
+
+### T34. Session & Account Security Hardening
+
+예상: 2.0 MM
+
+범위:
+
+- refresh token rotation persistence
+- refresh token reuse detection
+- device/session list API
+- self-service session revoke
+- suspicious login audit event
+- frontend session management UI
+
+성공 기준:
+
+- refresh token 재사용 탐지 시 관련 세션이 폐기됨
+- 사용자는 기기별 세션을 조회하고 폐기할 수 있음
+- suspicious login은 audit/log/notification 후보 이벤트로 남음
+- browser token policy가 `httpOnly refresh cookie + in-memory access token` 기준을 유지함
+
+실패 기준:
+
+- refresh token이 재사용 가능함
+- 로그아웃 후 refresh가 계속 성공함
+- access/refresh token이 localStorage에 저장됨
+
+### T35. Redis-backed Runtime Controls
+
+예상: 2.0 MM
+
+범위:
+
+- Redis-backed `RateLimitStore`
+- presence TTL Redis adapter
+- gateway identify/message throttle Redis key strategy
+- Redis 장애 시 endpoint별 fail-open/fail-closed 정책
+- Testcontainers Redis integration tests
+
+성공 기준:
+
+- rate limit 카운터가 다중 backend instance에서 공유됨
+- presence TTL 만료가 Redis 기반으로 deterministic하게 검증됨
+- Redis 장애 정책이 인증, 메시지 쓰기, gateway identify별로 문서화됨
+
+실패 기준:
+
+- production profile에서도 in-memory limiter가 사용됨
+- Redis 장애 시 인증/메시지/gateway 정책이 불명확함
+
+### T36. Real WebSocket Gateway Transport
+
+예상: 3.0 MM
+
+범위:
+
+- WebSocket identify/auth
+- heartbeat ack/timeout
+- sequence number and resume
+- channel subscription authorization
+- Playwright two-browser realtime smoke
+
+성공 기준:
+
+- 두 브라우저 사이에서 message/voice/stage event가 WebSocket으로 전파됨
+- reconnect/resume 후 이벤트 중복/누락이 없음
+- 권한 없는 channel event는 수신되지 않음
+
+실패 기준:
+
+- hidden channel event가 WebSocket으로 유출됨
+- reconnect 후 frontend state가 중복 적용됨
+
+### T37. Frontend Realtime State Reconciliation
+
+예상: 2.0 MM
+
+범위:
+
+- request id/client event id correlation
+- optimistic update rollback
+- duplicate Gateway event suppression
+- sequence gap handling UI
+- Pinia store and Playwright regression tests
+
+성공 기준:
+
+- message create REST success 후 Gateway echo가 와도 메시지가 중복되지 않음
+- sequence gap 발생 시 사용자에게 재동기화 상태가 표시됨
+- 실패한 optimistic update는 접근 가능한 오류 메시지와 함께 rollback됨
+
+실패 기준:
+
+- 빠른 연속 메시지에서 순서가 뒤집힘
+- Gateway reconnect 후 이미 표시된 이벤트가 다시 추가됨
+
+### T38. CSP Reporting & Style Policy Hardening
+
+예상: 1.0 MM
+
+범위:
+
+- CSP report-only/report endpoint
+- script/style violation telemetry
+- `style-src 'unsafe-inline'` 제거 가능성 분석
+- nonce/hash 기반 style policy 후보 검증
+- browser security telemetry QA artifact
+
+성공 기준:
+
+- CSP 위반 report가 안전하게 수집되고 민감정보가 필터링됨
+- script CSP nonce 정책이 regression 없이 유지됨
+- style CSP hardening 경로와 남은 예외가 문서화됨
+
+실패 기준:
+
+- CSP report가 사용자 데이터나 token을 저장함
+- style policy 변경으로 Nuxt hydration/layout이 깨짐
+
+### T39. Backup, Restore & Migration Drill
+
+예상: 1.5 MM
+
+범위:
+
+- PostgreSQL backup/restore script
+- Flyway migration forward/rollback rehearsal
+- restore 후 API smoke
+- destructive migration guardrail
+- QA artifact retention policy
+
+성공 기준:
+
+- seed data backup을 복구한 뒤 auth/guild/message smoke가 통과함
+- migration 실패 시 복구 절차가 문서화됨
+- backup artifact 보관/삭제 정책이 명확함
+
+실패 기준:
+
+- migration 실패 시 수동 DB 조작 외 복구 경로가 없음
+- restore 후 application smoke가 검증되지 않음
+
+### T40. Cross-node Gateway Fanout
+
+예상: 3.0 MM
+
+범위:
+
+- Redis Streams 또는 Redpanda 기반 gateway fanout
+- gateway node subscription registry
+- event sequence replay buffer
+- multi-node delivery authorization test
+- cross-node duplicate suppression
+
+성공 기준:
+
+- 서로 다른 gateway node에 연결된 두 사용자가 동일 channel event를 수신함
+- hidden channel 사용자는 cross-node fanout에서도 event를 수신하지 않음
+- replay buffer와 sequence가 reconnect/resume에 사용됨
+
+실패 기준:
+
+- 단일 JVM에서는 통과하지만 다중 node에서 이벤트가 유실됨
+- fanout payload에 token/secret/signed URL이 포함됨
+
+### T41. LiveKit Production Voice Integration
+
+예상: 3.0 MM
+
+범위:
+
+- secret-backed LiveKit token signer
+- room naming and participant claim policy
+- voice/stage permission to media room mapping
+- two-browser media smoke
+- media secret deployment guide
+
+성공 기준:
+
+- 권한 있는 사용자에게만 LiveKit room token이 발급됨
+- token claim에 guild/channel/user/session 경계가 반영됨
+- two-browser media smoke가 voice join/leave state와 함께 통과함
+
+실패 기준:
+
+- media secret이 코드, test fixture, artifact에 노출됨
+- Spring backend가 RTP media plane을 직접 처리하려 함
+
+### T42. OpenAPI & Frontend Client Contract
+
+예상: 2.0 MM
+
+범위:
+
+- backend OpenAPI spec generation
+- frontend API client contract sync
+- request/response error shape validation
+- CI drift check
+- API versioning policy
+
+성공 기준:
+
+- frontend API client가 OpenAPI contract와 drift 없이 생성/검증됨
+- backend error shape와 request id policy가 spec에 반영됨
+- API breaking change는 CI에서 탐지됨
+
+실패 기준:
+
+- frontend client가 수동 타입 복사로 유지됨
+- backend response 변경이 UI 테스트 전까지 발견되지 않음
+
+### T43. Notification & Mention Inbox
+
+예상: 2.5 MM
+
+범위:
+
+- mention inbox
+- DM/server notification center
+- unread/read-state integration
+- notification preference skeleton
+- PWA/browser notification adapter
+
+성공 기준:
+
+- mention/DM/server unread가 inbox에서 일관되게 표시됨
+- read marker 변경이 notification count에 반영됨
+- 사용자 notification preference가 최소 단위로 적용됨
+
+실패 기준:
+
+- 메시지를 읽어도 unread/mention count가 줄지 않음
+- hidden channel mention이 notification에 노출됨
+
+### T44. Message Search & Moderation Reports
+
+예상: 3.0 MM
+
+범위:
+
+- guild/channel scoped message search UI
+- PostgreSQL full-text 또는 search provider boundary
+- message report flow
+- moderation queue
+- incident timeline and audit link
+
+성공 기준:
+
+- 권한 있는 channel 범위에서만 메시지가 검색됨
+- 사용자가 메시지를 신고하고 moderator가 queue에서 처리할 수 있음
+- moderation action이 audit/security action과 연결됨
+
+실패 기준:
+
+- 검색 결과에 접근 권한 없는 channel message가 포함됨
+- report 처리 후 audit trail이 남지 않음
+
+### T45. Admin Console & Role Permission UX
+
+예상: 2.5 MM
+
+범위:
+
+- server settings/admin console
+- role ordering and permission diff
+- preview-as-role
+- channel overwrite editor
+- privileged action audit visibility
+
+성공 기준:
+
+- admin은 role/channel permission 변경 전 diff를 확인할 수 있음
+- preview-as-role이 API authorization 결과와 일치함
+- privileged mutation은 audit log에 남음
+
+실패 기준:
+
+- UI는 허용하지만 API가 거부하는 permission mismatch가 발생함
+- role hierarchy 우회가 가능함
+
+### T46. Upload Security & Content Safety
+
+예상: 2.0 MM
+
+범위:
+
+- file signature validation
+- MIME/content-type mismatch rejection
+- unsafe preview and SSRF boundary
+- orphan cleanup hardening
+- malware scanning provider interface skeleton
+
+성공 기준:
+
+- 확장자와 실제 file signature 불일치가 차단됨
+- preview/fetch 기능이 내부망/metadata endpoint로 접근하지 않음
+- upload 성공/message 실패 orphan이 정리됨
+
+실패 기준:
+
+- 사용자가 임의 object key나 internal URL을 preview 대상으로 지정할 수 있음
+- scanner 실패 시 허용/차단 정책이 불명확함
+
+### T47. Accessibility & Responsive UX Pass
+
+예상: 2.0 MM
+
+범위:
+
+- keyboard navigation
+- focus trap and skip path
+- aria labels for icon buttons
+- color contrast review
+- mobile/tablet/desktop visual regression smoke
+
+성공 기준:
+
+- keyboard만으로 login, guild/channel navigation, message composer 사용이 가능함
+- modal/drawer focus가 trap되고 restore됨
+- 주요 icon button에 접근 가능한 이름이 있음
+
+실패 기준:
+
+- 모바일 drawer나 modal에서 focus가 배경으로 빠짐
+- 텍스트/버튼이 작은 viewport에서 겹치거나 잘림
+
+### T48. Bot & Webhook Skeleton
+
+예상: 3.0 MM
+
+범위:
+
+- bot identity and token policy
+- webhook create/send/delete
+- bot/webhook permission model
+- audit entries for bot/webhook management
+- rate limit and abuse boundary
+
+성공 기준:
+
+- webhook message는 actor/source가 명확하게 표시됨
+- bot/webhook token은 생성 후 재조회되지 않음
+- 권한 없는 사용자는 webhook 생성/삭제/전송을 할 수 없음
+
+실패 기준:
+
+- webhook token이 로그나 응답에서 반복 노출됨
+- bot action이 일반 사용자 action과 구분되지 않음
+
+### T49. Server Events & Scheduling
+
+예상: 2.5 MM
+
+범위:
+
+- server event create/update/cancel
+- RSVP/interest state
+- event reminder notification candidate
+- stage/voice channel association
+- calendar/list UI
+
+성공 기준:
+
+- 권한 있는 사용자가 서버 이벤트를 생성하고 멤버가 RSVP할 수 있음
+- event 변경/취소가 notification/audit 후보 이벤트로 남음
+- stage/voice event가 channel permission을 따른다
+
+실패 기준:
+
+- hidden voice/stage channel event가 일반 사용자에게 노출됨
+- event 시간대/상태 전이가 테스트되지 않음
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:
 
 1. Plan 문서 생성/갱신
 2. Design 문서 생성/갱신
-3. 테스트 먼저 작성
-4. 구현
-5. backend/frontend/e2e QA 실행
-6. 실패 시 `docs/05-feedback/{task}.feedback.md` 작성
-7. feedback 기준 재구현
-8. 통과 시 report 작성
-9. 다음 task 진행
+3. `docs/03-tasking/agent-team-operating-model.md` 기준으로 context packet 작성
+4. 구현 에이전트가 테스트 먼저 작성
+5. 구현 에이전트가 구현
+6. Spec Compliance Agent 리뷰
+7. Code Quality Agent 리뷰
+8. Runtime QA Agent가 backend/frontend/e2e QA 실행
+9. 실패 시 `docs/05-feedback/{task}.feedback.md` 작성
+10. feedback 기준 재구현
+11. 통과 시 report 작성
+12. 다음 task 진행
 
 ## 5. 즉시 시작 가능한 첫 작업
 

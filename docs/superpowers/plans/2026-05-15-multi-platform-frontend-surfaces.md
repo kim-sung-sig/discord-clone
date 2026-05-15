@@ -10,6 +10,17 @@
 
 ---
 
+## Execution Model
+
+Use [agent-team-operating-model.md](C:\git\discord\docs\03-tasking\agent-team-operating-model.md) for all T27~T30 execution.
+
+- Coordinator owns task packets, sequencing, integration, and final commit gate.
+- Implementer agents own only their allowed write paths.
+- Spec Compliance Agent reviews Plan/Design alignment before quality review.
+- Code Quality Agent reviews diff quality and architecture boundaries.
+- Runtime QA Agent runs the relevant command set and reports artifacts.
+- P0/P1 findings block the next task until fixed or explicitly converted to a documented follow-up.
+
 ## File Structure
 
 - Modify: `package.json` to include future `packages/*`, `apps/desktop`, and `apps/mobile` workspaces when those tasks start.
