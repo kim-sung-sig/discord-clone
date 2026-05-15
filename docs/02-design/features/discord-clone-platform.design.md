@@ -2,7 +2,7 @@
 
 작성일: 2026-05-13  
 PDCA Phase: Design  
-대상: Spring Boot backend + Nuxt frontend
+대상: Spring Boot backend + Nuxt/PWA/Desktop/Mobile frontend
 
 ## 1. 아키텍처 결정
 
@@ -53,6 +53,14 @@ PDCA Phase: Design
 - Playwright
 - Storybook
 
+### 2.2.1 Cross-Platform Frontend
+
+- PWA: Nuxt app에 manifest, service worker, offline shell, installability, mobile viewport QA를 추가한다.
+- Desktop app: Tauri 2를 기본 desktop shell로 채택한다. Electron은 native module/enterprise compatibility가 Tauri로 부족할 때만 재검토한다.
+- Native mobile option: Expo React Native를 1차 후보로 둔다. PWA로 해결되지 않는 push notification, background media/session, app store 배포, native share/file picker 요구가 확정될 때 `apps/mobile`로 확장한다.
+- Shared packages: `packages/api-client`, `packages/design-tokens`, `packages/ui-contracts`, `packages/platform-shell`로 API 호출, 디자인 토큰, route/screen contract, 플랫폼 capability contract를 공유한다.
+- Screen strategy: 웹은 multi-pane, 모바일은 single active pane + drawer/bottom navigation, 데스크톱은 wide multi-pane + OS integration을 기준으로 한다.
+
 ### 2.3 Realtime
 
 - Backend Gateway: Spring WebSocket initially
@@ -92,6 +100,7 @@ PDCA Phase: Design
 | 빠른 초기 개발 | Modular Monolith | Full MSA 대비 개발/QA/배포 복잡도 절감 |
 | 향후 확장 | Bounded context + outbox event | 모놀리스 내부 결합으로 분리 불가 |
 | 화면 품질 | Nuxt + component test + Storybook + Playwright | 구현 후 UX 회귀 탐지 불가 |
+| 멀티 플랫폼 화면 확장 | Nuxt PWA + Tauri desktop + Expo 후보 + shared UI contracts | 웹 전용 컴포넌트가 모바일/데스크톱 확장을 막고 플랫폼별 UX가 분기됨 |
 | QA 자동 반복 | PDCA docs + feedback loop | 실패 원인 누락, 같은 결함 반복 |
 
 ## 4. 모노레포 구조
@@ -100,6 +109,8 @@ PDCA Phase: Design
 discord/
   apps/
     web/                         # Nuxt 3 app
+    desktop/                     # Tauri 2 shell for Nuxt web build
+    mobile/                      # Expo React Native candidate shell
   backend/
     boot/                        # Spring Boot app entry
     modules/
@@ -124,6 +135,8 @@ discord/
   packages/
     api-client/
     design-tokens/
+    ui-contracts/
+    platform-shell/
   infra/
     docker/
     k8s/
@@ -330,7 +343,48 @@ apps/web/
     guild.store.ts
     message.store.ts
   tests/
+
+apps/desktop/
+  src-tauri/
+    tauri.conf.json
+    capabilities/
+  src/
+    main.ts                      # desktop bootstrap and webview bridge
+    tray.ts
+    notifications.ts
+  tests/
+
+apps/mobile/
+  app/
+    (auth)/
+    (main)/
+      guilds/
+      channels/
+      dm/
+  components/
+    shell/
+    message/
+    voice/
+  navigation/
+  tests/
+
+packages/ui-contracts/
+  screens.ts                     # route, pane, navigation, capability contracts
+  platform.ts
+
+packages/platform-shell/
+  pwa/
+  desktop/
+  mobile/
 ```
+
+### 8.1 Platform Screen Rules
+
+- Web desktop: server rail, channel sidebar, chat viewport, member sidebar, user/voice panel을 동시에 노출한다.
+- Mobile PWA: server/channel navigation은 drawer 또는 bottom navigation으로 접고, chat 또는 voice 화면 하나를 primary pane으로 유지한다.
+- Desktop app: web desktop layout을 유지하되 window state, tray reconnect, OS notification, invite deep link를 shell capability로 분리한다.
+- Native mobile: Expo screen stack은 PWA mobile IA를 따른다. 단, push/background/media/file picker 같은 native capability만 platform adapter로 분기한다.
+- 공통: 권한, presence, unread, route guard, API error 표현은 플랫폼별 재구현이 아니라 shared contract를 통해 검증한다.
 
 ## 9. QA 설계
 
@@ -352,6 +406,10 @@ apps/web/
 - Playwright e2e
 - visual screenshot smoke for app shell
 - accessibility smoke with axe
+- Playwright mobile viewport smoke for PWA shell
+- PWA manifest/service worker/installability smoke
+- Tauri desktop shell smoke for boot, window title, deep link placeholder, notification adapter boundary
+- Expo/native candidate component and navigation contract tests when `apps/mobile` is promoted
 
 ### Cross-system
 
@@ -377,6 +435,10 @@ apps/web/
 13. Moderation/AutoMod
 14. Voice signaling/SFU
 15. Stage/Soundboard/Premium skeleton
+16. Multi-platform frontend architecture and screen contracts
+17. PWA/mobile web shell
+18. Tauri desktop shell
+19. Native mobile app decision/Expo shell spike
 
 ## 11. 설계 승인 게이트
 
@@ -386,4 +448,4 @@ apps/web/
 - Gateway/Media/Search/Storage는 독립 인프라로 둔다.
 - LiveKit을 음성/영상 SFU 후보로 둔다.
 - task마다 TDD + 아키텍처 테스트 + 화면 테스트를 완료 기준으로 둔다.
-
+- PWA 우선, Tauri 데스크톱 shell, Expo 네이티브 후보를 멀티 플랫폼 프론트 기준선으로 승인한다.

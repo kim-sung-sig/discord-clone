@@ -18,6 +18,10 @@
 | T24 | Real Backend QA Orchestration | P0 | T23 residual risk: real-backend Playwright requires manual backend/database/env setup |
 | T25 | CI QA Harness Wiring | P0 | T22/T24 residual risks: warning artifacts and real-backend harness are not wired to CI |
 | T26 | Nuxt SSR CSP Nonce Hardening | P1 | T24/T25 residual risk: Nuxt script CSP currently uses `unsafe-inline` for hydration |
+| T27 | Multi-Platform Frontend Architecture & Screen Contracts | P1 | user scope expansion: desktop app and mobile app/PWA planning |
+| T28 | PWA & Mobile Web Shell | P1 | T27 follow-up: installable mobile web and responsive app-shell QA |
+| T29 | Tauri Desktop App Shell | P2 | T27 follow-up: desktop app surface and OS capability boundary |
+| T30 | Native Mobile App Decision & Expo Shell Spike | P2 | T27 follow-up: decide PWA-only vs native mobile expansion |
 
 ## Source Clusters
 
@@ -116,6 +120,16 @@ Sources:
 
 Promoted task: T26.
 
+### Multi-Platform Frontend Cluster
+
+Sources:
+
+- User scope expansion: frontend screen plan must cover desktop app and mobile app via PWA or native.
+- Existing T06 responsive shell is web-first and does not define installable PWA, desktop shell, or native mobile screen contracts.
+- Existing architecture has `apps/web` only, so shared UI/API/platform contracts need to be planned before implementation.
+
+Promoted tasks: T27, T28, T29, T30.
+
 ## Recommended Execution Order
 
 1. T16 Persistence/PostgreSQL Migration
@@ -129,6 +143,10 @@ Promoted task: T26.
 9. T24 Real Backend QA Orchestration
 10. T25 CI QA Harness Wiring
 11. T26 Nuxt SSR CSP Nonce Hardening
+12. T27 Multi-Platform Frontend Architecture & Screen Contracts
+13. T28 PWA & Mobile Web Shell
+14. T29 Tauri Desktop App Shell
+15. T30 Native Mobile App Decision & Expo Shell Spike
 
 Reasoning:
 
@@ -139,3 +157,4 @@ Reasoning:
 - Real-backend QA orchestration closes the remaining repeatability gap after frontend/backend integration exists.
 - CI wiring promotes the now-repeatable local QA harnesses into automated quality gates.
 - CSP nonce hardening should follow CI wiring so runtime hydration regressions remain visible while tightening browser policy.
+- Multi-platform frontend work should start after CSP/runtime QA stabilization so new PWA/desktop/mobile surfaces inherit a verified web baseline instead of multiplying existing runtime gaps.

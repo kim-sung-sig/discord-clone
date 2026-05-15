@@ -23,7 +23,8 @@
 | Phase 7 | voice signaling/SFU integration/soundboard/stage | 7.0 |
 | Phase 8 | premium entitlement/shop/quests skeleton | 3.0 |
 | Phase 9 | hardening/performance/security/e2e stabilization | 4.0 |
-| 합계 | Enterprise-grade V1~V3 | 41.5 MM |
+| Phase 10 | PWA/desktop/native-mobile frontend surfaces | 7.0 |
+| 합계 | Enterprise-grade V1~V3 + multi-platform frontend | 48.5 MM |
 
 현실적 1인 바이브 코딩 기준:
 
@@ -717,6 +718,104 @@
 - hydration breaks
 - arbitrary inline script remains allowed
 - CSP nonce and script tag nonce diverge
+
+### T27. Multi-Platform Frontend Architecture & Screen Contracts
+
+예상: 1.5 MM
+
+범위:
+
+- Nuxt web shell을 기준으로 PWA, 데스크톱, 네이티브 모바일 화면 정보구조 재정의
+- shared `api-client`, `design-tokens`, `ui-contracts`, `platform-shell` package 경계 설계
+- platform capability matrix: notification, deep link, tray, offline shell, push, background media/session, file picker
+- route/screen contract와 permission/error/unread/presence 표현 규칙 문서화
+- mobile/desktop/native screen QA 기준 추가
+
+성공 기준:
+
+- 웹, PWA mobile, Tauri desktop, Expo native 후보의 화면 IA와 navigation contract가 문서화됨
+- platform별 분기 기준이 capability contract로 표현됨
+- 기존 Nuxt shell을 재사용할 부분과 분리할 부분이 명시됨
+- 이후 T28~T30 구현 task가 독립적으로 실행 가능한 성공/실패 기준을 가짐
+
+실패 기준:
+
+- 플랫폼별 화면이 단순 복붙으로 정의되어 유지보수 경계가 없음
+- PWA와 native mobile 선택 기준이 불명확함
+- API/권한/디자인 토큰 계약 없이 UI가 플랫폼마다 달라짐
+
+### T28. PWA & Mobile Web Shell
+
+예상: 2.0 MM
+
+범위:
+
+- Nuxt PWA manifest/service worker/offline shell
+- 모바일 viewport용 single-pane chat, drawer channel navigation, bottom navigation
+- safe-area, touch target, mobile keyboard/composer interaction
+- Playwright mobile viewport smoke와 installability 검증
+
+성공 기준:
+
+- mobile viewport에서 login -> guild/channel -> message flow가 통과
+- PWA manifest와 service worker가 테스트로 검증됨
+- channel/member/voice navigation이 모바일에서 접근 가능함
+- offline shell이 최소한의 loading/error/retry 상태를 제공함
+
+실패 기준:
+
+- 모바일에서 핵심 channel/message UI가 숨겨지거나 unreachable 상태가 됨
+- PWA 설치 요건이 문서만 있고 검증되지 않음
+- desktop CSS breakpoint가 mobile UX를 깨뜨림
+
+### T29. Tauri Desktop App Shell
+
+예상: 1.5 MM
+
+범위:
+
+- `apps/desktop` Tauri 2 shell scaffold
+- Nuxt web build/dev server loading strategy
+- desktop capability adapter: notification, invite deep link placeholder, tray/window state skeleton
+- desktop smoke test and packaging contract
+
+성공 기준:
+
+- desktop shell이 Nuxt app을 로드하고 기본 app-shell smoke를 통과
+- Tauri capability allowlist가 최소 권한으로 문서화/검증됨
+- OS notification/deep link/tray 기능은 adapter boundary로 분리됨
+- 웹 코드가 desktop-only API에 직접 의존하지 않음
+
+실패 기준:
+
+- desktop shell이 web app을 깨뜨리거나 별도 UI fork가 됨
+- Tauri allowlist가 과도하게 열림
+- native API 호출이 Nuxt components에 직접 흩어짐
+
+### T30. Native Mobile App Decision & Expo Shell Spike
+
+예상: 2.0 MM
+
+범위:
+
+- PWA로 충분한 기능과 native가 필요한 기능을 decision record로 분리
+- `apps/mobile` Expo React Native 후보 shell
+- shared API/design token/ui-contract 적용성 검증
+- mobile navigation stack, auth screen, guild/channel/message read-only smoke
+- push/background/media/file picker capability gap 분석
+
+성공 기준:
+
+- PWA-only, PWA-first+native-later, native-parallel 중 선택 근거가 문서화됨
+- Expo shell이 shared API contract와 design token subset을 소비함
+- native mobile navigation/component tests가 최소 shell을 검증함
+- native 전환 시 추가 맨먼스와 리스크가 산정됨
+
+실패 기준:
+
+- native 도입이 명확한 제품/기술 근거 없이 결정됨
+- web/PWA와 native가 API contract를 공유하지 못함
+- push/background/media 같은 native-only 요구가 분석되지 않음
 
 ## 4. 자동 반복 루프 운영
 
