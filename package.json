@@ -3,11 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/*"
   ],
   "scripts": {
     "test": "npm run test --workspaces",
-    "e2e": "npm run e2e --workspaces"
+    "e2e": "npm run e2e -w apps/web"
   },
   "engines": {
     "node": ">=22.0.0",

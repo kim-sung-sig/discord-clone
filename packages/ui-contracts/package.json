@@ -1,0 +1,22 @@
+{
+  "name": "@discord-clone/ui-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./screens": "./src/screens.ts",
+    "./navigation": "./src/navigation.ts",
+    "./permissions": "./src/permissions.ts",
+    "./presence": "./src/presence.ts",
+    "./unread": "./src/unread.ts",
+    "./errors": "./src/errors.ts"
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
+  }
+}

@@ -24,6 +24,7 @@ Use [agent-team-operating-model.md](C:\git\discord\docs\03-tasking\agent-team-op
 ## File Structure
 
 - Modify: `package.json` to include future `packages/*`, `apps/desktop`, and `apps/mobile` workspaces when those tasks start.
+- Modify: `package-lock.json` whenever npm workspace membership changes.
 - Create: `packages/ui-contracts/package.json` for screen, navigation, permission, presence, unread, and error contracts.
 - Create: `packages/ui-contracts/src/screens.ts` for platform-neutral route and pane definitions.
 - Create: `packages/platform-shell/package.json` for platform capability interfaces.
@@ -45,6 +46,7 @@ Use [agent-team-operating-model.md](C:\git\discord\docs\03-tasking\agent-team-op
 
 **Files:**
 - Modify: `package.json`
+- Modify: `package-lock.json`
 - Create: `packages/ui-contracts/package.json`
 - Create: `packages/ui-contracts/src/screens.ts`
 - Create: `packages/ui-contracts/src/permissions.ts`
@@ -63,6 +65,16 @@ Change root `package.json` workspaces to:
     "apps/web",
     "packages/*"
   ]
+}
+```
+
+Change root `package.json` e2e script to skip workspaces that do not expose browser E2E:
+
+```json
+{
+  "scripts": {
+    "e2e": "npm run e2e -w apps/web"
+  }
 }
 ```
 
