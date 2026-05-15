@@ -38,7 +38,7 @@ $requiredSnippets = @(
   'qa/artifacts/toolchain',
   './gradlew test',
   'npm ci',
-  'npm run test --workspace @discord-clone/web -- --run',
+  'npm test --workspaces',
   'npm run build --workspace @discord-clone/web'
 )
 
