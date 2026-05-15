@@ -15,6 +15,7 @@
 | T21 | Audit/Security Actions Expansion | P2 | T12 analysis limitation, Discord research security actions |
 | T22 | Toolchain/Build Maintenance | P2 | repeated Gradle/Nuxt/Vue warning notes |
 | T23 | Frontend Real API Integration Stabilization | P0 | runtime review, common task failure criterion: UI/API mismatch |
+| T24 | Real Backend QA Orchestration | P0 | T23 residual risk: real-backend Playwright requires manual backend/database/env setup |
 
 ## Source Clusters
 
@@ -86,6 +87,15 @@ Sources:
 
 Promoted task: T23.
 
+### Runtime QA Orchestration Cluster
+
+Sources:
+
+- T23 stabilization residual risk: real-backend Playwright was not run in that pass because service/database setup is environment-gated.
+- Runtime review: API smoke is reusable, but full backend + frontend orchestration still requires manual env setup.
+
+Promoted task: T24.
+
 ## Recommended Execution Order
 
 1. T16 Persistence/PostgreSQL Migration
@@ -96,6 +106,7 @@ Promoted task: T23.
 6. T21 Audit/Security Actions Expansion
 7. T20 Premium Billing/Entitlement Persistence
 8. T22 Toolchain/Build Maintenance
+9. T24 Real Backend QA Orchestration
 
 Reasoning:
 
@@ -103,3 +114,4 @@ Reasoning:
 - Frontend real API integration should follow persistence to prevent local-store-only UX drift.
 - Observability and security controls become more valuable once real runtime flows exist.
 - Media and premium are larger capability expansions and should use the hardened/persistent foundation.
+- Real-backend QA orchestration closes the remaining repeatability gap after frontend/backend integration exists.

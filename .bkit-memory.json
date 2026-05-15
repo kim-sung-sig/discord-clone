@@ -1,7 +1,7 @@
 {
   "project": "discord-clone-platform",
   "level": "enterprise",
-  "phase": "report",
-  "currentFeature": "T23-frontend-real-api-integration-stabilization",
+  "phase": "design",
+  "currentFeature": "T24-real-backend-qa-orchestration",
   "updatedAt": "2026-05-15"
 }

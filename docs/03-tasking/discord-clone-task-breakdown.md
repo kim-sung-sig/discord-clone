@@ -645,6 +645,30 @@
 - access tokens are persisted insecurely
 - Playwright only validates local store mutations
 
+### T24. Real Backend QA Orchestration
+
+예상: 1.0 MM
+
+범위:
+
+- backend health/startup orchestration for real-backend QA
+- PostgreSQL dev database env override for `dev_user` / `dev_password`
+- API smoke and real-backend Playwright execution in one harness
+- artifact log capture for backend, API smoke, and Playwright
+
+성공 기준:
+
+- one command can run API smoke and real-backend Playwright with consistent env
+- harness can reuse an already-running backend or start `:backend:boot:bootRun`
+- failures point to artifact logs
+- contract test verifies command wiring without requiring external services
+
+실패 기준:
+
+- real-backend QA still requires manual env copy/paste
+- harness kills a backend it did not start
+- PostgreSQL 5432 dev convention is ignored
+
 ## 4. 자동 반복 루프 운영
 
 각 task 진행 순서:
