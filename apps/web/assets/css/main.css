@@ -37,6 +37,11 @@ input {
   min-height: 100vh;
 }
 
+.mobile-shell-bar,
+.mobile-shell-nav {
+  display: none;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: 240px 200px minmax(260px, 1fr) 190px 220px 240px;
@@ -1584,5 +1589,183 @@ input {
 
   .experience-panel {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) {
+    overflow: auto;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .mobile-shell-bar,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .mobile-shell-nav {
+    display: none;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .server-rail {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1 / span 5;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .workspace {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    grid-template-columns: minmax(180px, 0.6fr) minmax(0, 2fr);
+    grid-template-rows: minmax(360px, 1fr) auto auto;
+    overflow: auto;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .channel-sidebar,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .chat-viewport,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .member-sidebar,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .dm-sidebar,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .forum-panel,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .moderation-panel,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .role-permission-panel,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .gateway-status-panel,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .invite-modal,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .user-panel {
+    display: block;
+  }
+
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .voice-panel,
+  .app-shell:not([data-platform-surface="pwa-mobile"]) .experience-panel {
+    display: none;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .server-rail {
+    display: none;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar {
+    display: flex;
+    grid-row: 1;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    background:
+      linear-gradient(135deg, rgba(57, 217, 138, 0.16), rgba(84, 166, 255, 0.12)),
+      rgba(17, 24, 39, 0.98);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace {
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace > .channel-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace > .chat-viewport,
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace > .member-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace > .voice-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .channel-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .chat-viewport,
+  .app-shell[data-platform-surface="pwa-mobile"] .member-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .voice-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .dm-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .forum-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .moderation-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .experience-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .role-permission-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .gateway-status-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .invite-modal,
+  .app-shell[data-platform-surface="pwa-mobile"] .user-panel {
+    display: none;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace.mobile-pane-channels .channel-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace.mobile-pane-members .member-sidebar {
+    display: block;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace.mobile-pane-chat .chat-viewport,
+  .app-shell[data-platform-surface="pwa-mobile"] .workspace.mobile-pane-voice .voice-panel {
+    display: grid;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .channel-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .member-sidebar,
+  .app-shell[data-platform-surface="pwa-mobile"] .voice-panel,
+  .app-shell[data-platform-surface="pwa-mobile"] .chat-viewport {
+    padding: 18px 14px;
+    border: 0;
+  }
+
+  .message-list {
+    padding-bottom: 12px;
+  }
+
+  .message-composer {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav {
+    display: grid;
+    grid-row: 3;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(17, 24, 39, 0.98);
+    border-top: 1px solid var(--line);
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav button {
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav button[aria-selected="true"] {
+    color: #06131d;
+    background: linear-gradient(145deg, var(--accent), #54a6ff);
+    border-color: rgba(57, 217, 138, 0.62);
+  }
+
+  .app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav button:disabled {
+    cursor: wait;
+    opacity: 0.56;
   }
 }

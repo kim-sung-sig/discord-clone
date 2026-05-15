@@ -15,8 +15,12 @@ test('captures desktop and mobile Discord shell smoke screenshots', async ({ pag
   await page.screenshot({ path: resolve(visualSmokeDir, 'desktop-shell.png'), fullPage: true })
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByTestId('channel-general')).toBeVisible()
+  await expect(page.getByTestId('mobile-shell-bar')).toContainText('# general')
+  await expect(page.getByTestId('channel-general')).not.toBeVisible()
   await expect(page.getByTestId('message-input')).toBeVisible()
+  await page.getByTestId('mobile-nav-channels').click()
+  await expect(page.getByTestId('channel-general')).toBeVisible()
+  await page.getByTestId('mobile-nav-chat').click()
   await page.screenshot({ path: resolve(visualSmokeDir, 'mobile-shell.png'), fullPage: true })
 
   expect(statSync(resolve(visualSmokeDir, 'desktop-shell.png')).size).toBeGreaterThan(5000)

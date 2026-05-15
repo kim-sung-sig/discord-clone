@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ServerRail from '../components/shell/ServerRail.vue'
 import ChannelSidebar from '../components/shell/ChannelSidebar.vue'
 import ChatViewport from '../components/shell/ChatViewport.vue'
@@ -17,6 +18,32 @@ import { useShellStore } from '../stores/shell'
 
 const auth = useAuthStore()
 const shell = useShellStore()
+type MobilePane = 'channels' | 'chat' | 'members' | 'voice'
+
+const activeMobilePane = ref<MobilePane>('chat')
+const mobileShellReady = ref(false)
+const platformSurface = ref<'web-desktop' | 'pwa-mobile'>('web-desktop')
+const mobilePanes: Array<{ id: MobilePane, label: string }> = [
+  { id: 'channels', label: 'Channels' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'members', label: 'Members' },
+  { id: 'voice', label: 'Voice' }
+]
+const activeChannelLabel = computed(() => {
+  const activeChannel = shell.activeChannel
+
+  if (!activeChannel) {
+    return 'No active channel'
+  }
+
+  return activeChannel.type === 'GUILD_TEXT'
+    ? `# ${activeChannel.name}`
+    : `Voice ${activeChannel.name}`
+})
+
+function updatePlatformSurface() {
+  platformSurface.value = window.matchMedia('(max-width: 720px)').matches ? 'pwa-mobile' : 'web-desktop'
+}
 
 async function runRealBackendSmoke() {
   if (!auth.accessToken) {
@@ -44,12 +71,35 @@ async function runRealBackendSmoke() {
 definePageMeta({
   path: '/'
 })
+
+onMounted(() => {
+  updatePlatformSurface()
+  window.addEventListener('resize', updatePlatformSurface)
+  mobileShellReady.value = true
+
+  if ('serviceWorker' in navigator) {
+    void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updatePlatformSurface)
+})
 </script>
 
 <template>
-  <main class="app-shell" aria-label="Discord clone workspace">
+  <main class="app-shell" aria-label="Discord clone workspace" :data-platform-surface="platformSurface">
     <ServerRail />
-    <section class="workspace" data-testid="workspace">
+    <header class="mobile-shell-bar" data-testid="mobile-shell-bar">
+      <span>Discord Clone</span>
+      <strong>{{ activeChannelLabel }}</strong>
+    </header>
+    <section
+      class="workspace"
+      :class="`mobile-pane-${activeMobilePane}`"
+      data-testid="workspace"
+      :data-mobile-active-pane="activeMobilePane"
+    >
       <p v-if="shell.apiError" class="shell-api-error" data-testid="shell-api-error" role="alert">
         {{ shell.apiError }}
       </p>
@@ -64,7 +114,7 @@ definePageMeta({
           {{ shell.apiBusy ? 'Running...' : 'Run backend smoke' }}
         </button>
       </section>
-      <ChannelSidebar />
+      <ChannelSidebar @click.capture="activeMobilePane = 'chat'" />
       <DmSidebar />
       <ChatViewport />
       <ForumPanel />
@@ -77,5 +127,19 @@ definePageMeta({
       <InviteModal />
       <UserPanel />
     </section>
+    <nav class="mobile-shell-nav" data-testid="mobile-shell-nav" aria-label="Mobile shell navigation">
+      <button
+        v-for="pane in mobilePanes"
+        :key="pane.id"
+        type="button"
+        role="tab"
+        :data-testid="`mobile-nav-${pane.id}`"
+        :aria-selected="activeMobilePane === pane.id"
+        :disabled="!mobileShellReady"
+        @click="activeMobilePane = pane.id"
+      >
+        {{ pane.label }}
+      </button>
+    </nav>
   </main>
 </template>
