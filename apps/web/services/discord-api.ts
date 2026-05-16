@@ -86,8 +86,6 @@ const gatewayPaths = {
   resume: (sessionId: string) => `/api/gateway/sessions/${segment(sessionId)}/resume`,
   sessionEvents: (sessionId: string, afterSeq?: number) =>
     withQuery(`/api/gateway/sessions/${segment(sessionId)}/events`, { afterSeq }),
-  events: (sessionId: string, afterSequence?: number) =>
-    withQuery('/api/gateway/events', { sessionId, afterSequence }),
   publish: () => '/api/gateway/events'
 } as const
 
@@ -95,7 +93,7 @@ export const discordApiPaths = {
   authLogin: authPaths.login,
   channelMessages: channelPaths.messages,
   invitePreview: invitePaths.preview,
-  gatewayEvents: gatewayPaths.events,
+  gatewayEvents: gatewayPaths.sessionEvents,
   auth: authPaths,
   guild: guildPaths,
   channel: channelPaths,

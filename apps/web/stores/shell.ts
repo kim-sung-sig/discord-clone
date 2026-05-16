@@ -394,7 +394,9 @@ const demoAttachment = (): ShellAttachment => ({
 
 const backendErrorMessage = (error: unknown): string => {
   if (error instanceof DiscordRestError) {
-    return `Discord API rejected the request (${error.status}).`
+    const body = error.body as { message?: unknown } | undefined
+    const detail = typeof body?.message === 'string' ? ` ${body.message}` : ''
+    return `Discord API rejected the request (${error.status}).${detail}`
   }
   return 'Discord API is unavailable. Try again.'
 }

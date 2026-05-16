@@ -2,13 +2,19 @@ package com.example.discord.gateway;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,18 +29,23 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestController
 @RequestMapping("/api/gateway")
 class GatewayController {
+    private static final String INTERNAL_PUBLISHER_HEADER = "X-Internal-Gateway-Publisher";
+
     private final InMemoryGatewayService gatewayService;
     private final InMemoryGuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final String internalPublisherToken;
 
     GatewayController(
         InMemoryGatewayService gatewayService,
         InMemoryGuildService guildService,
-        AuthenticatedUserResolver authenticatedUserResolver
+        AuthenticatedUserResolver authenticatedUserResolver,
+        @Value("${discord.gateway.internal-publisher-token:}") String internalPublisherToken
     ) {
         this.gatewayService = gatewayService;
         this.guildService = guildService;
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.internalPublisherToken = internalPublisherToken;
     }
 
     @PostMapping("/identify")
@@ -58,7 +69,7 @@ class GatewayController {
     ResumeResponse resume(
         @PathVariable UUID sessionId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-        @RequestBody ResumeRequest request
+        @Valid @RequestBody ResumeRequest request
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(authorization);
         requireRequest(request);
@@ -87,10 +98,12 @@ class GatewayController {
     @PostMapping("/events")
     ResponseEntity<EventResponse> publish(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-        @RequestBody PublishEventRequest request
+        @RequestHeader(value = INTERNAL_PUBLISHER_HEADER, required = false) String internalPublisher,
+        @Valid @RequestBody PublishEventRequest request
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(authorization);
         requireRequest(request);
+        requireInternalPublisher(internalPublisher);
         if (!guildService.isGuildMemberOrOwner(request.guildId(), userId)) {
             throw new GatewayForbiddenException("guild membership required");
         }
@@ -99,6 +112,15 @@ class GatewayController {
         }
         GatewayEvent event = gatewayService.publish(request.type(), request.guildId(), request.channelId(), request.payload());
         return ResponseEntity.status(HttpStatus.CREATED).body(EventResponse.from(event));
+    }
+
+    private void requireInternalPublisher(String internalPublisher) {
+        if (internalPublisherToken == null || internalPublisherToken.isBlank()) {
+            throw new GatewayForbiddenException("internal gateway publisher disabled");
+        }
+        if (!internalPublisherToken.equals(internalPublisher)) {
+            throw new GatewayForbiddenException("internal gateway publisher required");
+        }
     }
 
     private static void requireRequest(Object request) {
@@ -113,7 +135,7 @@ class GatewayController {
     record HeartbeatResponse(SessionResponse session, EventResponse ack) {
     }
 
-    record ResumeRequest(long lastSeq) {
+    record ResumeRequest(@PositiveOrZero long lastSeq) {
     }
 
     record ResumeResponse(SessionResponse session, EventResponse resumed, List<EventResponse> events) {
@@ -122,7 +144,12 @@ class GatewayController {
     record EventsResponse(List<EventResponse> events) {
     }
 
-    record PublishEventRequest(String type, UUID guildId, UUID channelId, Map<String, Object> payload) {
+    record PublishEventRequest(
+        @NotBlank String type,
+        @NotNull UUID guildId,
+        UUID channelId,
+        @NotNull Map<String, Object> payload
+    ) {
     }
 
     record SessionResponse(
@@ -185,6 +212,12 @@ class GatewayControllerAdvice {
 
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<GatewayController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest()
+            .body(new GatewayController.ErrorResponse("invalid request"));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<GatewayController.ErrorResponse> invalidBody(MethodArgumentNotValidException exception) {
         return ResponseEntity.badRequest()
             .body(new GatewayController.ErrorResponse("invalid request"));
     }

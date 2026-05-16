@@ -1,9 +1,10 @@
-package com.example.discord.identity;
+package com.example.discord.auth;
 
+import com.example.discord.identity.PasswordHasher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-public final class BCryptPasswordHasher implements PasswordHasher {
+final class BCryptPasswordHasher implements PasswordHasher {
     private final PasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
     @Override

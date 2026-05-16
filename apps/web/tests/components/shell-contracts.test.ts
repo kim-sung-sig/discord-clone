@@ -14,7 +14,7 @@ describe('Discord shell API and Gateway contracts', () => {
       '/api/channels/channel-1/messages?before=msg-9&limit=25'
     )
     expect(discordApiPaths.invitePreview('abc123')).toBe('/api/invites/abc123')
-    expect(discordApiPaths.gatewayEvents('session-1', 42)).toBe('/api/gateway/events?sessionId=session-1&afterSequence=42')
+    expect(discordApiPaths.gatewayEvents('session-1', 42)).toBe('/api/gateway/sessions/session-1/events?afterSeq=42')
   })
 
   it('creates a fetch client that preserves method, path, and JSON body', async () => {

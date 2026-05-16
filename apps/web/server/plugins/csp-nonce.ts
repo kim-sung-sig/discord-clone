@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { setResponseHeaders } from 'h3'
-import { addNonceToScriptTags, htmlSecurityHeaders } from '../utils/security-headers'
+import { useRuntimeConfig } from '#imports'
+import { addNonceToScriptTags, connectSourcesFromUrls, htmlSecurityHeaders } from '../utils/security-headers'
 
 const createScriptNonce = (): string => randomBytes(18).toString('base64url')
 
@@ -13,6 +14,10 @@ export default defineNitroPlugin((nitroApp) => {
     html.body = addNonceToScriptTags(html.body, scriptNonce)
     html.bodyAppend = addNonceToScriptTags(html.bodyAppend, scriptNonce)
 
-    setResponseHeaders(context.event, htmlSecurityHeaders({ scriptNonce }))
+    const config = useRuntimeConfig(context.event)
+    setResponseHeaders(context.event, htmlSecurityHeaders({
+      scriptNonce,
+      connectSources: connectSourcesFromUrls([config.public.apiBaseUrl])
+    }))
   })
 })

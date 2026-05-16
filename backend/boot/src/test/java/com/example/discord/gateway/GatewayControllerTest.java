@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-@SpringBootTest
+@SpringBootTest(properties = "discord.gateway.internal-publisher-token=test-harness")
 @AutoConfigureMockMvc
 class GatewayControllerTest {
     @Autowired
@@ -126,6 +126,7 @@ class GatewayControllerTest {
 
         mockMvc.perform(post("/api/gateway/events")
                 .header("Authorization", outsider.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -141,6 +142,7 @@ class GatewayControllerTest {
 
         mockMvc.perform(post("/api/gateway/events")
                 .header("Authorization", owner.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -155,6 +157,27 @@ class GatewayControllerTest {
             .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void rejectsPublicGatewayPublishWithoutInternalGatewayHeader() throws Exception {
+        AuthSession owner = signup("gateway_publish_public_owner");
+        String guildId = createGuild(owner);
+
+        mockMvc.perform(post("/api/gateway/events")
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "type": "MESSAGE_CREATE",
+                      "guildId": "%s",
+                      "channelId": null,
+                      "payload": {
+                        "content": "spoof"
+                      }
+                    }
+                    """.formatted(guildId)))
+            .andExpect(status().isForbidden());
+    }
+
     private org.springframework.test.web.servlet.ResultActions identify(AuthSession user) throws Exception {
         return mockMvc.perform(post("/api/gateway/identify")
             .header("Authorization", user.bearer()));
@@ -164,6 +187,7 @@ class GatewayControllerTest {
         String channelJson = channelId == null ? "null" : "\"" + channelId + "\"";
         MvcResult result = mockMvc.perform(post("/api/gateway/events")
                 .header("Authorization", requester.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {

@@ -47,6 +47,24 @@ class ArchitectureTest {
         assertThat(forbiddenImports).isEmpty();
     }
 
+    @Test
+    void backendModulesDoNotImportSpringOrJakartaFrameworks() throws Exception {
+        Path modulesRoot = Path.of("..", "modules").normalize();
+        List<String> forbiddenImports;
+        try (var files = Files.walk(modulesRoot)) {
+            forbiddenImports = files
+                .filter(path -> path.toString().endsWith(".java"))
+                .flatMap(path -> readLines(path).stream()
+                    .filter(line -> line.startsWith("import "))
+                    .filter(line -> line.contains("org.springframework.")
+                        || line.contains("jakarta."))
+                    .map(line -> path + ": " + line))
+                .toList();
+        }
+
+        assertThat(forbiddenImports).isEmpty();
+    }
+
     private static List<String> readLines(Path path) {
         try {
             return Files.readAllLines(path);

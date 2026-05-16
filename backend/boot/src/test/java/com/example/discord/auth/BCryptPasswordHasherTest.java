@@ -1,10 +1,11 @@
-package com.example.discord.identity;
+package com.example.discord.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.discord.identity.PasswordHasher;
 import org.junit.jupiter.api.Test;
 
-class PasswordHasherTest {
+class BCryptPasswordHasherTest {
     @Test
     void hashesPasswordWithoutStoringRawSecret() {
         PasswordHasher hasher = new BCryptPasswordHasher();

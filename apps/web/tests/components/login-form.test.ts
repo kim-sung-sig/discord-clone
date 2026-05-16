@@ -19,7 +19,7 @@ describe('LoginForm', () => {
     vi.unstubAllGlobals()
   })
 
-  it('logs in through the backend API and keeps the access token in Pinia memory', async () => {
+  it('logs in through the backend API and restores the access token from session storage only', async () => {
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     const fetcher: typeof fetch = async (input, init) => {
       calls.push({ input, init })
@@ -57,8 +57,8 @@ describe('LoginForm', () => {
     expect(auth.user?.username).toBe('user')
     expect(wrapper.get('[data-testid="login-success"]').text()).toContain('Signed in with backend session')
 
-    expect(window.localStorage.getItem('backend-access-token')).toBeNull()
-    expect(window.sessionStorage.getItem('backend-access-token')).toBeNull()
+    expect(JSON.stringify(window.localStorage)).not.toContain('backend-access-token')
+    expect(JSON.stringify(window.sessionStorage)).toContain('backend-access-token')
     expect(document.cookie).not.toContain('backend-access-token')
   })
 

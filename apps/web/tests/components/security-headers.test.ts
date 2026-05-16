@@ -3,17 +3,22 @@ import { addNonceToScriptTags, htmlSecurityHeaders } from '../../server/utils/se
 
 describe('Nuxt HTML security headers', () => {
   it('defines deployment security headers with a script nonce for rendered HTML responses', () => {
-    const headers = htmlSecurityHeaders({ scriptNonce: 'nonce-test-123' })
+    const headers = htmlSecurityHeaders({
+      scriptNonce: 'nonce-test-123',
+      connectSources: ['https://api.discord-clone.local', 'wss://rtc.discord-clone.local']
+    })
 
     expect(headers['Content-Security-Policy']).toContain("default-src 'self'")
     expect(headers['Content-Security-Policy']).toContain("frame-ancestors 'none'")
     expect(headers['Content-Security-Policy']).toContain("script-src 'self' 'nonce-nonce-test-123'")
     expect(headers['Content-Security-Policy']).not.toContain("script-src 'self' 'unsafe-inline'")
     expect(headers['Content-Security-Policy']).toContain('ws://127.0.0.1:*')
+    expect(headers['Content-Security-Policy']).toContain('https://api.discord-clone.local')
+    expect(headers['Content-Security-Policy']).toContain('wss://rtc.discord-clone.local')
     expect(headers['X-Content-Type-Options']).toBe('nosniff')
     expect(headers['X-Frame-Options']).toBe('DENY')
     expect(headers['Referrer-Policy']).toBe('no-referrer')
-    expect(headers['Permissions-Policy']).toBe('camera=(), microphone=(), geolocation=()')
+    expect(headers['Permissions-Policy']).toBe('camera=(), microphone=(self), geolocation=()')
   })
 
   it('adds the matching nonce to rendered script tags without duplicating existing nonces', () => {
