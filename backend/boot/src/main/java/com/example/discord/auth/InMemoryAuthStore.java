@@ -1,7 +1,11 @@
 package com.example.discord.auth;
 
 import com.example.discord.identity.EmailAddress;
+import com.example.discord.identity.RefreshSession;
 import com.example.discord.user.UserProfile;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +19,8 @@ class InMemoryAuthStore implements AuthStore {
     private final ConcurrentMap<String, AuthAccount> accountsByEmail = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, AuthAccount> accountsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Boolean> revokedAccessTokens = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, RefreshSession> refreshSessionsById = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, UUID> refreshSessionIdsByTokenHash = new ConcurrentHashMap<>();
 
     @Override
     public boolean saveIfAbsent(AuthAccount account) {
@@ -44,5 +50,50 @@ class InMemoryAuthStore implements AuthStore {
     @Override
     public boolean isAccessTokenRevoked(String token) {
         return revokedAccessTokens.containsKey(token);
+    }
+
+    @Override
+    public void saveRefreshSession(RefreshSession session) {
+        refreshSessionsById.put(session.id(), session);
+        refreshSessionIdsByTokenHash.put(session.tokenHash(), session.id());
+    }
+
+    @Override
+    public Optional<RefreshSession> findRefreshSessionByTokenHash(String tokenHash) {
+        UUID sessionId = refreshSessionIdsByTokenHash.get(tokenHash);
+        if (sessionId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(refreshSessionsById.get(sessionId));
+    }
+
+    @Override
+    public void replaceRefreshSession(RefreshSession revokedPrevious, RefreshSession next) {
+        saveRefreshSession(revokedPrevious);
+        saveRefreshSession(next);
+    }
+
+    @Override
+    public List<RefreshSession> refreshSessionsForUser(UUID userId) {
+        return refreshSessionsById.values().stream()
+            .filter(session -> session.userId().equals(userId))
+            .sorted(Comparator.comparing(RefreshSession::createdAt))
+            .toList();
+    }
+
+    @Override
+    public boolean revokeRefreshSession(UUID userId, UUID sessionId, Instant revokedAt) {
+        RefreshSession session = refreshSessionsById.get(sessionId);
+        if (session == null || !session.userId().equals(userId)) {
+            return false;
+        }
+        saveRefreshSession(session.revoke(revokedAt));
+        return true;
+    }
+
+    @Override
+    public void revokeAllRefreshSessions(UUID userId, Instant revokedAt) {
+        refreshSessionsForUser(userId)
+            .forEach(session -> saveRefreshSession(session.revoke(revokedAt)));
     }
 }

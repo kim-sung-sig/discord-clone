@@ -83,6 +83,7 @@ class OperationalHardeningFilterTest {
             .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:3000"))
             .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
             .andExpect(header().string("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-Id"))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
             .andExpect(header().string("Vary", "Origin"));
     }
 

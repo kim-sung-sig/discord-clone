@@ -10,8 +10,9 @@ const isHydrated = ref(false)
 const hasAccessToken = computed(() => Boolean(auth.accessToken))
 
 onMounted(() => {
-  auth.restoreSession()
-  isHydrated.value = true
+  void auth.restoreSession().finally(() => {
+    isHydrated.value = true
+  })
 })
 
 async function submitLogin() {
@@ -27,7 +28,7 @@ async function submitLogin() {
     <p class="login-kicker">Welcome back</p>
     <h1 id="login-title">Sign in to Discord Clone</h1>
     <p class="login-copy">
-      Sign in through the Spring Boot API. Your access token is restored for this browser tab only.
+      Sign in through the Spring Boot API. Your access token stays in memory while refresh uses an httpOnly cookie.
     </p>
 
     <form class="login-form" data-testid="login-form" @submit.prevent="submitLogin">
@@ -85,7 +86,7 @@ async function submitLogin() {
     </form>
 
     <p class="login-token-policy" data-testid="login-token-policy">
-      Access token is stored in session storage for this browser tab.
+      Access token stays in memory. Refresh is handled by an httpOnly cookie.
     </p>
   </section>
 </template>

@@ -39,6 +39,9 @@ const authPaths = {
   signup: () => '/api/auth/signup',
   login: () => '/api/auth/login',
   logout: () => '/api/auth/logout',
+  refresh: () => '/api/auth/refresh',
+  sessions: () => '/api/auth/sessions',
+  session: (sessionId: string) => `/api/auth/sessions/${segment(sessionId)}`,
   me: () => '/api/users/@me'
 } as const
 
@@ -143,6 +146,7 @@ export const createDiscordRestClient = (options: DiscordRestClientOptions) => {
     const response = await fetchImplementation(joinUrl(options.baseUrl, path), {
       method,
       headers: headersFor(requestOptions, hasBody),
+      credentials: 'include',
       ...(hasBody ? { body: JSON.stringify(body) } : {})
     })
 

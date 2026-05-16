@@ -9,6 +9,9 @@ import { useShellStore } from '../../stores/shell'
 describe('Discord shell API and Gateway contracts', () => {
   it('builds stable REST paths for auth, guild, channel, invite, and gateway calls', () => {
     expect(discordApiPaths.authLogin()).toBe('/api/auth/login')
+    expect(discordApiPaths.auth.refresh()).toBe('/api/auth/refresh')
+    expect(discordApiPaths.auth.sessions()).toBe('/api/auth/sessions')
+    expect(discordApiPaths.auth.session('session-1')).toBe('/api/auth/sessions/session-1')
     expect(discordApiPaths.guild('guild-1')).toBe('/api/guilds/guild-1')
     expect(discordApiPaths.channelMessages('channel-1', { before: 'msg-9', limit: 25 })).toBe(
       '/api/channels/channel-1/messages?before=msg-9&limit=25'
@@ -32,6 +35,7 @@ describe('Discord shell API and Gateway contracts', () => {
 
     expect(calls[0]?.input).toBe('https://discord.local/api/channels/channel-1/messages')
     expect(calls[0]?.init?.method).toBe('POST')
+    expect(calls[0]?.init?.credentials).toBe('include')
     expect(calls[0]?.init?.body).toBe(JSON.stringify({ body: 'hello' }))
   })
 

@@ -19,10 +19,16 @@ describe('LoginForm', () => {
     vi.unstubAllGlobals()
   })
 
-  it('logs in through the backend API and restores the access token from session storage only', async () => {
+  it('logs in through the backend API with cookie refresh and memory-only access token', async () => {
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     const fetcher: typeof fetch = async (input, init) => {
       calls.push({ input, init })
+      if (String(input).endsWith('/api/auth/refresh')) {
+        return new Response(JSON.stringify({ message: 'refresh token invalid' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
       return new Response(JSON.stringify({
         accessToken: 'backend-access-token',
         user: {
@@ -46,10 +52,12 @@ describe('LoginForm', () => {
     await flushPromises()
 
     const auth = useAuthStore()
+    const loginCall = calls.find((call) => String(call.input).endsWith('/api/auth/login'))
 
-    expect(String(calls[0]?.input)).toMatch(/\/api\/auth\/login$/)
-    expect(calls[0]?.init?.method).toBe('POST')
-    expect(calls[0]?.init?.body).toBe(JSON.stringify({
+    expect(String(loginCall?.input)).toMatch(/\/api\/auth\/login$/)
+    expect(loginCall?.init?.method).toBe('POST')
+    expect(loginCall?.init?.credentials).toBe('include')
+    expect(loginCall?.init?.body).toBe(JSON.stringify({
       email: 'user@example.com',
       password: 'correct horse battery staple'
     }))
@@ -58,7 +66,7 @@ describe('LoginForm', () => {
     expect(wrapper.get('[data-testid="login-success"]').text()).toContain('Signed in with backend session')
 
     expect(JSON.stringify(window.localStorage)).not.toContain('backend-access-token')
-    expect(JSON.stringify(window.sessionStorage)).toContain('backend-access-token')
+    expect(JSON.stringify(window.sessionStorage)).not.toContain('backend-access-token')
     expect(document.cookie).not.toContain('backend-access-token')
   })
 

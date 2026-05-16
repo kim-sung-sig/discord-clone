@@ -115,6 +115,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         response.setHeader("Access-Control-Allow-Origin", origin);
         response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Request-Id");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Vary", "Origin");
     }
 

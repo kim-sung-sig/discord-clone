@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test'
 
-test('logs in through the API from the login page with session-only token restore', async ({ page }) => {
+test('logs in through the API from the login page with memory-only access token and refresh cookie', async ({ page }) => {
   await page.route('**/api/auth/login', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
+      headers: {
+        'Set-Cookie': 'dc_refresh=e2e-refresh-token; Path=/api/auth; HttpOnly; SameSite=Lax'
+      },
       body: JSON.stringify({
         accessToken: 'backend-e2e-access-token',
         user: {
@@ -25,7 +28,7 @@ test('logs in through the API from the login page with session-only token restor
 
   await expect(page.getByTestId('login-success')).toContainText('Signed in with backend session')
   await expect(page.getByTestId('login-token-policy')).toContainText(
-    'Access token is stored in session storage for this browser tab.'
+    'Access token stays in memory. Refresh is handled by an httpOnly cookie.'
   )
   await expect(page.getByTestId('open-workspace')).toBeVisible()
 
@@ -46,5 +49,6 @@ test('logs in through the API from the login page with session-only token restor
 
   expect(JSON.stringify(persistedClientState.localStorage)).not.toContain('backend-e2e-access-token')
   expect(JSON.stringify(cookies)).not.toContain('backend-e2e-access-token')
-  expect(JSON.stringify(persistedClientState.sessionStorage)).toContain('backend-e2e-access-token')
+  expect(JSON.stringify(persistedClientState.sessionStorage)).not.toContain('backend-e2e-access-token')
+  expect(JSON.stringify(cookies)).toContain('dc_refresh')
 })

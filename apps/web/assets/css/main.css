@@ -759,6 +759,82 @@ input {
   color: var(--accent);
 }
 
+.user-panel-identity,
+.session-panel,
+.session-list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.session-panel {
+  position: relative;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.session-action,
+.session-revoke {
+  padding: 8px 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.session-action:hover,
+.session-revoke:hover:not(:disabled) {
+  border-color: rgba(57, 217, 138, 0.48);
+}
+
+.session-revoke:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.session-error {
+  width: 100%;
+  margin: 0;
+  color: #ffb4b4;
+  font-size: 12px;
+  text-align: right;
+}
+
+.session-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  display: grid;
+  width: min(320px, 80vw);
+  max-height: 240px;
+  gap: 8px;
+  padding: 12px;
+  margin: 0;
+  overflow: auto;
+  list-style: none;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+}
+
+.session-list li {
+  justify-content: space-between;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.session-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .role-permission-panel {
   grid-column: 6;
   grid-row: 1;

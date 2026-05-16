@@ -1,6 +1,7 @@
 package com.example.discord.auth;
 
 import com.example.discord.identity.EmailAddress;
+import com.example.discord.identity.RefreshSession;
 import com.example.discord.user.UserProfile;
 import com.example.discord.user.Username;
 import java.nio.charset.StandardCharsets;
@@ -10,8 +11,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -125,6 +128,110 @@ class JdbcAuthStore implements AuthStore {
         }
     }
 
+    @Override
+    public void saveRefreshSession(RefreshSession session) {
+        try (Connection connection = dataSource.getConnection()) {
+            upsertRefreshSession(connection, session);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to save refresh session", exception);
+        }
+    }
+
+    @Override
+    public Optional<RefreshSession> findRefreshSessionByTokenHash(String tokenHash) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT id, user_id, token_hash, device_name, created_at, expires_at, revoked_at
+                 FROM auth_refresh_sessions
+                 WHERE token_hash = ?
+                 """)) {
+            statement.setString(1, tokenHash);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(mapRefreshSession(resultSet));
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to find refresh session", exception);
+        }
+    }
+
+    @Override
+    public void replaceRefreshSession(RefreshSession revokedPrevious, RefreshSession next) {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                upsertRefreshSession(connection, revokedPrevious);
+                upsertRefreshSession(connection, next);
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to rotate refresh session", exception);
+        }
+    }
+
+    @Override
+    public List<RefreshSession> refreshSessionsForUser(UUID userId) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT id, user_id, token_hash, device_name, created_at, expires_at, revoked_at
+                 FROM auth_refresh_sessions
+                 WHERE user_id = ?
+                 ORDER BY created_at ASC
+                 """)) {
+            statement.setObject(1, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<RefreshSession> sessions = new java.util.ArrayList<>();
+                while (resultSet.next()) {
+                    sessions.add(mapRefreshSession(resultSet));
+                }
+                return List.copyOf(sessions);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list refresh sessions", exception);
+        }
+    }
+
+    @Override
+    public boolean revokeRefreshSession(UUID userId, UUID sessionId, Instant revokedAt) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 UPDATE auth_refresh_sessions
+                 SET revoked_at = COALESCE(revoked_at, ?)
+                 WHERE id = ?
+                   AND user_id = ?
+                 """)) {
+            statement.setTimestamp(1, Timestamp.from(revokedAt));
+            statement.setObject(2, sessionId);
+            statement.setObject(3, userId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to revoke refresh session", exception);
+        }
+    }
+
+    @Override
+    public void revokeAllRefreshSessions(UUID userId, Instant revokedAt) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 UPDATE auth_refresh_sessions
+                 SET revoked_at = COALESCE(revoked_at, ?)
+                 WHERE user_id = ?
+                 """)) {
+            statement.setTimestamp(1, Timestamp.from(revokedAt));
+            statement.setObject(2, userId);
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to revoke refresh sessions", exception);
+        }
+    }
+
     private static void insertUser(Connection connection, UserProfile profile) throws SQLException {
         try (var statement = connection.prepareStatement("""
             INSERT INTO users(id, username, display_name, created_at, updated_at)
@@ -157,6 +264,44 @@ class JdbcAuthStore implements AuthStore {
             EmailAddress.from(resultSet.getString("email")),
             resultSet.getString("password_hash"),
             mapProfile(resultSet)
+        );
+    }
+
+    private static void upsertRefreshSession(Connection connection, RefreshSession session) throws SQLException {
+        try (var statement = connection.prepareStatement("""
+            INSERT INTO auth_refresh_sessions(id, user_id, token_hash, device_name, created_at, expires_at, revoked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE
+            SET token_hash = EXCLUDED.token_hash,
+                device_name = EXCLUDED.device_name,
+                expires_at = EXCLUDED.expires_at,
+                revoked_at = EXCLUDED.revoked_at
+            """)) {
+            statement.setObject(1, session.id());
+            statement.setObject(2, session.userId());
+            statement.setString(3, session.tokenHash());
+            statement.setString(4, session.deviceName());
+            statement.setTimestamp(5, Timestamp.from(session.createdAt()));
+            statement.setTimestamp(6, Timestamp.from(session.expiresAt()));
+            if (session.revokedAt().isPresent()) {
+                statement.setTimestamp(7, Timestamp.from(session.revokedAt().get()));
+            } else {
+                statement.setNull(7, Types.TIMESTAMP_WITH_TIMEZONE);
+            }
+            statement.executeUpdate();
+        }
+    }
+
+    private static RefreshSession mapRefreshSession(ResultSet resultSet) throws SQLException {
+        Timestamp revokedAt = resultSet.getTimestamp("revoked_at");
+        return new RefreshSession(
+            resultSet.getObject("id", UUID.class),
+            resultSet.getObject("user_id", UUID.class),
+            resultSet.getString("token_hash").trim(),
+            resultSet.getString("device_name"),
+            resultSet.getTimestamp("created_at").toInstant(),
+            resultSet.getTimestamp("expires_at").toInstant(),
+            Optional.ofNullable(revokedAt).map(Timestamp::toInstant)
         );
     }
 

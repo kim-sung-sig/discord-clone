@@ -32,6 +32,13 @@ public record RefreshSession(
         return !instant.isBefore(expiresAt);
     }
 
+    public RefreshSession revoke(Instant revokedAt) {
+        if (revoked()) {
+            return this;
+        }
+        return new RefreshSession(id, userId, tokenHash, deviceName, createdAt, expiresAt, Optional.of(revokedAt));
+    }
+
     public Rotation rotate(UUID nextSessionId, String nextTokenHash, Instant rotatedAt, Instant nextExpiresAt) {
         if (revoked()) {
             throw new IllegalStateException("refresh session revoked");

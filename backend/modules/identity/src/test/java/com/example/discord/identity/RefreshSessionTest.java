@@ -83,4 +83,24 @@ class RefreshSessionTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("refresh session expired");
     }
+
+    @Test
+    void revokeIsIdempotent() {
+        Instant createdAt = Instant.parse("2026-05-13T00:00:00Z");
+        Instant revokedAt = createdAt.plusSeconds(30);
+        RefreshSession session = RefreshSession.create(
+            UUID.fromString("11111111-1111-1111-1111-111111111111"),
+            UUID.fromString("22222222-2222-2222-2222-222222222222"),
+            "old-token-hash",
+            "Chrome on Windows",
+            createdAt,
+            createdAt.plusSeconds(604800)
+        );
+
+        RefreshSession revoked = session.revoke(revokedAt);
+
+        assertThat(revoked.revoked()).isTrue();
+        assertThat(revoked.revokedAt()).contains(revokedAt);
+        assertThat(revoked.revoke(revokedAt.plusSeconds(10))).isSameAs(revoked);
+    }
 }

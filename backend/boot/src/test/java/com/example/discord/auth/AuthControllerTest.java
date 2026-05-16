@@ -1,23 +1,36 @@
 package com.example.discord.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.Cookie;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class AuthControllerTest {
+    private static final String REFRESH_COOKIE = "dc_refresh";
+    private static final AtomicInteger LOGIN_IP_COUNTER = new AtomicInteger(10);
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -34,6 +47,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isCreated())
+            .andExpect(cookie().httpOnly(REFRESH_COOKIE, true))
             .andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
             .andExpect(jsonPath("$.user.username").value("vibe_signup"))
             .andExpect(jsonPath("$.user.displayName").value("Vibe Signup"));
@@ -63,6 +77,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isOk())
+            .andExpect(cookie().httpOnly(REFRESH_COOKIE, true))
             .andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
             .andReturn();
 
@@ -201,6 +216,70 @@ class AuthControllerTest {
     }
 
     @Test
+    void refreshRotatesCookieAndRejectsReuseByRevokingSessionFamily() throws Exception {
+        signup("refresh@example.com", "vibe_refresh", "Vibe Refresh");
+        MvcResult login = login("refresh@example.com", "correct horse battery staple", "Chrome on Windows");
+        Cookie firstRefresh = refreshCookie(login);
+
+        MvcResult refresh = mockMvc.perform(post("/api/auth/refresh")
+                .cookie(firstRefresh))
+            .andExpect(status().isOk())
+            .andExpect(cookie().httpOnly(REFRESH_COOKIE, true))
+            .andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
+            .andReturn();
+        Cookie rotatedRefresh = refreshCookie(refresh);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(firstRefresh))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.message").value("refresh token reuse detected"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(rotatedRefresh))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listsAndRevokesOwnRefreshSessions() throws Exception {
+        signup("sessions@example.com", "vibe_sessions", "Vibe Sessions");
+        MvcResult login = login("sessions@example.com", "correct horse battery staple", "Firefox on Linux");
+        String accessToken = com.jayway.jsonpath.JsonPath.read(login.getResponse().getContentAsString(), "$.accessToken");
+        Cookie refreshCookie = refreshCookie(login);
+
+        MvcResult sessions = mockMvc.perform(get("/api/auth/sessions")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sessions", hasSize(2)))
+            .andExpect(jsonPath("$.sessions[1].deviceName").value("Firefox on Linux"))
+            .andExpect(jsonPath("$.sessions[1].revoked").value(false))
+            .andReturn();
+
+        String sessionId = com.jayway.jsonpath.JsonPath.read(
+            sessions.getResponse().getContentAsString(),
+            "$.sessions[1].id"
+        );
+
+        mockMvc.perform(delete("/api/auth/sessions/{sessionId}", sessionId)
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(refreshCookie))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logsSuspiciousLoginCandidateWhenDeviceIsNew(CapturedOutput output) throws Exception {
+        signup("audit@example.com", "vibe_audit", "Vibe Audit");
+
+        login("audit@example.com", "correct horse battery staple", "New Device Browser");
+
+        assertThat(output.getOut())
+            .contains("auth suspicious login detected")
+            .contains("device_name=New Device Browser");
+    }
+
+    @Test
     void locksUnknownEmailAfterRepeatedInvalidLoginAttempts() throws Exception {
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
@@ -248,5 +327,40 @@ class AuthControllerTest {
     void logsOutWithoutLeakingAuthenticationState() throws Exception {
         mockMvc.perform(post("/api/auth/logout"))
             .andExpect(status().isNoContent());
+    }
+
+    private void signup(String email, String username, String displayName) throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "%s",
+                      "username": "%s",
+                      "displayName": "%s",
+                      "password": "correct horse battery staple"
+                    }
+                    """.formatted(email, username, displayName)))
+            .andExpect(status().isCreated());
+    }
+
+    private MvcResult login(String email, String password, String userAgent) throws Exception {
+        return mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "198.51.100." + LOGIN_IP_COUNTER.getAndIncrement())
+                .header("User-Agent", userAgent)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "%s",
+                      "password": "%s"
+                    }
+                    """.formatted(email, password)))
+            .andExpect(status().isOk())
+            .andReturn();
+    }
+
+    private static Cookie refreshCookie(MvcResult result) {
+        Cookie cookie = result.getResponse().getCookie(REFRESH_COOKIE);
+        org.assertj.core.api.Assertions.assertThat(cookie).isNotNull();
+        return cookie;
     }
 }

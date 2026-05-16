@@ -73,7 +73,7 @@ definePageMeta({
 })
 
 onMounted(() => {
-  auth.restoreSession()
+  void auth.restoreSession()
   updatePlatformSurface()
   window.addEventListener('resize', updatePlatformSurface)
   mobileShellReady.value = true
