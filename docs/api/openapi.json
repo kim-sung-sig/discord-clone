@@ -1,0 +1,761 @@
+{
+  "components": {
+    "responses": {
+      "AuthSession": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Authenticated session response."
+      },
+      "BadRequest": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        },
+        "description": "400 error."
+      },
+      "Channel": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Channel response."
+      },
+      "Forbidden": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        },
+        "description": "403 error."
+      },
+      "GatewayEvents": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Gateway events response."
+      },
+      "Guild": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Guild response."
+      },
+      "Message": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Message response."
+      },
+      "MessageList": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Message list response."
+      },
+      "NotFound": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        },
+        "description": "404 error."
+      },
+      "Unauthorized": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        },
+        "description": "401 error."
+      },
+      "VoiceJoin": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Voice join response."
+      }
+    },
+    "schemas": {
+      "ApiErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "status": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requestId",
+          "code",
+          "message",
+          "status"
+        ],
+        "type": "object"
+      },
+      "CreateChannelRequest": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object"
+      },
+      "CreateGuildRequest": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateMessageRequest": {
+        "properties": {
+          "clientEventId": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Discord Clone API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AuthSession"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Login and issue an access token.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Logged out."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Logout the current session.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/channels/{channelId}/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MessageList"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "List channel messages.",
+        "tags": [
+          "messages"
+        ]
+      },
+      "post": {
+        "operationId": "createMessage",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Message"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Create a channel message.",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/gateway/sessions/{sessionId}/events": {
+      "get": {
+        "operationId": "listGatewayEvents",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "afterSeq",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/GatewayEvents"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Poll Gateway events after a sequence.",
+        "tags": [
+          "gateway"
+        ]
+      }
+    },
+    "/api/guilds": {
+      "post": {
+        "operationId": "createGuild",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Guild"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Create a guild.",
+        "tags": [
+          "guilds"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/channels": {
+      "post": {
+        "operationId": "createChannel",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChannelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Channel"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Create a guild channel.",
+        "tags": [
+          "guilds"
+        ]
+      }
+    },
+    "/api/security/csp-report": {
+      "post": {
+        "operationId": "submitCspReport",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Report accepted."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Submit sanitized CSP violation telemetry.",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/voice/channels/{channelId}/join": {
+      "post": {
+        "operationId": "joinVoiceChannel",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VoiceJoin"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Join a voice channel and receive a media token.",
+        "tags": [
+          "voice"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "guilds"
+    },
+    {
+      "name": "messages"
+    },
+    {
+      "name": "voice"
+    },
+    {
+      "name": "gateway"
+    },
+    {
+      "name": "security"
+    }
+  ]
+}

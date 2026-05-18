@@ -1,0 +1,17 @@
+{
+  "name": "@discord-clone/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./generated": "./src/generated/openapi-types.ts"
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
+  }
+}

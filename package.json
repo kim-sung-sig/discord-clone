@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "openapi:write": "node qa/openapi-contract.mjs --write",
+    "openapi:check": "node qa/openapi-contract.mjs --check && node qa/openapi-contract.test.mjs",
     "test": "npm run test --workspaces",
     "e2e": "npm run e2e -w apps/web"
   },
