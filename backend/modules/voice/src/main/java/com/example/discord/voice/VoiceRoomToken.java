@@ -10,6 +10,7 @@ public record VoiceRoomToken(
     Instant expiresAt
 ) {
     public static final String PROVIDER = "LIVEKIT_SKELETON";
+    public static final String LIVEKIT_PROVIDER = "LIVEKIT";
 
     public VoiceRoomToken {
         if (room == null || room.isBlank()) {
@@ -21,8 +22,8 @@ public record VoiceRoomToken(
         if (token == null || token.isBlank()) {
             throw new IllegalArgumentException("token is required");
         }
-        if (!PROVIDER.equals(provider)) {
-            throw new IllegalArgumentException("provider must be " + PROVIDER);
+        if (!PROVIDER.equals(provider) && !LIVEKIT_PROVIDER.equals(provider)) {
+            throw new IllegalArgumentException("provider must be " + PROVIDER + " or " + LIVEKIT_PROVIDER);
         }
         if (expiresAt == null) {
             throw new IllegalArgumentException("expiresAt is required");

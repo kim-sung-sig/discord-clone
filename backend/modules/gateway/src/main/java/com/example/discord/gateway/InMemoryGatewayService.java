@@ -11,19 +11,34 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public final class InMemoryGatewayService {
     private final InMemoryGuildService guildService;
     private final Clock clock;
     private final Duration heartbeatTimeout;
+    private final GatewayEventBus eventBus;
     private final Map<UUID, GatewaySession> sessions = new LinkedHashMap<>();
     private final List<GatewayEvent> events = new ArrayList<>();
+    private final Map<String, GatewayEvent> eventsByBusEventId = new LinkedHashMap<>();
+    private final List<Consumer<GatewayEvent>> listeners = new ArrayList<>();
     private long nextSequence = 1L;
 
     public InMemoryGatewayService(InMemoryGuildService guildService, Clock clock, Duration heartbeatTimeout) {
+        this(guildService, clock, heartbeatTimeout, new InMemoryGatewayEventBus(clock));
+    }
+
+    public InMemoryGatewayService(
+        InMemoryGuildService guildService,
+        Clock clock,
+        Duration heartbeatTimeout,
+        GatewayEventBus eventBus
+    ) {
         this.guildService = Objects.requireNonNull(guildService, "guildService must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.heartbeatTimeout = Objects.requireNonNull(heartbeatTimeout, "heartbeatTimeout must not be null");
+        this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
+        this.eventBus.addEventListener(this::appendBusEvent);
     }
 
     public synchronized GatewayIdentifyResult identify(UUID userId) {
@@ -42,6 +57,7 @@ public final class InMemoryGatewayService {
             ready.sequence()
         );
         sessions.put(session.id(), session);
+        registerSubscriptions(session);
         ready = ready.withPayload(ready.payloadPlus("sessionId", session.id().toString()));
         return new GatewayIdentifyResult(session, ready);
     }
@@ -71,9 +87,12 @@ public final class InMemoryGatewayService {
         if (channelId != null && !guildService.channelBelongsToGuild(guildId, channelId)) {
             throw new IllegalArgumentException("channel does not belong to guild");
         }
-        GatewayEvent event = new GatewayEvent(nextSequence++, type, guildId, channelId, payload, clock.instant());
-        events.add(event);
-        return event;
+        GatewayBusEvent busEvent = eventBus.publish(new GatewayBusPublishCommand(type, guildId, channelId, payload));
+        return appendBusEvent(busEvent);
+    }
+
+    public synchronized void addEventListener(Consumer<GatewayEvent> listener) {
+        listeners.add(Objects.requireNonNull(listener, "listener must not be null"));
     }
 
     public synchronized List<GatewayEvent> poll(UUID sessionId, UUID userId, long afterSequence) {
@@ -119,10 +138,46 @@ public final class InMemoryGatewayService {
     }
 
     private boolean canDeliver(UUID userId, GatewayEvent event) {
+        if (event.guildId() == null) {
+            return true;
+        }
         if (event.channelId() != null) {
             return guildService.canViewChannel(event.guildId(), event.channelId(), userId);
         }
         return guildService.isGuildMemberOrOwner(event.guildId(), userId);
+    }
+
+    private void registerSubscriptions(GatewaySession session) {
+        for (UUID guildId : session.guildIds()) {
+            eventBus.subscribeGuild(guildId);
+            guildService.visibleChannels(guildId, session.userId())
+                .forEach(channel -> eventBus.subscribeChannel(channel.id()));
+        }
+    }
+
+    private synchronized GatewayEvent appendBusEvent(GatewayBusEvent busEvent) {
+        GatewayEvent existing = eventsByBusEventId.get(busEvent.eventId());
+        if (existing != null) {
+            return existing;
+        }
+        if (busEvent.channelId() != null && !guildService.channelBelongsToGuild(busEvent.guildId(), busEvent.channelId())) {
+            throw new IllegalArgumentException("channel does not belong to guild");
+        }
+        GatewayEvent event = new GatewayEvent(
+            nextSequence++,
+            busEvent.eventId(),
+            busEvent.type(),
+            busEvent.guildId(),
+            busEvent.channelId(),
+            busEvent.payload(),
+            busEvent.createdAt()
+        );
+        events.add(event);
+        eventsByBusEventId.put(busEvent.eventId(), event);
+        for (Consumer<GatewayEvent> listener : List.copyOf(listeners)) {
+            listener.accept(event);
+        }
+        return event;
     }
 
     private GatewaySession requireOwnedSession(UUID sessionId, UUID userId) {

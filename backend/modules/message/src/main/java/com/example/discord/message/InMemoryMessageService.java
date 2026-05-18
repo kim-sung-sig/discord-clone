@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -139,6 +140,23 @@ public class InMemoryMessageService {
         return messages.values().stream()
             .filter(message -> message.guildId().equals(guildId))
             .filter(message -> message.channelId().equals(channelId))
+            .filter(message -> !message.deleted())
+            .filter(message -> message.content().toLowerCase(Locale.ROOT).contains(normalized))
+            .sorted(NEWEST_FIRST)
+            .limit(pageSize(limit))
+            .toList();
+    }
+
+    public synchronized List<Message> search(UUID guildId, Set<UUID> allowedChannelIds, String query, int limit) {
+        Objects.requireNonNull(guildId, "guildId must not be null");
+        Set<UUID> channels = allowedChannelIds == null ? Set.of() : Set.copyOf(allowedChannelIds);
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (channels.isEmpty() || normalized.isEmpty()) {
+            return List.of();
+        }
+        return messages.values().stream()
+            .filter(message -> message.guildId().equals(guildId))
+            .filter(message -> channels.contains(message.channelId()))
             .filter(message -> !message.deleted())
             .filter(message -> message.content().toLowerCase(Locale.ROOT).contains(normalized))
             .sorted(NEWEST_FIRST)

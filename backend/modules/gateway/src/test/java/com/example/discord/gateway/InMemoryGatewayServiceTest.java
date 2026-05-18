@@ -155,6 +155,76 @@ class InMemoryGatewayServiceTest {
         assertThat(events).extracting(GatewayEvent::sequence).containsExactly(visibleEvent.sequence());
     }
 
+    @Test
+    void sharedBusFansOutEventsToSessionsOnOtherGatewayNodes() {
+        InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
+        InMemoryGatewayService nodeA = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
+        InMemoryGatewayService nodeB = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel channel = guildService.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        GatewayIdentifyResult identifiedOnNodeB = nodeB.identify(ownerId);
+
+        GatewayEvent publishedOnNodeA = nodeA.publish(
+            "MESSAGE_CREATE",
+            guild.id(),
+            channel.id(),
+            Map.of("content", "cross-node")
+        );
+
+        List<GatewayEvent> deliveredOnNodeB = nodeB.poll(identifiedOnNodeB.session().id(), ownerId, 0L);
+        assertThat(deliveredOnNodeB)
+            .extracting(GatewayEvent::type)
+            .containsExactly("MESSAGE_CREATE");
+        assertThat(deliveredOnNodeB)
+            .extracting(event -> event.payload().get("content"))
+            .containsExactly("cross-node");
+        assertThat(deliveredOnNodeB)
+            .extracting(GatewayEvent::busEventId)
+            .containsExactly(publishedOnNodeA.busEventId());
+    }
+
+    @Test
+    void crossNodeFanoutStillFiltersHiddenChannelEventsAtDeliveryTime() {
+        InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
+        InMemoryGatewayService nodeA = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
+        InMemoryGatewayService nodeB = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
+        UUID ownerId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel visible = guildService.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        Channel hidden = guildService.createChannel(guild.id(), "staff", ChannelType.GUILD_TEXT, null);
+        guildService.addMember(guild.id(), memberId);
+        denyEveryoneView(guild, hidden);
+        GatewayIdentifyResult identifiedOnNodeB = nodeB.identify(memberId);
+        GatewayEvent visibleEvent = nodeA.publish(
+            "MESSAGE_CREATE",
+            guild.id(),
+            visible.id(),
+            Map.of("content", "visible cross-node")
+        );
+        nodeA.publish("MESSAGE_CREATE", guild.id(), hidden.id(), Map.of("content", "hidden cross-node"));
+
+        List<GatewayEvent> deliveredOnNodeB = nodeB.poll(identifiedOnNodeB.session().id(), memberId, 0L);
+
+        assertThat(deliveredOnNodeB).extracting(GatewayEvent::busEventId).containsExactly(visibleEvent.busEventId());
+    }
+
+    @Test
+    void busRedeliveryDoesNotAppendDuplicateGatewayEvents() {
+        InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
+        InMemoryGatewayService node = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = node.identify(ownerId);
+        GatewayEvent published = node.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "once"));
+
+        eventBus.redeliver(published.busEventId());
+
+        List<GatewayEvent> delivered = node.poll(identified.session().id(), ownerId, 0L);
+        assertThat(delivered).extracting(GatewayEvent::busEventId).containsExactly(published.busEventId());
+    }
+
     private void denyEveryoneView(Guild guild, Channel channel) {
         guildService.addChannelRoleOverwrite(
             guild.id(),

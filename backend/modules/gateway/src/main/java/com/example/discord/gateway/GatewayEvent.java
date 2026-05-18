@@ -7,12 +7,17 @@ import java.util.UUID;
 
 public record GatewayEvent(
     long sequence,
+    String busEventId,
     String type,
     UUID guildId,
     UUID channelId,
     Map<String, Object> payload,
     Instant createdAt
 ) {
+    public GatewayEvent(long sequence, String type, UUID guildId, UUID channelId, Map<String, Object> payload, Instant createdAt) {
+        this(sequence, null, type, guildId, channelId, payload, createdAt);
+    }
+
     public GatewayEvent {
         if (sequence < 1) {
             throw new IllegalArgumentException("sequence must be positive");
@@ -23,7 +28,7 @@ public record GatewayEvent(
     }
 
     GatewayEvent withPayload(Map<String, Object> updatedPayload) {
-        return new GatewayEvent(sequence, type, guildId, channelId, updatedPayload, createdAt);
+        return new GatewayEvent(sequence, busEventId, type, guildId, channelId, updatedPayload, createdAt);
     }
 
     Map<String, Object> payloadPlus(String key, Object value) {

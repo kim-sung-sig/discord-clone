@@ -46,6 +46,48 @@ class InMemoryAttachmentServiceTest {
     }
 
     @Test
+    void rejectsFilenameExtensionAndContentTypeMismatch() {
+        assertThatThrownBy(() -> service.requestUpload(
+                new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "avatar.png", "image/jpeg", 100)
+            ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("attachment filename extension does not match content type");
+    }
+
+    @Test
+    void rejectsUploadedBytesWhenSignatureDoesNotMatchContentType() {
+        PresignedUpload upload = service.requestUpload(
+            new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "avatar.png", "image/png", 100)
+        );
+
+        assertThatThrownBy(() -> service.markUploaded(upload.attachmentId(), OWNER_ID, jpegBytes()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("attachment file signature does not match content type");
+
+        assertThat(objectStore.exists(upload.objectKey())).isFalse();
+        assertThat(service.attachmentByOwner(upload.attachmentId(), OWNER_ID).status()).isEqualTo(AttachmentStatus.PENDING);
+    }
+
+    @Test
+    void scannerUnavailableBlocksUploadCompletion() {
+        InMemoryAttachmentService blockedService = new InMemoryAttachmentService(
+            new AttachmentUploadPolicy(1024, java.util.Set.of("image/png", "image/jpeg"), Duration.ofMinutes(5)),
+            objectStore,
+            clock,
+            (attachment, bytes) -> AttachmentScanResult.unavailable("scanner offline")
+        );
+        PresignedUpload upload = blockedService.requestUpload(
+            new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "avatar.png", "image/png", 100)
+        );
+
+        assertThatThrownBy(() -> blockedService.markUploaded(upload.attachmentId(), OWNER_ID, pngBytes()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("attachment scanner unavailable");
+
+        assertThat(objectStore.exists(upload.objectKey())).isFalse();
+    }
+
+    @Test
     void generatesObjectKeyFromServerScopeAndNeverFromFilename() {
         PresignedUpload upload = service.requestUpload(
             new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "../../secret.png", "image/png", 100)
@@ -63,7 +105,7 @@ class InMemoryAttachmentServiceTest {
         PresignedUpload upload = service.requestUpload(
             new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "image.png", "image/png", 100)
         );
-        service.markUploaded(upload.attachmentId(), OWNER_ID);
+        service.markUploaded(upload.attachmentId(), OWNER_ID, pngBytes());
         service.attachToMessage(upload.attachmentId(), OWNER_ID, GUILD_ID, CHANNEL_ID, MESSAGE_ID);
 
         PresignedDownload download = service.requestDownload(upload.attachmentId(), OWNER_ID, GUILD_ID, CHANNEL_ID);
@@ -83,8 +125,8 @@ class InMemoryAttachmentServiceTest {
         PresignedUpload attached = service.requestUpload(
             new AttachmentUploadRequest(OWNER_ID, GUILD_ID, CHANNEL_ID, "attached.jpg", "image/jpeg", 100)
         );
-        service.markUploaded(orphan.attachmentId(), OWNER_ID);
-        service.markUploaded(attached.attachmentId(), OWNER_ID);
+        service.markUploaded(orphan.attachmentId(), OWNER_ID, pngBytes());
+        service.markUploaded(attached.attachmentId(), OWNER_ID, jpegBytes());
         service.attachToMessage(attached.attachmentId(), OWNER_ID, GUILD_ID, CHANNEL_ID, MESSAGE_ID);
         objectStore.put(orphan.objectKey());
         objectStore.put(attached.objectKey());
@@ -98,6 +140,18 @@ class InMemoryAttachmentServiceTest {
         assertThat(objectStore.exists(attached.objectKey())).isTrue();
         assertThat(service.attachment(attached.attachmentId(), OWNER_ID, GUILD_ID, CHANNEL_ID).status())
             .isEqualTo(AttachmentStatus.ATTACHED);
+    }
+
+    private static byte[] pngBytes() {
+        return new byte[] {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00
+        };
+    }
+
+    private static byte[] jpegBytes() {
+        return new byte[] {
+            (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00
+        };
     }
 
     private static final class MutableClock extends Clock {

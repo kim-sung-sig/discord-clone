@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class InMemoryModerationService {
@@ -13,6 +14,8 @@ public final class InMemoryModerationService {
     private final Map<UUID, List<AutoModRule>> autoModRulesByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<AuditLogEntry>> auditLogsByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<SecurityAlert>> securityAlertsByGuild = new LinkedHashMap<>();
+    private final Map<UUID, List<MessageReport>> messageReportsByGuild = new LinkedHashMap<>();
+    private Instant lastAuditCreatedAt = Instant.EPOCH;
 
     public synchronized OnboardingQuestion createOnboardingQuestion(
         UUID guildId,
@@ -111,6 +114,82 @@ public final class InMemoryModerationService {
         return List.copyOf(alerts);
     }
 
+    public synchronized MessageReport reportMessage(ReportMessageCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("command is required");
+        }
+        Instant now = Instant.now();
+        MessageReport report = new MessageReport(
+            UUID.randomUUID(),
+            command.guildId(),
+            command.channelId(),
+            command.messageId(),
+            command.reporterId(),
+            command.reason(),
+            MessageReportStatus.OPEN,
+            Optional.empty(),
+            "",
+            now,
+            now
+        );
+        messageReportsByGuild.computeIfAbsent(command.guildId(), ignored -> new ArrayList<>()).add(report);
+        appendAudit(command.guildId(), AuditLogAction.MESSAGE_REPORTED, command.reporterId(), command.messageId(), "message reported");
+        return report;
+    }
+
+    public synchronized MessageReport resolveMessageReport(
+        UUID guildId,
+        UUID reportId,
+        UUID moderatorId,
+        MessageReportStatus status,
+        String resolution
+    ) {
+        require(guildId, "guildId");
+        require(reportId, "reportId");
+        require(moderatorId, "moderatorId");
+        if (status == null || status == MessageReportStatus.OPEN) {
+            throw new IllegalArgumentException("terminal report status is required");
+        }
+
+        List<MessageReport> reports = messageReportsByGuild.getOrDefault(guildId, List.of());
+        for (int i = 0; i < reports.size(); i++) {
+            MessageReport current = reports.get(i);
+            if (current.id().equals(reportId)) {
+                MessageReport resolved = new MessageReport(
+                    current.id(),
+                    current.guildId(),
+                    current.channelId(),
+                    current.messageId(),
+                    current.reporterId(),
+                    current.reason(),
+                    status,
+                    Optional.of(moderatorId),
+                    resolution,
+                    current.createdAt(),
+                    Instant.now()
+                );
+                reports.set(i, resolved);
+                appendAudit(guildId, AuditLogAction.MESSAGE_REPORT_RESOLVED, moderatorId, current.messageId(), "message report resolved");
+                return resolved;
+            }
+        }
+        throw new IllegalArgumentException("report not found");
+    }
+
+    public synchronized List<MessageReport> pendingMessageReports(UUID guildId) {
+        return messageReportsByGuild.getOrDefault(guildId, List.of()).stream()
+            .filter(report -> report.status() == MessageReportStatus.OPEN)
+            .toList();
+    }
+
+    public synchronized List<MessageReport> messageReports(UUID guildId, UUID messageId) {
+        require(guildId, "guildId");
+        require(messageId, "messageId");
+        return messageReportsByGuild.getOrDefault(guildId, List.of()).stream()
+            .filter(report -> report.messageId().equals(messageId))
+            .toList();
+    }
+
     public synchronized void appendAudit(UUID guildId, AuditLogAction action, UUID actorId, UUID targetId, String reason) {
         require(guildId, "guildId");
         require(actorId, "actorId");
@@ -118,8 +197,17 @@ public final class InMemoryModerationService {
         if (action == null) {
             throw new IllegalArgumentException("action is required");
         }
-        AuditLogEntry entry = new AuditLogEntry(UUID.randomUUID(), guildId, action, actorId, targetId, reason, Instant.now());
+        AuditLogEntry entry = new AuditLogEntry(UUID.randomUUID(), guildId, action, actorId, targetId, reason, nextAuditInstant());
         auditLogsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(entry);
+    }
+
+    private Instant nextAuditInstant() {
+        Instant now = Instant.now();
+        if (!now.isAfter(lastAuditCreatedAt)) {
+            now = lastAuditCreatedAt.plusNanos(1);
+        }
+        lastAuditCreatedAt = now;
+        return now;
     }
 
     private void appendSecurityAlert(UUID guildId, UUID actorId, UUID targetId, String type, String severity, String reason) {

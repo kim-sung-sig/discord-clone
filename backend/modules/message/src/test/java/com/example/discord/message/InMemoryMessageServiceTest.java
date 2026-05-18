@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class InMemoryMessageServiceTest {
@@ -108,6 +109,31 @@ class InMemoryMessageServiceTest {
         assertThat(service.search(GUILD_ID, CHANNEL_ID, "BACKEND", 10))
             .extracting(Message::id)
             .containsExactly(match.id());
+    }
+
+    @Test
+    void guildSearchOnlyReturnsMessagesFromAllowedChannels() {
+        InMemoryMessageService service = service();
+        UUID allowedChannelId = CHANNEL_ID;
+        UUID hiddenChannelId = UUID.fromString("00000000-0000-0000-0000-000000000005");
+        Message visible = service.create(new CreateMessageCommand(GUILD_ID, allowedChannelId, AUTHOR_ID, "release search notes"));
+        service.create(new CreateMessageCommand(GUILD_ID, hiddenChannelId, AUTHOR_ID, "hidden search notes"));
+
+        assertThat(service.search(GUILD_ID, Set.of(allowedChannelId), "search", 10))
+            .extracting(Message::id)
+            .containsExactly(visible.id());
+    }
+
+    @Test
+    void guildSearchExcludesDeletedMessages() {
+        InMemoryMessageService service = service();
+        Message visible = service.create(new CreateMessageCommand(GUILD_ID, CHANNEL_ID, AUTHOR_ID, "moderation search live"));
+        Message deleted = service.create(new CreateMessageCommand(GUILD_ID, CHANNEL_ID, AUTHOR_ID, "moderation search deleted"));
+        service.delete(GUILD_ID, CHANNEL_ID, deleted.id());
+
+        assertThat(service.search(GUILD_ID, Set.of(CHANNEL_ID), "moderation", 10))
+            .extracting(Message::id)
+            .containsExactly(visible.id());
     }
 
     private static InMemoryMessageService service() {

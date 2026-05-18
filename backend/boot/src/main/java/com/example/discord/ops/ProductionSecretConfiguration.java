@@ -25,6 +25,9 @@ class ProductionSecretConfiguration {
         if (!activeProfiles.contains("postgres")) {
             failures.add("production profile requires postgres profile");
         }
+        if (!activeProfiles.contains("redis")) {
+            failures.add("production profile requires redis profile");
+        }
 
         requireSecret(
             environment,
@@ -44,8 +47,24 @@ class ProductionSecretConfiguration {
             "spring.datasource.password",
             List.of("dev_password")
         );
+        if (activeProfiles.contains("media-livekit")) {
+            requireNonDefault(environment, failures, "discord.media.livekit.api-key", List.of("test", "local", "lk-test-key"));
+            requireSecret(
+                environment,
+                failures,
+                "discord.media.livekit.api-secret",
+                List.of("test", "local", "livekit-test-secret", "livekit-local-secret")
+            );
+            requireNonDefault(
+                environment,
+                failures,
+                "discord.media.livekit.url",
+                List.of("http://localhost:7880", "ws://localhost:7880", "wss://localhost:7880")
+            );
+        }
         requireNonDefault(environment, failures, "spring.datasource.username", List.of("dev_user"));
         requireNonDefault(environment, failures, "spring.datasource.url", List.of("jdbc:postgresql://127.0.0.1:15432/discord"));
+        requireNonDefault(environment, failures, "spring.data.redis.host", List.of("127.0.0.1", "localhost"));
 
         if (!failures.isEmpty()) {
             throw new IllegalStateException("production secret/config validation failed: " + String.join(", ", failures));

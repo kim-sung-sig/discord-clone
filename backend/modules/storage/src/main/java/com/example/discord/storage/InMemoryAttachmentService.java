@@ -11,12 +11,24 @@ public final class InMemoryAttachmentService {
     private final AttachmentUploadPolicy policy;
     private final ObjectStore objectStore;
     private final Clock clock;
+    private final AttachmentScanner scanner;
+    private final FileSignatureValidator signatureValidator = new FileSignatureValidator();
     private final Map<UUID, Attachment> attachments = new LinkedHashMap<>();
 
     public InMemoryAttachmentService(AttachmentUploadPolicy policy, ObjectStore objectStore, Clock clock) {
+        this(policy, objectStore, clock, AttachmentScanner.allowAll());
+    }
+
+    public InMemoryAttachmentService(
+        AttachmentUploadPolicy policy,
+        ObjectStore objectStore,
+        Clock clock,
+        AttachmentScanner scanner
+    ) {
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.scanner = Objects.requireNonNull(scanner, "scanner must not be null");
     }
 
     public synchronized PresignedUpload requestUpload(AttachmentUploadRequest request) {
@@ -24,6 +36,7 @@ public final class InMemoryAttachmentService {
         String contentType = AttachmentUploadPolicy.normalizeContentType(request.contentType());
         policy.validate(contentType, request.sizeBytes());
         String filename = requireFilename(request.filename());
+        policy.validateFilename(filename, contentType);
         UUID attachmentId = UUID.randomUUID();
         String objectKey = objectKey(request, attachmentId, extension(filename));
         Instant now = clock.instant();
@@ -47,6 +60,23 @@ public final class InMemoryAttachmentService {
 
     public synchronized Attachment markUploaded(UUID attachmentId, UUID ownerId) {
         Attachment current = requireOwnedAttachment(attachmentId, ownerId);
+        return markUploaded(current);
+    }
+
+    public synchronized Attachment markUploaded(UUID attachmentId, UUID ownerId, byte[] bytes) {
+        Attachment current = requireOwnedAttachment(attachmentId, ownerId);
+        signatureValidator.validate(current.contentType(), bytes);
+        AttachmentScanResult scanResult = scanner.scan(current, bytes.clone());
+        if (scanResult.status() == AttachmentScanStatus.UNAVAILABLE) {
+            throw new IllegalStateException("attachment scanner unavailable");
+        }
+        if (scanResult.status() == AttachmentScanStatus.BLOCKED) {
+            throw new IllegalStateException("attachment blocked by scanner");
+        }
+        return markUploaded(current);
+    }
+
+    private Attachment markUploaded(Attachment current) {
         objectStore.put(current.objectKey());
         Attachment updated = new Attachment(
             current.id(),

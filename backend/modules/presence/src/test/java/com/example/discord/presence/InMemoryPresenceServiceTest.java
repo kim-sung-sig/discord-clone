@@ -18,7 +18,7 @@ class InMemoryPresenceServiceTest {
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-05-14T00:00:00Z"));
     private final InMemoryPresenceService service = new InMemoryPresenceService(
-        new InMemoryRedisPresenceTtlStore(clock),
+        new InMemoryPresenceTtlStore(clock),
         clock
     );
 

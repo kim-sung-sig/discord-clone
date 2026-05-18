@@ -10,11 +10,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
-public final class InMemoryRedisPresenceTtlStore implements PresenceTtlStore {
+public final class InMemoryPresenceTtlStore implements PresenceTtlStore {
     private final Clock clock;
     private final Map<String, Entry> entries = new LinkedHashMap<>();
 
-    public InMemoryRedisPresenceTtlStore(Clock clock) {
+    public InMemoryPresenceTtlStore(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 

@@ -4,9 +4,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!redis")
 final class InMemoryRateLimitStore implements RateLimitStore {
     private final Map<WindowKey, CounterWindow> windows = new ConcurrentHashMap<>();
 

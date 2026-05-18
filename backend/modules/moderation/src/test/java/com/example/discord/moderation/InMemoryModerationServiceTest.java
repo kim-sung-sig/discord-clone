@@ -65,4 +65,59 @@ class InMemoryModerationServiceTest {
             .extracting(AuditLogEntry::action)
             .containsExactly(AuditLogAction.AUTOMOD_MESSAGE_BLOCKED, AuditLogAction.AUTOMOD_RULE_CREATED);
     }
+
+    @Test
+    void reportingMessageAddsPendingReportAndAuditEntry() {
+        InMemoryModerationService service = new InMemoryModerationService();
+        UUID guildId = UUID.randomUUID();
+        UUID channelId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        UUID reporterId = UUID.randomUUID();
+
+        MessageReport report = service.reportMessage(new ReportMessageCommand(
+            guildId,
+            channelId,
+            messageId,
+            reporterId,
+            "harassment"
+        ));
+
+        assertThat(report.status()).isEqualTo(MessageReportStatus.OPEN);
+        assertThat(service.pendingMessageReports(guildId)).extracting(MessageReport::id).containsExactly(report.id());
+        assertThat(service.auditLogs(guildId))
+            .extracting(AuditLogEntry::action)
+            .containsExactly(AuditLogAction.MESSAGE_REPORTED);
+    }
+
+    @Test
+    void resolvingMessageReportRemovesItFromPendingQueueAndAddsModeratorAudit() {
+        InMemoryModerationService service = new InMemoryModerationService();
+        UUID guildId = UUID.randomUUID();
+        UUID channelId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        UUID moderatorId = UUID.randomUUID();
+        MessageReport report = service.reportMessage(new ReportMessageCommand(
+            guildId,
+            channelId,
+            messageId,
+            UUID.randomUUID(),
+            "spam"
+        ));
+
+        MessageReport resolved = service.resolveMessageReport(
+            guildId,
+            report.id(),
+            moderatorId,
+            MessageReportStatus.RESOLVED,
+            "removed message"
+        );
+
+        assertThat(resolved.status()).isEqualTo(MessageReportStatus.RESOLVED);
+        assertThat(resolved.moderatorId()).contains(moderatorId);
+        assertThat(service.pendingMessageReports(guildId)).isEmpty();
+        assertThat(service.messageReports(guildId, messageId)).extracting(MessageReport::id).containsExactly(report.id());
+        assertThat(service.auditLogs(guildId))
+            .extracting(AuditLogEntry::action)
+            .containsExactly(AuditLogAction.MESSAGE_REPORT_RESOLVED, AuditLogAction.MESSAGE_REPORTED);
+    }
 }
