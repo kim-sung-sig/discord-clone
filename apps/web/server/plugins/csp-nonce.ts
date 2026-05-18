@@ -17,7 +17,11 @@ export default defineNitroPlugin((nitroApp) => {
     const config = useRuntimeConfig(context.event)
     setResponseHeaders(context.event, htmlSecurityHeaders({
       scriptNonce,
-      connectSources: connectSourcesFromUrls([config.public.apiBaseUrl])
+      connectSources: connectSourcesFromUrls([config.public.apiBaseUrl]),
+      cspReporting: {
+        enforceEndpoint: '/api/security/csp-report',
+        reportOnlyEndpoint: '/api/security/csp-report-only'
+      }
     }))
   })
 })

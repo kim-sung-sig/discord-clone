@@ -218,6 +218,22 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="message-attachment-attachment-demo-image"]').text()).toContain('qa-snapshot.png')
   })
 
+  it('provides keyboard skip path and traps focus inside invite modal', async () => {
+    const wrapper = await mountSuspended(App)
+
+    expect(wrapper.get('[data-testid="skip-to-workspace"]').attributes('href')).toBe('#workspace-content')
+    expect(wrapper.get('[data-testid="workspace"]').attributes('id')).toBe('workspace-content')
+    expect(wrapper.get('[data-testid="workspace"]').attributes('tabindex')).toBe('-1')
+    expect(wrapper.get('[data-testid="message-input"]').attributes('aria-label')).toBe('Message composer')
+    expect(wrapper.get('[data-testid="attachment-stage-demo"]').text()).toContain('Attach image')
+
+    const acceptButton = wrapper.get('[data-testid="invite-accept"]')
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    acceptButton.element.dispatchEvent(tabEvent)
+
+    expect(tabEvent.defaultPrevented).toBe(true)
+  })
+
   it('extracts user mentions without matching emails and scopes sends to the active channel', async () => {
     const wrapper = await mountSuspended(App)
 
@@ -248,6 +264,25 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Allow SEND_MESSAGES')
     expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Deny MANAGE_CHANNELS')
     expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="role-permission-panel"]').exists()).toBe(true)
+  })
+
+  it('renders admin permission diff, preview-as-role, and privileged audit feedback', async () => {
+    const wrapper = await mountSuspended(App)
+    const rolePanel = wrapper.get('[data-testid="role-permission-panel"]')
+
+    expect(rolePanel.get('[data-testid="permission-diff"]').text()).toContain('Moderator')
+    expect(rolePanel.get('[data-testid="permission-diff"]').text()).toContain('MANAGE_CHANNELS')
+    expect(rolePanel.get('[data-testid="permission-diff"]').text()).toContain('Before denied')
+    expect(rolePanel.get('[data-testid="permission-diff"]').text()).toContain('After allowed')
+    expect(rolePanel.get('[data-testid="preview-as-role"]').text()).toContain('Preview as Moderator')
+    expect(rolePanel.get('[data-testid="preview-as-role"]').text()).toContain('Allowed SEND_MESSAGES')
+    expect(rolePanel.get('[data-testid="preview-as-role"]').text()).toContain('Denied MANAGE_CHANNELS')
+
+    await rolePanel.get('[data-testid="apply-permission-draft"]').trigger('click')
+
+    expect(rolePanel.get('[data-testid="role-moderator"]').text()).toContain('MANAGE_CHANNELS')
+    expect(rolePanel.get('[data-testid="privileged-audit"]').text()).toContain('ROLE_PERMISSION_UPDATED')
+    expect(rolePanel.get('[data-testid="privileged-audit"]').text()).toContain('Moderator MANAGE_CHANNELS')
   })
 
   it('renders the invite preview modal with limits, role grants, and accept CTA inside the workspace', async () => {

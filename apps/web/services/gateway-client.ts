@@ -9,6 +9,31 @@ export interface GatewayDispatch {
   createdAt: string
 }
 
+export interface GatewaySocketLike {
+  onopen: (() => void) | null
+  onmessage: ((event: { data: string }) => void) | null
+  onclose: (() => void) | null
+  send: (frame: string) => void
+  close: () => void
+}
+
+export interface GatewaySocketLifecycleOptions {
+  url: string
+  accessToken: string
+  sessionId?: () => string | null | undefined
+  lastSequence: () => number
+  heartbeatIntervalMs?: number
+  webSocketFactory?: (url: string) => GatewaySocketLike
+  onDispatch: (dispatch: GatewayDispatch) => void
+  onDisconnect?: () => void
+}
+
+export interface GatewaySocketLifecycle {
+  connect: () => void
+  disconnect: () => void
+  sendHeartbeat: () => void
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -25,8 +50,9 @@ export const normalizeGatewayDispatch = (value: unknown): GatewayDispatch | null
   }
 
   const sequence = value.sequence
-  const type = value.type
-  const payload = value.payload
+  const rawType = value.type
+  const eventType = optionalString(value.eventType)
+  const payload = value.payload ?? {}
   const createdAt = value.createdAt
   const guildId = optionalString(value.guildId)
   const channelId = optionalString(value.channelId)
@@ -34,7 +60,7 @@ export const normalizeGatewayDispatch = (value: unknown): GatewayDispatch | null
   if (!Number.isInteger(sequence) || sequence < 1) {
     return null
   }
-  if (typeof type !== 'string' || type.trim().length === 0) {
+  if (typeof rawType !== 'string' || rawType.trim().length === 0) {
     return null
   }
   if (!isRecord(payload)) {
@@ -48,9 +74,14 @@ export const normalizeGatewayDispatch = (value: unknown): GatewayDispatch | null
     return null
   }
 
+  const normalizedType = rawType.trim().toUpperCase()
+  const dispatchType = normalizedType === 'EVENT' && eventType
+    ? eventType.trim().toUpperCase()
+    : normalizedType
+
   return {
     sequence,
-    type: type.trim().toUpperCase(),
+    type: dispatchType,
     ...(guildId ? { guildId } : {}),
     ...(channelId ? { channelId } : {}),
     payload: { ...payload },
@@ -66,3 +97,78 @@ export const toShellGatewayEvent = (dispatch: GatewayDispatch): ShellGatewayEven
   type: dispatch.type,
   label: `${dispatch.type.toLowerCase().replaceAll('_', ' ')} dispatch accepted`
 })
+
+export const createGatewaySocketLifecycle = (options: GatewaySocketLifecycleOptions): GatewaySocketLifecycle => {
+  let socket: GatewaySocketLike | null = null
+  let heartbeatId: ReturnType<typeof setInterval> | null = null
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 30_000
+
+  const sendFrame = (frame: Record<string, unknown>) => {
+    socket?.send(JSON.stringify(frame))
+  }
+
+  const sendHeartbeat = () => {
+    sendFrame({
+      op: 'HEARTBEAT',
+      lastSequence: options.lastSequence()
+    })
+  }
+
+  const connect = () => {
+    const factory = options.webSocketFactory ?? ((url: string) => new WebSocket(url) as GatewaySocketLike)
+    socket = factory(options.url)
+    socket.onopen = () => {
+      const sessionId = options.sessionId?.()
+      const lastSequence = options.lastSequence()
+      if (sessionId && lastSequence > 0) {
+        sendFrame({
+          op: 'RESUME',
+          token: options.accessToken,
+          sessionId,
+          lastSequence
+        })
+      } else {
+        sendFrame({
+          op: 'IDENTIFY',
+          token: options.accessToken
+        })
+      }
+
+      if (heartbeatIntervalMs > 0) {
+        heartbeatId = setInterval(sendHeartbeat, heartbeatIntervalMs)
+      }
+    }
+    socket.onmessage = (event) => {
+      try {
+        const dispatch = normalizeGatewayDispatch(JSON.parse(event.data))
+        if (dispatch) {
+          options.onDispatch(dispatch)
+        }
+      } catch {
+        // Ignore malformed frames; the next valid Gateway frame can still advance the stream.
+      }
+    }
+    socket.onclose = () => {
+      if (heartbeatId) {
+        clearInterval(heartbeatId)
+        heartbeatId = null
+      }
+      options.onDisconnect?.()
+    }
+  }
+
+  const disconnect = () => {
+    if (heartbeatId) {
+      clearInterval(heartbeatId)
+      heartbeatId = null
+    }
+    socket?.close()
+    socket = null
+  }
+
+  return {
+    connect,
+    disconnect,
+    sendHeartbeat
+  }
+}

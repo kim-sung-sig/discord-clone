@@ -5,6 +5,10 @@ import { connectSourcesFromUrls, htmlSecurityHeaders } from '../utils/security-h
 export default defineEventHandler((event) => {
   const config = useRuntimeConfig(event)
   setResponseHeaders(event, htmlSecurityHeaders({
-    connectSources: connectSourcesFromUrls([config.public.apiBaseUrl])
+    connectSources: connectSourcesFromUrls([config.public.apiBaseUrl]),
+    cspReporting: {
+      enforceEndpoint: '/api/security/csp-report',
+      reportOnlyEndpoint: '/api/security/csp-report-only'
+    }
   }))
 })

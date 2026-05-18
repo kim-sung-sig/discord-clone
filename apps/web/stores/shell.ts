@@ -43,6 +43,11 @@ interface BackendMessageResponse {
   createdAt: string
 }
 
+interface BackendMessagePageResponse {
+  messages: BackendMessageResponse[]
+  nextCursor: string | null
+}
+
 interface BackendVoiceJoinResponse {
   participant: ShellVoiceParticipant
   token: {
@@ -73,6 +78,26 @@ export interface ShellMessage {
   deleted: boolean
   mentions: string[]
   attachments: ShellAttachment[]
+  status?: 'sending' | 'sent' | 'failed'
+  clientEventId?: string
+  requestId?: string
+  serverVersion?: number
+}
+
+type ShellMutationAction = 'MESSAGE_CREATE' | 'VOICE_JOIN' | 'STAGE_START'
+
+export interface ShellPendingMutation {
+  id: string
+  action: ShellMutationAction
+  entityId: string
+  clientEventId: string
+  requestId: string
+  createdAt: string
+}
+
+export interface ShellFailedMutation extends ShellPendingMutation {
+  reason: string
+  failedAt: string
 }
 
 export interface ShellAttachment {
@@ -125,6 +150,18 @@ export interface ShellPermissionOverwrite {
   roleId: string
   allow: string[]
   deny: string[]
+}
+
+export interface ShellAdminPermissionDraft {
+  roleId: string
+  permission: string
+  before: boolean
+  after: boolean
+}
+
+export interface ShellAdminConsoleState {
+  previewRoleId: string
+  permissionDraft: ShellAdminPermissionDraft | null
 }
 
 export interface ShellInvitePreview {
@@ -384,6 +421,43 @@ const payloadString = (dispatch: GatewayDispatch, key: string): string | undefin
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
 }
 
+const payloadBoolean = (dispatch: GatewayDispatch, key: string): boolean | undefined => {
+  const value = dispatch.payload[key]
+  return typeof value === 'boolean' ? value : undefined
+}
+
+const payloadNumber = (dispatch: GatewayDispatch, key: string): number | undefined => {
+  const value = dispatch.payload[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+const payloadStringArray = (dispatch: GatewayDispatch, key: string): string[] | undefined => {
+  const value = dispatch.payload[key]
+  return Array.isArray(value) && value.every((candidate) => typeof candidate === 'string')
+    ? value
+    : undefined
+}
+
+const nextShellMessageSequence = (messages: ShellMessage[]): number =>
+  messages.reduce((highest, message) => Math.max(highest, message.sequence), 0) + 1
+
+const createShellClientEventId = (): string => {
+  const timePart = Date.now().toString(36)
+  const randomPart = Math.random().toString(36).slice(2, 10)
+  return `web-shell:${timePart}:${randomPart}`
+}
+
+const gatewayEventId = (dispatch: GatewayDispatch): string => {
+  const entityId =
+    payloadString(dispatch, 'id') ??
+    payloadString(dispatch, 'messageId') ??
+    payloadString(dispatch, 'clientEventId') ??
+    dispatch.channelId ??
+    'gateway'
+  const version = payloadNumber(dispatch, 'serverVersion') ?? payloadNumber(dispatch, 'version') ?? dispatch.sequence
+  return `${dispatch.type}:${entityId}:${version}`
+}
+
 const demoAttachment = (): ShellAttachment => ({
   id: 'attachment-demo-image',
   filename: 'qa-snapshot.png',
@@ -563,6 +637,15 @@ export const useShellStore = defineStore('shell', {
         deny: ['MANAGE_CHANNELS']
       }
     ] satisfies ShellPermissionOverwrite[],
+    adminConsole: {
+      previewRoleId: 'role-moderator',
+      permissionDraft: {
+        roleId: 'role-moderator',
+        permission: 'MANAGE_CHANNELS',
+        before: false,
+        after: true
+      }
+    } satisfies ShellAdminConsoleState,
     invitePreview: {
       code: 'discord-clone-t03',
       guildId: 'guild-discord-clone',
@@ -586,6 +669,11 @@ export const useShellStore = defineStore('shell', {
         }
       ]
     } satisfies ShellGatewayState,
+    latestGatewaySequence: 42,
+    processedEventIds: ['READY:gateway:42'] as string[],
+    pendingMutations: [] satisfies ShellPendingMutation[],
+    failedMutations: [] satisfies ShellFailedMutation[],
+    resyncRequired: false,
     social: {
       activeSelection: {
         type: 'GROUP',
@@ -870,6 +958,71 @@ export const useShellStore = defineStore('shell', {
           roleName: state.roles.find((role) => role.id === overwrite.roleId)?.name ?? overwrite.roleId
         }))
     },
+    adminPermissionDiff: (state) => {
+      const draft = state.adminConsole.permissionDraft
+      if (!draft) {
+        return null
+      }
+      const role = state.roles.find((candidate) => candidate.id === draft.roleId)
+      return {
+        ...draft,
+        roleName: role?.name ?? draft.roleId,
+        beforeLabel: draft.before ? 'allowed' : 'denied',
+        afterLabel: draft.after ? 'allowed' : 'denied'
+      }
+    },
+    previewAsRole: (state) => {
+      const everyoneRole = state.roles.find((role) => role.id === 'role-everyone')
+      const selectedRole = state.roles.find((role) => role.id === state.adminConsole.previewRoleId)
+      const allowed = new Set<string>(everyoneRole?.permissions ?? [])
+      for (const permission of selectedRole?.permissions ?? []) {
+        allowed.add(permission)
+      }
+
+      const activeOverwrites = state.permissionOverwrites.filter(
+        (overwrite) =>
+          overwrite.channelId === state.activeChannelId &&
+          (overwrite.roleId === 'role-everyone' || overwrite.roleId === state.adminConsole.previewRoleId)
+      )
+      const overwriteAllows = new Set<string>()
+      for (const overwrite of activeOverwrites) {
+        for (const permission of overwrite.deny) {
+          allowed.delete(permission)
+        }
+      }
+      for (const overwrite of activeOverwrites) {
+        for (const permission of overwrite.allow) {
+          overwriteAllows.add(permission)
+          allowed.add(permission)
+        }
+      }
+
+      const denied = new Set<string>()
+      for (const overwrite of activeOverwrites) {
+        for (const permission of overwrite.deny) {
+          if (!allowed.has(permission)) {
+            denied.add(permission)
+          }
+        }
+      }
+
+      return {
+        roleName: selectedRole?.name ?? state.adminConsole.previewRoleId,
+        allowed: Array.from(allowed).sort((left, right) => {
+          const leftOverwrite = overwriteAllows.has(left)
+          const rightOverwrite = overwriteAllows.has(right)
+          if (leftOverwrite !== rightOverwrite) {
+            return leftOverwrite ? -1 : 1
+          }
+          return left.localeCompare(right)
+        }),
+        denied: Array.from(denied).sort()
+      }
+    },
+    privilegedAuditLogs: (state) =>
+      state.moderation.auditLogs.filter((entry) =>
+        ['ROLE_PERMISSION_UPDATED', 'ROLE_ASSIGNED', 'MESSAGE_DELETED', 'MESSAGE_PINNED', 'MESSAGE_UNPINNED'].includes(entry.action)
+      ),
     invitePreviewSummary: (state) => {
       const channel = state.channelGroups
         .flatMap((group) => group.channels)
@@ -1052,7 +1205,7 @@ export const useShellStore = defineStore('shell', {
       this.messages.push({
         id: `message-${Date.now()}`,
         channelId: this.activeChannelId,
-        sequence: this.messages.reduce((highest, message) => Math.max(highest, message.sequence), 0) + 1,
+        sequence: nextShellMessageSequence(this.messages),
         author: this.currentUser,
         body,
         createdAt: new Date().toISOString(),
@@ -1118,31 +1271,140 @@ export const useShellStore = defineStore('shell', {
     },
     async sendBackendMessage(channelId: string, content: string, bearerToken: string): Promise<ShellMessage | null> {
       return this.withBackendRequest(async (client, requestId) => {
-        const message = await client.post<BackendMessageResponse>(
-          discordApiPaths.channel.messages(channelId),
-          { content },
-          { bearerToken, requestId }
-        )
-        const shellMessage: ShellMessage = {
-          id: message.id,
-          channelId: message.channelId,
-          sequence: this.messages.reduce((highest, candidate) => Math.max(highest, candidate.sequence), 0) + 1,
-          author: message.authorId,
-          body: message.content,
-          createdAt: message.createdAt,
-          edited: message.edited,
-          pinned: message.pinned,
-          deleted: message.deleted,
-          mentions: message.mentions,
-          attachments: []
+        const body = content.trim()
+        const clientEventId = createShellClientEventId()
+        const localMessageId = `local-${clientEventId}`
+        const optimisticMessage: ShellMessage = {
+          id: localMessageId,
+          channelId,
+          sequence: nextShellMessageSequence(this.messages),
+          author: this.currentUser,
+          body,
+          createdAt: new Date().toISOString(),
+          edited: false,
+          pinned: false,
+          deleted: false,
+          mentions: extractMentions(body),
+          attachments: [],
+          status: 'sending',
+          clientEventId,
+          requestId
         }
         this.messages = [
-          ...this.messages.filter((candidate) => candidate.id !== shellMessage.id),
-          shellMessage
+          ...this.messages.filter((candidate) => candidate.id !== optimisticMessage.id),
+          optimisticMessage
         ]
-        this.composerBody = ''
-        this.stagedAttachment = null
-        return shellMessage
+        this.pendingMutations.push({
+          id: `pending-${clientEventId}`,
+          action: 'MESSAGE_CREATE',
+          entityId: optimisticMessage.id,
+          clientEventId,
+          requestId,
+          createdAt: optimisticMessage.createdAt
+        })
+
+        try {
+          const message = await client.post<BackendMessageResponse>(
+            discordApiPaths.channel.messages(channelId),
+            { content: body, clientEventId },
+            { bearerToken, requestId }
+          )
+          const shellMessage = this.confirmBackendMessage(message, clientEventId, requestId)
+          this.composerBody = ''
+          this.stagedAttachment = null
+          return shellMessage
+        } catch (error) {
+          this.failPendingMutation(clientEventId, backendErrorMessage(error))
+          throw error
+        }
+      })
+    },
+    confirmBackendMessage(
+      message: BackendMessageResponse,
+      clientEventId: string,
+      requestId: string
+    ): ShellMessage {
+      const existing = this.messages.find(
+        (candidate) => candidate.id === message.id || candidate.clientEventId === clientEventId
+      )
+      const shellMessage: ShellMessage = {
+        id: message.id,
+        channelId: message.channelId,
+        sequence: existing?.sequence ?? nextShellMessageSequence(this.messages),
+        author: message.authorId,
+        body: message.content,
+        createdAt: message.createdAt,
+        edited: message.edited,
+        pinned: message.pinned,
+        deleted: message.deleted,
+        mentions: message.mentions,
+        attachments: existing?.attachments ?? [],
+        status: 'sent',
+        clientEventId,
+        requestId,
+        serverVersion: existing?.serverVersion
+      }
+      this.messages = [
+        ...this.messages.filter(
+          (candidate) => candidate.id !== shellMessage.id && candidate.clientEventId !== clientEventId
+        ),
+        shellMessage
+      ]
+      this.pendingMutations = this.pendingMutations.filter(
+        (candidate) => candidate.clientEventId !== clientEventId
+      )
+      return shellMessage
+    },
+    failPendingMutation(clientEventId: string, reason: string) {
+      const failed = this.pendingMutations.find((candidate) => candidate.clientEventId === clientEventId)
+      this.pendingMutations = this.pendingMutations.filter(
+        (candidate) => candidate.clientEventId !== clientEventId
+      )
+      this.messages = this.messages.filter((candidate) => candidate.clientEventId !== clientEventId)
+
+      if (!failed) {
+        return
+      }
+
+      this.failedMutations = [
+        ...this.failedMutations.filter((candidate) => candidate.clientEventId !== clientEventId),
+        {
+          ...failed,
+          reason,
+          failedAt: new Date().toISOString()
+        }
+      ]
+    },
+    async resyncChannelMessages(channelId: string, bearerToken: string, limit = 50): Promise<ShellMessage[] | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const page = await client.get<BackendMessagePageResponse>(
+          discordApiPaths.channel.messages(channelId, { limit }),
+          { bearerToken, requestId }
+        )
+        const nextSequence = nextShellMessageSequence(this.messages)
+        const messages = page.messages.map((message, index) => {
+          const existing = this.messages.find((candidate) => candidate.id === message.id)
+          return {
+            id: message.id,
+            channelId: message.channelId,
+            sequence: existing?.sequence ?? nextSequence + index,
+            author: message.authorId,
+            body: message.content,
+            createdAt: message.createdAt,
+            edited: message.edited,
+            pinned: message.pinned,
+            deleted: message.deleted,
+            mentions: message.mentions,
+            attachments: existing?.attachments ?? [],
+            status: 'sent'
+          } satisfies ShellMessage
+        })
+        this.messages = [
+          ...this.messages.filter((message) => message.channelId !== channelId),
+          ...messages
+        ]
+        this.resyncRequired = false
+        return messages
       })
     },
     async joinBackendVoice(channelId: string, bearerToken: string): Promise<BackendVoiceJoinResponse | null> {
@@ -1208,7 +1470,12 @@ export const useShellStore = defineStore('shell', {
       }
     },
     recordGatewayEvent(event: ShellGatewayEvent): boolean {
-      if (event.sequence <= this.gateway.lastSequence) {
+      if (event.sequence <= this.latestGatewaySequence) {
+        return false
+      }
+
+      if (event.sequence > this.latestGatewaySequence + 1) {
+        this.resyncRequired = true
         return false
       }
 
@@ -1221,7 +1488,8 @@ export const useShellStore = defineStore('shell', {
       }
 
       this.gateway.events.push(event)
-      this.gateway.lastSequence = Math.max(this.gateway.lastSequence, event.sequence)
+      this.latestGatewaySequence = event.sequence
+      this.gateway.lastSequence = event.sequence
       return true
     },
     applyGatewayDispatch(dispatch: unknown): boolean {
@@ -1230,11 +1498,17 @@ export const useShellStore = defineStore('shell', {
         return false
       }
 
+      const eventId = gatewayEventId(normalizedDispatch)
+      if (this.processedEventIds.includes(eventId)) {
+        return false
+      }
+
       const accepted = this.recordGatewayEvent(toShellGatewayEvent(normalizedDispatch))
       if (!accepted) {
         return false
       }
 
+      this.processedEventIds = [...this.processedEventIds.slice(-255), eventId]
       this.applyGatewayDispatchState(normalizedDispatch)
       return true
     },
@@ -1262,9 +1536,125 @@ export const useShellStore = defineStore('shell', {
         return
       }
 
+      if (dispatch.type === 'MESSAGE_CREATE') {
+        this.applyGatewayMessageCreate(dispatch)
+        return
+      }
+
+      if (dispatch.type === 'MESSAGE_UPDATE') {
+        this.applyGatewayMessageUpdate(dispatch)
+        return
+      }
+
+      if (dispatch.type === 'MESSAGE_DELETE') {
+        this.applyGatewayMessageDelete(dispatch)
+        return
+      }
+
       if (dispatch.type === 'DISCONNECTED' || dispatch.type === 'SESSION_CLOSED') {
         this.gateway.status = 'DISCONNECTED'
         this.gateway.resumed = false
+      }
+    },
+    applyGatewayMessageCreate(dispatch: GatewayDispatch) {
+      const messageId = payloadString(dispatch, 'id') ?? payloadString(dispatch, 'messageId')
+      const channelId = dispatch.channelId || payloadString(dispatch, 'channelId')
+      const body = payloadString(dispatch, 'content') ?? payloadString(dispatch, 'body') ?? ''
+
+      if (!messageId || !channelId) {
+        return
+      }
+
+      const clientEventId = payloadString(dispatch, 'clientEventId')
+      const requestId = payloadString(dispatch, 'requestId')
+      const serverVersion = payloadNumber(dispatch, 'serverVersion') ?? payloadNumber(dispatch, 'version')
+      const existing = this.messages.find(
+        (candidate) => candidate.id === messageId || candidate.clientEventId === clientEventId
+      )
+      const message: ShellMessage = {
+        id: messageId,
+        channelId,
+        sequence: payloadNumber(dispatch, 'messageSequence') ?? existing?.sequence ?? nextShellMessageSequence(this.messages),
+        author: payloadString(dispatch, 'authorId') ?? payloadString(dispatch, 'author') ?? existing?.author ?? 'unknown',
+        body,
+        createdAt: payloadString(dispatch, 'createdAt') ?? existing?.createdAt ?? dispatch.createdAt,
+        edited: payloadBoolean(dispatch, 'edited') ?? existing?.edited ?? false,
+        pinned: payloadBoolean(dispatch, 'pinned') ?? existing?.pinned ?? false,
+        deleted: payloadBoolean(dispatch, 'deleted') ?? existing?.deleted ?? false,
+        mentions: payloadStringArray(dispatch, 'mentions') ?? extractMentions(body),
+        attachments: existing?.attachments ?? [],
+        status: 'sent',
+        ...(clientEventId ? { clientEventId } : {}),
+        ...(requestId ? { requestId } : {}),
+        ...(serverVersion !== undefined ? { serverVersion } : existing?.serverVersion !== undefined ? { serverVersion: existing.serverVersion } : {})
+      }
+
+      this.messages = [
+        ...this.messages.filter(
+          (candidate) => candidate.id !== message.id && candidate.clientEventId !== clientEventId
+        ),
+        message
+      ]
+      if (clientEventId) {
+        this.pendingMutations = this.pendingMutations.filter(
+          (candidate) => candidate.clientEventId !== clientEventId
+        )
+      }
+    },
+    applyGatewayMessageUpdate(dispatch: GatewayDispatch) {
+      const messageId = payloadString(dispatch, 'id') ?? payloadString(dispatch, 'messageId')
+      if (!messageId) {
+        return
+      }
+
+      const message = this.messages.find((candidate) => candidate.id === messageId)
+      if (!message) {
+        return
+      }
+
+      const serverVersion = payloadNumber(dispatch, 'serverVersion') ?? payloadNumber(dispatch, 'version')
+      if (serverVersion !== undefined && message.serverVersion !== undefined && serverVersion < message.serverVersion) {
+        return
+      }
+
+      const body = payloadString(dispatch, 'content') ?? payloadString(dispatch, 'body')
+      if (body !== undefined) {
+        message.body = body
+        message.mentions = payloadStringArray(dispatch, 'mentions') ?? extractMentions(body)
+      }
+      message.edited = payloadBoolean(dispatch, 'edited') ?? true
+      if (payloadBoolean(dispatch, 'pinned') !== undefined) {
+        message.pinned = payloadBoolean(dispatch, 'pinned')!
+      }
+      if (serverVersion !== undefined) {
+        message.serverVersion = serverVersion
+      }
+      message.status = 'sent'
+    },
+    applyGatewayMessageDelete(dispatch: GatewayDispatch) {
+      const messageId = payloadString(dispatch, 'id') ?? payloadString(dispatch, 'messageId')
+      if (!messageId) {
+        return
+      }
+
+      const message = this.messages.find((candidate) => candidate.id === messageId)
+      if (!message) {
+        return
+      }
+
+      const serverVersion = payloadNumber(dispatch, 'serverVersion') ?? payloadNumber(dispatch, 'version')
+      if (serverVersion !== undefined && message.serverVersion !== undefined && serverVersion < message.serverVersion) {
+        return
+      }
+
+      message.body = ''
+      message.deleted = true
+      message.edited = false
+      message.pinned = false
+      message.mentions = []
+      message.status = 'sent'
+      if (serverVersion !== undefined) {
+        message.serverVersion = serverVersion
       }
     },
     selectDirectDm(directMessageId: string): boolean {
@@ -1452,6 +1842,32 @@ export const useShellStore = defineStore('shell', {
         detail,
         createdAt: new Date().toISOString()
       })
+    },
+    applyPermissionDraft(): boolean {
+      const draft = this.adminConsole.permissionDraft
+      if (!draft) {
+        return false
+      }
+
+      const role = this.roles.find((candidate) => candidate.id === draft.roleId)
+      if (!role) {
+        return false
+      }
+
+      if (draft.after && !role.permissions.includes(draft.permission)) {
+        role.permissions.push(draft.permission)
+      }
+      if (!draft.after) {
+        role.permissions = role.permissions.filter((permission) => permission !== draft.permission)
+      }
+
+      const roleName = role.name
+      this.appendAuditLog('ROLE_PERMISSION_UPDATED', `${roleName} ${draft.permission} changed to ${draft.after ? 'allowed' : 'denied'}`)
+      this.adminConsole.permissionDraft = {
+        ...draft,
+        before: draft.after
+      }
+      return true
     },
     joinVoiceChannel(channelId: string): boolean {
       const channel = this.channelGroups

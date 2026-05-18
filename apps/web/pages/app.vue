@@ -90,6 +90,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="app-shell" aria-label="Discord clone workspace" :data-platform-surface="platformSurface">
+    <a class="skip-link" data-testid="skip-to-workspace" href="#workspace-content">Skip to workspace</a>
     <ServerRail />
     <header class="mobile-shell-bar" data-testid="mobile-shell-bar">
       <span>Discord Clone</span>
@@ -97,8 +98,10 @@ onBeforeUnmount(() => {
     </header>
     <section
       class="workspace"
+      id="workspace-content"
       :class="`mobile-pane-${activeMobilePane}`"
       data-testid="workspace"
+      tabindex="-1"
       :data-mobile-active-pane="activeMobilePane"
     >
       <p v-if="shell.apiError" class="shell-api-error" data-testid="shell-api-error" role="alert">
