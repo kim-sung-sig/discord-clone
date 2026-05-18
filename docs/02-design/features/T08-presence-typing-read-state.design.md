@@ -16,7 +16,7 @@ Planned files:
 - `backend/modules/presence/src/main/java/com/example/discord/presence/TypingIndicator.java`
 - `backend/modules/presence/src/main/java/com/example/discord/presence/ReadMarker.java`
 - `backend/modules/presence/src/main/java/com/example/discord/presence/PresenceTtlStore.java`
-- `backend/modules/presence/src/main/java/com/example/discord/presence/InMemoryRedisPresenceTtlStore.java`
+- `backend/modules/presence/src/main/java/com/example/discord/presence/InMemoryPresenceTtlStore.java`
 - `backend/modules/presence/src/main/java/com/example/discord/presence/InMemoryPresenceService.java`
 - `backend/modules/presence/src/test/java/com/example/discord/presence/InMemoryPresenceServiceTest.java`
 

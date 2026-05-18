@@ -20,7 +20,7 @@
 
 - [ ] Write failing unit tests for TTL expiry to offline, typing expiry, and deterministic unread count.
 - [ ] Run `./gradlew.bat :backend:modules:presence:test` and verify RED.
-- [ ] Implement `PresenceTtlStore`, `InMemoryRedisPresenceTtlStore`, and `InMemoryPresenceService`.
+- [ ] Implement `PresenceTtlStore`, `InMemoryPresenceTtlStore`, and `InMemoryPresenceService`.
 - [ ] Run targeted module test and verify GREEN.
 - [ ] Commit `feat: add presence domain module`.
 

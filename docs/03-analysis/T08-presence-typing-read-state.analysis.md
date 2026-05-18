@@ -9,7 +9,7 @@ Slice: T08 Presence/Typing/Read State
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | online/idle/dnd/offline | Met | `PresenceStatus`, TTL store, backend tests, and Nuxt `PresenceBadge` |
-| Redis TTL presence test | Met | `InMemoryRedisPresenceTtlStore` and service tests prove TTL expiry to offline with injected clock |
+| Redis TTL presence test | Met | `InMemoryPresenceTtlStore` and service tests prove TTL expiry to offline with injected clock |
 | typing expires automatically | Met | backend typing expiry tests and active-channel frontend typing tests |
 | read marker | Met | backend read marker endpoint/model and Pinia `markChannelRead` |
 | unread count deterministic | Met | backend unread count tests and frontend unread badge/clear tests |
