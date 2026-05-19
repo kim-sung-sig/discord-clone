@@ -1,0 +1,8 @@
+# Existing backend method-signature debt captured on 2026-05-20.
+# New methods with more than five parameters should not be added to this list without a PDCA feedback item.
+backend\modules\experience\src\main\java\com\example\discord\experience\InMemoryExperienceService.java :: public synchronized Entitlement grantEntitlement( UUID userId, UUID guildId, String featureKey, String provider, String providerSubscriptionId, Instant expiresAt ) {
+backend\modules\gateway\src\main\java\com\example\discord\gateway\GatewayEvent.java :: public GatewayEvent(long sequence, String type, UUID guildId, UUID channelId, Map<String, Object> payload, Instant createdAt) {
+backend\modules\identity\src\main\java\com\example\discord\identity\RefreshSession.java :: public static RefreshSession create( UUID id, UUID userId, String tokenHash, String deviceName, Instant createdAt, Instant expiresAt ) {
+backend\modules\moderation\src\main\java\com\example\discord\moderation\InMemoryModerationService.java :: private void appendSecurityAlert(UUID guildId, UUID actorId, UUID targetId, String type, String severity, String reason) {
+backend\modules\notification\src\main\java\com\example\discord\notification\InMemoryNotificationInboxService.java :: public synchronized void recordServerNotification( UUID userId, UUID guildId, UUID channelId, UUID sourceId, long sequence, String summary ) {
+backend\modules\notification\src\main\java\com\example\discord\notification\InMemoryNotificationInboxService.java :: private void addItem( UUID userId, UUID guildId, UUID channelId, UUID sourceId, long sequence, NotificationKind kind, String summary ) {

@@ -217,6 +217,44 @@ powershell -NoProfile -ExecutionPolicy Bypass -File qa/real-backend-e2e.ps1
 
 ## 6. Review And QA Team
 
+### Review Context Isolation
+
+리뷰 에이전트는 구현 에이전트와 다른 컨텍스트에서 시작한다. review agents start from empty task context and receive only a Diff-Only Review Packet. 리뷰어는 구현자의 장기 대화, scratch notes, 추론 과정, 미정리 로그를 받지 않는다. reviewer must not receive implementer scratch notes.
+
+Diff-Only Review Packet:
+
+```text
+Task ID:
+Plan/Design paths:
+Changed files:
+git diff --stat:
+git diff -- <task-owned paths>:
+Tests run:
+Artifact paths:
+Known residual risks:
+Review return format:
+- P0/P1/P2 findings
+- file:line
+- reproduction command
+- required fix or acceptable deferral
+```
+
+리뷰 금지 입력:
+
+- 구현 에이전트의 scratch notes
+- 해결 과정 전체 로그
+- 실패 로그 전문
+- task scope 밖 파일의 전체 dump
+- reviewer 판단을 유도하는 결론
+
+리뷰 허용 입력:
+
+- Plan/Design 성공 기준
+- `git diff --stat`
+- `git diff -- <task-owned paths>`
+- 관련 테스트 파일과 테스트 결과
+- artifact 경로와 핵심 실패 로그 30~80줄
+
 ### Spec Compliance Agent
 
 입력:
@@ -307,13 +345,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File qa/toolchain-warning-scan.ps
 
 1. `Coordinator`: task packet 작성
 2. `Implementer Agent`: TDD로 구현하고 자기 테스트 실행
-3. `Spec Compliance Agent`: Plan/Design 대비 검토
-4. `Implementer Agent`: spec gap 수정
-5. `Code Quality Agent`: diff 품질 검토
-6. `Implementer Agent`: P0/P1 수정
-7. `Runtime QA Agent`: 관련 QA 실행
-8. `Coordinator`: analysis/report/feedback 문서 정리
-9. `Coordinator`: commit
+3. `Coordinator`: 구현 컨텍스트를 닫고 Diff-Only Review Packet 작성
+4. `Spec Compliance Agent`: fresh context에서 Plan/Design 대비 검토
+5. `Implementer Agent`: spec gap 수정
+6. `Code Quality Agent`: fresh context에서 diff 품질 검토
+7. `Implementer Agent`: P0/P1 수정
+8. `Runtime QA Agent`: 관련 QA 실행
+9. `Coordinator`: analysis/report/feedback 문서 정리
+10. `Coordinator`: commit and push gate 실행
 
 ## 9. Commit Gate
 
@@ -325,6 +364,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File qa/toolchain-warning-scan.ps
 - Playwright 또는 real-backend QA가 필요한 task는 artifact를 남긴다.
 - P0/P1 review finding이 남아 있지 않다.
 - `docs/03-analysis` 또는 `docs/04-report`에 검증 결과가 기록된다.
+- New behavior includes TDD Evidence: the RED failure, GREEN pass, and final harness command are recorded in Analysis or Report.
+- Style/architecture gates pass when relevant: `backend-style-contract`, `frontend-style-contract`, `development-process-contract`, and `style-architecture-governance-contract`.
+- Review context isolation was respected: reviewers received a Diff-Only Review Packet and returned P0/P1/P2 findings.
+
+### Commit And Push Gate
+
+각 task가 끝나면 Coordinator가 commit/push를 진행한다.
+
+규칙:
+
+- commit only the task-owned paths.
+- do not commit unrelated dirty work.
+- commit message는 task id와 결과를 포함한다.
+- push after the commit when remote is configured.
+- push 실패 시 commit hash, branch, remote, 실패 원인을 Report 또는 Feedback에 기록한다.
+- P0/P1 review finding이 남아 있으면 commit/push하지 않는다.
+
+권장 순서:
+
+```powershell
+git status --short
+git add -- <task-owned paths>
+git diff --cached --stat
+git commit -m "chore(T###): summarize task result"
+git push origin <branch>
+```
 
 ## 10. Recommended Next Use
 
