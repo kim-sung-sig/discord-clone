@@ -40,6 +40,12 @@ Allowed tool ids:
 | `development-process-contract` | Validate TDD/DDD/process rules are documented for agents. |
 | `style-architecture-governance-contract` | Validate Mermaid architecture/style guide and harness wiring. |
 | `review-context-isolation-contract` | Validate diff-only review context separation and commit/push policy. |
+| `task-complete-contract` | Validate task completion commit/push helper shape. |
+| `review-packet-contract` | Validate diff-only review packet generator shape. |
+| `real-lint-contract` | Validate real backend/frontend lint tool wiring. |
+| `frontend-lint` | Run ESLint against frontend and shared TypeScript. |
+| `backend-lint` | Run Gradle Checkstyle against backend Java sources. |
+| `format-check` | Run Prettier format checks for lint configuration files. |
 
 ## Ticket Creation
 
@@ -82,3 +88,7 @@ Use `docs/03-tasking/style-architecture-governance.md` as the agent-readable gui
 - Ubiquitous Language: domain names should reflect Discord domain concepts.
 - DTO Boundary: transport DTOs stay at boot/controller or frontend service boundaries.
 - Method Signature: prefer command/query/options objects when signatures grow.
+
+## Review Packet And Task Completion Helpers
+
+Use `qa/new-review-packet.ps1` to generate a diff-only review packet before starting a fresh review agent. Use `qa/task-complete.ps1` after all gates pass to commit only task-owned paths and push the current branch. Both helpers are contract-tested and exposed through the agent harness.

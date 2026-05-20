@@ -1,6 +1,7 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.3.7" apply false
+    checkstyle
+    id("org.springframework.boot") version "3.5.14" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
@@ -11,6 +12,11 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "checkstyle")
+
+    extra["tomcat.version"] = "10.1.55"
+    extra["netty.version"] = "4.1.133.Final"
+    extra["kafka.version"] = "4.2.0"
 
     java {
         toolchain {
@@ -20,5 +26,10 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+    }
+
+    checkstyle {
+        toolVersion = "10.21.4"
+        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
     }
 }

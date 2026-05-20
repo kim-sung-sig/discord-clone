@@ -98,6 +98,24 @@ $allowedTools = [ordered]@{
   'review-context-isolation-contract' = New-Tool 'Validate diff-only review context separation and commit/push policy.' $repoRoot {
     @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/review-context-isolation.contract.ps1')
   }
+  'task-complete-contract' = New-Tool 'Validate task completion commit/push helper shape.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/task-complete.contract.ps1')
+  }
+  'review-packet-contract' = New-Tool 'Validate diff-only review packet generator shape.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/review-packet.contract.ps1')
+  }
+  'real-lint-contract' = New-Tool 'Validate real backend/frontend lint tool wiring.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/real-lint.contract.ps1')
+  }
+  'frontend-lint' = New-Tool 'Run ESLint against frontend and shared TypeScript.' $repoRoot {
+    @((Get-NpmCommand), 'run', 'lint:frontend')
+  }
+  'backend-lint' = New-Tool 'Run Gradle Checkstyle against backend Java sources.' $repoRoot {
+    @((Get-NpmCommand), 'run', 'lint:backend')
+  }
+  'format-check' = New-Tool 'Run Prettier format check for lint configuration files.' $repoRoot {
+    @((Get-NpmCommand), 'run', 'format:check')
+  }
 }
 
 function Write-HarnessState($toolId, $result, $exitCode, $runDir, $logPath) {
@@ -113,7 +131,22 @@ function Write-HarnessState($toolId, $result, $exitCode, $runDir, $logPath) {
     blocked = $result -eq 'FAIL'
     updatedAt = (Get-Date).ToString('o')
   }
-  $state | ConvertTo-Json -Depth 4 | Set-Content -Path $statePath -Encoding UTF8
+  $stateDirectory = Split-Path -Parent $statePath
+  New-Item -ItemType Directory -Force -Path $stateDirectory | Out-Null
+  $tempStatePath = Join-Path $stateDirectory "agent-harness-state.$PID.tmp"
+  $state | ConvertTo-Json -Depth 4 | Set-Content -Path $tempStatePath -Encoding UTF8
+
+  for ($attempt = 1; $attempt -le 5; $attempt++) {
+    try {
+      Move-Item -LiteralPath $tempStatePath -Destination $statePath -Force
+      return
+    } catch {
+      if ($attempt -eq 5) {
+        throw
+      }
+      Start-Sleep -Milliseconds (100 * $attempt)
+    }
+  }
 }
 
 if ($List) {

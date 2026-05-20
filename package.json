@@ -10,11 +10,24 @@
   "scripts": {
     "openapi:write": "node qa/openapi-contract.mjs --write",
     "openapi:check": "node qa/openapi-contract.mjs --check && node qa/openapi-contract.test.mjs",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "eslint \"apps/web/**/*.{ts,vue}\" \"packages/**/*.ts\"",
+    "lint:backend": "node qa/gradle-wrapper.mjs checkstyleMain checkstyleTest",
+    "format:check": "prettier --check eslint.config.mjs package.json apps/web/package.json",
     "test": "npm run test --workspaces",
     "e2e": "npm run e2e -w apps/web"
   },
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "commander": "^13.1.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-vue": "^10.6.2",
+    "prettier": "^3.7.4",
+    "typescript-eslint": "^8.48.0",
+    "vue-eslint-parser": "^10.2.0"
   }
 }
