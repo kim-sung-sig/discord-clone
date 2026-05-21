@@ -9,6 +9,7 @@ param(
   [string] $ArtifactsDir = 'qa/artifacts/db-drill',
   [string] $PostgresCliContainer = '',
   [switch] $ConfirmCleanTarget,
+  [switch] $EnsureTargetDatabase,
   [switch] $AllowNonLocal
 )
 
@@ -33,6 +34,9 @@ if (-not [string]::IsNullOrWhiteSpace($SourceJdbcUrl) -and $SourceJdbcUrl.Trim()
 }
 Assert-SourceAndTargetDiffer $SourceJdbcUrl $TargetJdbcUrl
 $parsedTarget = Assert-SafeJdbcUrl $TargetJdbcUrl -AllowNonLocal:$AllowNonLocal
+if ($EnsureTargetDatabase) {
+  Ensure-PostgresDatabaseExists $TargetJdbcUrl $PostgresUser $PostgresPassword $PostgresCliContainer
+}
 
 $restoreLog = Join-Path $runDir 'restore.log'
 $metadataPath = Join-Path $runDir 'restore-metadata.txt'
@@ -42,6 +46,7 @@ $containerDumpPath = "/tmp/discord-clone-$stamp-restore.dump"
   "timestamp=$stamp"
   "target_jdbc_url=$($parsedTarget.Redacted)"
   'target_password=redacted'
+  "target_database_lifecycle=$(if ($EnsureTargetDatabase) { 'ensured' } else { 'preexisting' })"
   "dump_path=$DumpPath"
 ) | Set-Content -Path $metadataPath
 

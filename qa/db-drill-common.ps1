@@ -104,8 +104,9 @@ function Invoke-LoggedCommand($Label, $FilePath, [string[]] $ArgumentList, $Work
   }
 }
 
-function Invoke-PostgresQuery([string] $JdbcUrl, [string] $PostgresUser, [string] $PostgresPassword, [string] $PostgresCliContainer, [string] $Query) {
+function Invoke-PostgresQuery([string] $JdbcUrl, [string] $PostgresUser, [string] $PostgresPassword, [string] $PostgresCliContainer, [string] $Query, [string] $DatabaseName = '') {
   $parsed = ConvertFrom-JdbcPostgresUrl $JdbcUrl
+  $database = if ([string]::IsNullOrWhiteSpace($DatabaseName)) { $parsed.Database } else { $DatabaseName }
   if (-not [string]::IsNullOrWhiteSpace($PostgresCliContainer)) {
     Assert-CommandAvailable 'docker' 'Docker is required when -PostgresCliContainer is used.'
     $arguments = @(
@@ -121,7 +122,7 @@ function Invoke-PostgresQuery([string] $JdbcUrl, [string] $PostgresUser, [string
       '-U',
       $PostgresUser,
       '-d',
-      $parsed.Database,
+      $database,
       '-t',
       '-A',
       '-v',
@@ -135,7 +136,7 @@ function Invoke-PostgresQuery([string] $JdbcUrl, [string] $PostgresUser, [string
     $previousPassword = [Environment]::GetEnvironmentVariable('PGPASSWORD', 'Process')
     [Environment]::SetEnvironmentVariable('PGPASSWORD', $PostgresPassword, 'Process')
     try {
-      $output = & psql -h $parsed.Host -p $parsed.Port -U $PostgresUser -d $parsed.Database -t -A -v ON_ERROR_STOP=1 -c $Query
+      $output = & psql -h $parsed.Host -p $parsed.Port -U $PostgresUser -d $database -t -A -v ON_ERROR_STOP=1 -c $Query
     } finally {
       [Environment]::SetEnvironmentVariable('PGPASSWORD', $previousPassword, 'Process')
     }
@@ -150,6 +151,27 @@ function Invoke-PostgresQuery([string] $JdbcUrl, [string] $PostgresUser, [string
 
 function Quote-PostgresIdentifier([string] $Identifier) {
   return '"' + $Identifier.Replace('"', '""') + '"'
+}
+
+function ConvertTo-PostgresLiteral([string] $Value) {
+  return "'" + $Value.Replace("'", "''") + "'"
+}
+
+function Ensure-PostgresDatabaseExists([string] $TargetJdbcUrl, [string] $PostgresUser, [string] $PostgresPassword, [string] $PostgresCliContainer) {
+  $parsed = ConvertFrom-JdbcPostgresUrl $TargetJdbcUrl
+  $databaseLiteral = ConvertTo-PostgresLiteral $parsed.Database
+  $databaseIdentifier = Quote-PostgresIdentifier $parsed.Database
+  $existsQuery = "SELECT 1 FROM pg_database WHERE datname = $databaseLiteral;"
+  $exists = Invoke-PostgresQuery $TargetJdbcUrl $PostgresUser $PostgresPassword $PostgresCliContainer $existsQuery 'postgres' |
+    Where-Object { $_.Trim() -eq '1' } |
+    Select-Object -First 1
+
+  if ([string]::IsNullOrWhiteSpace($exists)) {
+    Invoke-PostgresQuery $TargetJdbcUrl $PostgresUser $PostgresPassword $PostgresCliContainer "CREATE DATABASE $databaseIdentifier;" 'postgres' | Out-Null
+    Write-DrillStep "created restore target database: $($parsed.Redacted)"
+  } else {
+    Write-DrillStep "restore target database already exists: $($parsed.Redacted)"
+  }
 }
 
 function Write-DatabaseSnapshotHash([string] $JdbcUrl, [string] $PostgresUser, [string] $PostgresPassword, [string] $PostgresCliContainer, [string] $OutputPath) {
@@ -167,10 +189,10 @@ function Write-DatabaseSnapshotHash([string] $JdbcUrl, [string] $PostgresUser, [
 
   foreach ($tableName in $tableNames) {
     $table = [string] $tableName
-    $tableLiteral = $table.Replace("'", "''")
+    $tableLiteral = ConvertTo-PostgresLiteral $table
     $tableIdentifier = Quote-PostgresIdentifier $table
     $hashQuery = @"
-SELECT '$tableLiteral'
+SELECT $tableLiteral
   || '|'
   || count(*)::text
   || '|'

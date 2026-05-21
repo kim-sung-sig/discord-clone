@@ -157,7 +157,7 @@ try {
   Invoke-LoggedCommand `
     'target database restore' `
     (Get-PowerShellCommand) `
-    @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'qa/db-restore.ps1'), '-DumpPath', $dumpPath.FullName, '-SourceJdbcUrl', $SourceJdbcUrl, '-TargetJdbcUrl', $TargetJdbcUrl, '-PostgresUser', $PostgresUser, '-PostgresPassword', $PostgresPassword, '-ArtifactsDir', $runDir, '-PostgresCliContainer', $PostgresCliContainer, '-ConfirmCleanTarget') `
+    @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'qa/db-restore.ps1'), '-DumpPath', $dumpPath.FullName, '-SourceJdbcUrl', $SourceJdbcUrl, '-TargetJdbcUrl', $TargetJdbcUrl, '-PostgresUser', $PostgresUser, '-PostgresPassword', $PostgresPassword, '-ArtifactsDir', $runDir, '-PostgresCliContainer', $PostgresCliContainer, '-ConfirmCleanTarget', '-EnsureTargetDatabase') `
     $repoRoot `
     $restoreLog
 
