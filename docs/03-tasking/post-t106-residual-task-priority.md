@@ -12,16 +12,17 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 5. Defer UI polish and charts until data ownership, access control, and retention are stable.
 6. Current user direction: prioritize centralization before operator docs or feature polish.
 7. Current user direction on 2026-05-20: verify T00-T49 core gaps first, then continue all operations/security work with recurring security review.
+8. Current user direction on 2026-05-21: commit and push at practical task boundaries after verification.
 
 ## Reordered Queue
 
 | Rank | Task | Priority | Source | Reason |
 | ---: | --- | --- | --- | --- |
-| 1 | T166 Discord Shell Layout Compression Pass | P2 | Core browser review | Dense desktop panels show clipped or overlapping text in screenshots. |
-| 2 | T55 restore snapshot hash comparison | P1 | T39 | Backup drill should compare restored pre-existing data, not only run post-restore API smoke. |
-| 3 | T58 production backup runbook | P1 | T39 | Local restore drill exists; production PITR/cloud procedure remains missing. |
-| 4 | T56 target database lifecycle automation | P2 | T39 | Restore drill still expects operator-created target database. |
-| 5 | T57 process-tree cleanup helper for QA harnesses | P2 | T39 | Failed startup can leave child Java processes if cleanup is interrupted. |
+| 1 | T55 restore snapshot hash comparison | P1 | T39 | Backup drill should compare restored pre-existing data, not only run post-restore API smoke. |
+| 2 | T58 production backup runbook | P1 | T39 | Local restore drill exists; production PITR/cloud procedure remains missing. |
+| 3 | T56 target database lifecycle automation | P2 | T39 | Restore drill still expects operator-created target database. |
+| 4 | T57 process-tree cleanup helper for QA harnesses | P2 | T39 | Failed startup can leave child Java processes if cleanup is interrupted. |
+| 5 | T189 Playwright local port isolation guard | P2 | T166 | Visual smoke can silently reuse an unrelated localhost:3000 service unless an isolated port/CI mode is enforced. |
 | 6 | T163 Remove Legacy Frontend SBOM Fallback Utility | P3 | T162 | The security gate no longer invokes the fallback generator; removing unused tooling later would reduce maintenance surface. |
 | 7 | T167 CSP alert incident lifecycle history | P3 | T127 | Current acknowledgement stores latest state per fingerprint; a later incident model should keep assignment, status changes, and exportable history. |
 | 8 | T168 Privacy-reviewed subject distribution summary | P3 | T128 | Operators may later need aggregate subject distribution, but it needs privacy review before exposing more identifiers. |
@@ -121,8 +122,8 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 | T62 Gateway subscription reconciliation | Completed | Resume/poll now re-register visible subscriptions, with focused tests, Redis smoke coverage, and a screenshot report. |
 | T183 Redis Gateway source-node duplicate suppression policy | Completed | Same-node Redis records are decoded and ACKed without duplicate local listener delivery when `sourceNodeId` matches the current node. |
 | T164 Real Backend Browser Smoke Default Gate | Completed | Added `npm run e2e:real-backend`, local Compose bootstrap, 18080 backend default, CI contract wiring, and owned Java child cleanup for the real backend Playwright smoke. |
+| T166 Discord Shell Layout Compression Pass | Completed | Added Playwright layout guard, compressed dense desktop shell panels, fixed skip-link spacing, and wrapped admin/audit text without viewport overflow. |
 
 ## Recommended Next Task
 
-T166 should run next. The next highest-priority gap is desktop shell layout compression for clipped or overlapping
-text discovered in screenshot review.
+T55 should run next. The next highest-priority gap is restore snapshot hash comparison for backup confidence.

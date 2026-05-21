@@ -31,6 +31,22 @@ input {
   font: inherit;
 }
 
+.skip-link {
+  position: absolute;
+  z-index: 20;
+  top: 8px;
+  left: 8px;
+  padding: 8px 10px;
+  color: #06131d;
+  background: var(--accent);
+  border-radius: 8px;
+  transform: translateY(-140%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
@@ -44,7 +60,7 @@ input {
 
 .workspace {
   display: grid;
-  grid-template-columns: 240px 200px minmax(260px, 1fr) 190px 220px 240px;
+  grid-template-columns: 220px 180px minmax(240px, 1fr) 170px 200px 200px;
   grid-template-rows: minmax(0, 1fr) auto auto 76px;
   min-width: 0;
 }
@@ -841,8 +857,8 @@ input {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 14px;
   overflow: auto;
   background:
     linear-gradient(160deg, rgba(32, 43, 66, 0.96), rgba(15, 23, 42, 0.94)),
@@ -853,6 +869,18 @@ input {
   border-bottom: 0;
   border-radius: 0;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+}
+
+.role-permission-panel button,
+.role-permission-panel strong,
+.role-permission-panel span,
+.role-permission-panel small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.role-permission-panel button {
+  width: 100%;
 }
 
 .forum-panel {
@@ -994,9 +1022,9 @@ input {
   grid-row: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 14px 18px;
+  padding: 12px 14px;
   background:
     linear-gradient(115deg, rgba(255, 107, 107, 0.16), rgba(84, 166, 255, 0.1)),
     rgba(12, 18, 32, 0.98);
@@ -1079,10 +1107,10 @@ input {
   grid-column: 3 / 5;
   grid-row: 2;
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
-  gap: 14px;
+  grid-template-columns: minmax(90px, 0.32fr) minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
-  padding: 14px 22px;
+  padding: 12px 14px;
   background:
     linear-gradient(110deg, rgba(84, 166, 255, 0.16), rgba(57, 217, 138, 0.1)),
     rgba(12, 18, 32, 0.98);
@@ -1123,13 +1151,13 @@ input {
 
 .gateway-status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .gateway-status-grid div,
 .gateway-event {
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1151,7 +1179,7 @@ input {
   grid-template-columns: auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-width: 220px;
+  min-width: min(220px, 100%);
 }
 
 .gateway-event span {
@@ -1188,6 +1216,7 @@ input {
 .role-panel-section {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .role-panel-section h3 {
@@ -1199,11 +1228,36 @@ input {
 
 .role-card,
 .overwrite-card,
-.assignment-row {
+.assignment-row,
+.permission-diff,
+.preview-as-role,
+.privileged-audit-entry {
   padding: 12px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line);
   border-radius: 16px;
+}
+
+.permission-diff,
+.preview-as-role,
+.privileged-audit-entry {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.permission-diff strong,
+.permission-diff span,
+.permission-diff small,
+.preview-as-role strong,
+.preview-as-role small,
+.privileged-audit-entry strong,
+.privileged-audit-entry span,
+.audit-log-entry strong,
+.audit-log-entry small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .permission-chips {
@@ -1258,10 +1312,10 @@ input {
   grid-column: 5 / 7;
   grid-row: 3;
   display: grid;
-  grid-template-columns: minmax(150px, 0.9fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(160px, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   min-width: 0;
-  padding: 14px 18px;
+  padding: 12px 14px;
   overflow: auto;
   background:
     radial-gradient(circle at 100% 0%, rgba(84, 166, 255, 0.18), transparent 14rem),
@@ -1304,7 +1358,7 @@ input {
   display: grid;
   gap: 8px;
   align-content: start;
-  padding: 10px 12px;
+  padding: 9px 10px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1328,6 +1382,13 @@ input {
 
 .voice-controls {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.voice-card button,
+.experience-card button,
+.moderation-card button {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .voice-controls p {
