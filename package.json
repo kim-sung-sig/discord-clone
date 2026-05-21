@@ -15,7 +15,8 @@
     "lint:backend": "node qa/gradle-wrapper.mjs checkstyleMain checkstyleTest",
     "format:check": "prettier --check eslint.config.mjs package.json apps/web/package.json",
     "test": "npm run test --workspaces",
-    "e2e": "npm run e2e -w apps/web"
+    "e2e": "npm run e2e -w apps/web",
+    "e2e:real-backend": "node qa/real-backend-e2e.mjs"
   },
   "engines": {
     "node": ">=22.0.0",
