@@ -1,0 +1,384 @@
+/* Discord + VSCode dark theme pass */
+:root {
+  --discord-bg: #111214;
+  --discord-rail: #1e1f22;
+  --discord-panel: #1e1f22;
+  --discord-sidebar: #2b2d31;
+  --discord-chat: #313338;
+  --discord-elevated: #383a40;
+  --discord-hover: #35373c;
+  --discord-selected: #404249;
+  --discord-text: #f2f3f5;
+  --discord-muted: #b5bac1;
+  --discord-subtle: #949ba4;
+  --discord-border: #3f4147;
+  --discord-green: #23a55a;
+  --discord-brand: #5865f2;
+  --vscode-focus: #0078d4;
+  --vscode-warning: #cca700;
+  --ink: var(--discord-text);
+  --muted: var(--discord-muted);
+  --rail: var(--discord-rail);
+  --panel: var(--discord-panel);
+  --panel-strong: var(--discord-elevated);
+  --chat: var(--discord-chat);
+  --accent: var(--vscode-focus);
+  --accent-strong: #0e639c;
+  --accent-2: var(--discord-brand);
+  --line: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  color: var(--discord-text);
+  background-color: var(--discord-bg);
+  background-image: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--vscode-focus);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-rows: 30px 38px minmax(0, 1fr);
+  min-height: 100vh;
+  color: var(--discord-text);
+  background: var(--discord-bg);
+}
+
+.global-title-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--discord-muted);
+  background: var(--discord-bg);
+  border-bottom: 1px solid #060607;
+}
+
+.global-title-bar-title {
+  color: var(--discord-subtle);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.global-title-bar strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--discord-text);
+  font-size: 13px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-title-bar nav {
+  display: flex;
+  gap: 6px;
+}
+
+.global-title-bar button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--discord-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.global-title-bar button:hover {
+  color: var(--discord-text);
+  background: var(--discord-hover);
+}
+
+.account-banner {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 38px;
+  padding: 0 16px;
+  color: #dbfce7;
+  background: #003c1f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.account-banner span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-banner button {
+  min-height: 24px;
+  padding: 2px 10px;
+  color: #dbfce7;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid #87efac;
+  border-radius: 4px;
+}
+
+.server-rail {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  gap: 12px;
+  width: 72px;
+  padding: 12px 0;
+  background: var(--discord-rail);
+  border-right: 0;
+}
+
+.server-pill {
+  width: 40px;
+  height: 40px;
+  color: white;
+  background: var(--discord-brand);
+  border-radius: 14px;
+  transition: border-radius 0.15s ease, background-color 0.15s ease;
+}
+
+.server-pill:hover {
+  background: var(--vscode-focus);
+  border-radius: 12px;
+}
+
+.brand {
+  color: var(--discord-muted);
+}
+
+.workspace {
+  grid-column: 2;
+  grid-row: 3;
+  grid-template-columns: 224px 200px minmax(260px, 1fr) 140px 160px 200px;
+  grid-template-rows: minmax(0, 1fr) auto auto 60px;
+  min-height: 0;
+  background: var(--discord-chat);
+}
+
+.channel-sidebar,
+.dm-sidebar,
+.member-sidebar {
+  background: var(--discord-sidebar);
+  border-color: rgba(0, 0, 0, 0.26);
+}
+
+.channel-sidebar,
+.dm-sidebar {
+  padding: 12px 10px;
+}
+
+.dm-sidebar {
+  background-image: none;
+}
+
+.chat-viewport {
+  padding: 18px 24px;
+  background: var(--discord-chat);
+}
+
+.member-sidebar {
+  grid-column: 4;
+  grid-row: 1;
+  padding: 16px 14px;
+}
+
+.forum-panel {
+  grid-column: 5;
+}
+
+.role-permission-panel {
+  grid-column: 6;
+}
+
+.gateway-status-panel,
+.invite-modal {
+  grid-column: 3 / 5;
+}
+
+.moderation-panel,
+.voice-panel {
+  grid-column: 5 / 7;
+}
+
+.role-permission-panel,
+.forum-panel,
+.moderation-panel,
+.gateway-status-panel,
+.voice-panel,
+.experience-panel,
+.invite-modal,
+.user-panel,
+.security-dashboard-header,
+.security-dashboard-panel,
+.security-alert-banner,
+.security-operator-token,
+.security-summary-card {
+  color: var(--discord-text);
+  background: var(--discord-panel);
+  border-color: var(--discord-border);
+  border-radius: 8px;
+}
+
+.user-panel {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  background: #232428;
+}
+
+.channel-item,
+.dm-row,
+.group-member,
+.dm-active-card,
+.group-call-skeleton,
+.message-card,
+.member,
+.role-card,
+.overwrite-card,
+.assignment-row,
+.permission-diff,
+.preview-as-role,
+.privileged-audit-entry,
+.forum-post,
+.thread-detail,
+.voice-card,
+.experience-card,
+.moderation-card,
+.gateway-status-grid div,
+.gateway-event,
+.security-report-card,
+.directive-list li,
+.guard-health-summary strong,
+.guard-health-summary span,
+.guard-method-list li,
+.guard-warning-list li,
+.subject-diagnostics-list li {
+  background: var(--discord-elevated);
+  border-color: var(--discord-border);
+  border-radius: 6px;
+}
+
+.channel-item:hover,
+.dm-row:hover,
+.message-card:hover {
+  background: var(--discord-hover);
+}
+
+.channel-item[aria-current="page"],
+.dm-row[aria-current="page"] {
+  background: var(--discord-selected);
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--vscode-focus);
+}
+
+.chat-header {
+  border-bottom-color: var(--discord-border);
+}
+
+.chat-header p,
+.dm-header p,
+.dm-section h3,
+.dm-active-card p,
+.group-call-skeleton p,
+.member small,
+.message-meta time,
+.message-edited,
+.security-report-card small {
+  color: var(--discord-muted);
+}
+
+.message-composer {
+  background: transparent;
+}
+
+.message-composer input,
+.security-operator-token input,
+.csp-alert-ack-form input,
+.csp-alert-ack-form select {
+  color: var(--discord-text);
+  background: var(--discord-elevated);
+  border-color: var(--discord-border);
+  border-radius: 6px;
+}
+
+.message-composer button,
+.real-api-panel button,
+.invite-accept,
+.voice-card button,
+.experience-card button,
+.moderation-card button,
+.forum-actions button,
+.thread-actions button,
+.dm-section-heading button,
+.group-member button,
+.group-call-skeleton button,
+.security-operator-token button,
+.csp-alert-ack-form button {
+  color: white;
+  background: var(--vscode-focus);
+  border: 0;
+  border-radius: 4px;
+}
+
+.message-pill,
+.unread-badge,
+.mention-chip,
+.invite-role-chip,
+.permission-chip,
+.forum-tag,
+.automod-rule-chip,
+.reaction-chip-active {
+  color: white;
+  background: var(--discord-brand);
+}
+
+.presence-badge-online .presence-dot,
+.storage-health-ready {
+  background: var(--discord-green);
+}
+
+.security-dashboard {
+  color: var(--discord-text);
+  background: var(--discord-bg);
+}
+
+.security-summary-card strong,
+.directive-list strong,
+.security-report-card strong,
+.role-panel-header p,
+.dm-row strong,
+.expression-toggle {
+  color: var(--vscode-focus);
+}
+
+@media (max-width: 720px) {
+  .global-title-bar,
+  .account-banner {
+    display: none;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .workspace {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}

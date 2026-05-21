@@ -91,6 +91,18 @@ onBeforeUnmount(() => {
 <template>
   <main class="app-shell" aria-label="Discord clone workspace" :data-platform-surface="platformSurface">
     <a class="skip-link" data-testid="skip-to-workspace" href="#workspace-content">Skip to workspace</a>
+    <header class="global-title-bar" data-testid="global-title-bar" aria-label="Global navigation">
+      <span class="global-title-bar-title">Discord Clone</span>
+      <strong>{{ activeChannelLabel }}</strong>
+      <nav aria-label="Global actions">
+        <button type="button" aria-label="Inbox">[]</button>
+        <button type="button" aria-label="Help">?</button>
+      </nav>
+    </header>
+    <aside class="account-banner" data-testid="account-banner" aria-label="Account registration notice">
+      <span>Unregistered account. Register before it disappears.</span>
+      <button type="button">Register account</button>
+    </aside>
     <ServerRail />
     <header class="mobile-shell-bar" data-testid="mobile-shell-bar">
       <span>Discord Clone</span>
