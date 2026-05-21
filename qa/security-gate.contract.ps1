@@ -4,6 +4,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $gate = Join-Path $repoRoot 'qa/security-gate.ps1'
 $allowlist = Join-Path $repoRoot 'qa/security-allowlist.json'
 $workflow = Join-Path $repoRoot '.github/workflows/ci.yml'
+$legacyFrontendSbomFallback = Join-Path $repoRoot 'qa/security-frontend-sbom.mjs'
 
 function Assert($condition, $message) {
   if (-not $condition) {
@@ -19,6 +20,7 @@ function Assert-Tracked($relativePath) {
 Assert (Test-Path $gate) 'security gate script is missing'
 Assert (Test-Path $allowlist) 'security allowlist is missing'
 Assert (Test-Path $workflow) 'CI workflow is missing'
+Assert (-not (Test-Path $legacyFrontendSbomFallback)) 'legacy frontend SBOM fallback utility must be removed'
 
 foreach ($trackedDependency in @(
   'qa/security-gate.ps1',

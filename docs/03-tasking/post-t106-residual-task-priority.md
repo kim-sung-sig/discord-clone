@@ -93,6 +93,7 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 | T137 CSP Telemetry SQLite Legacy Cleanup Note | Completed | Added legacy SQLite CSP telemetry archive/delete guidance and validation contract. |
 | T161 Redis CLI Secret Handling In QA Health Checks | Completed | Replaced `redis-cli -a` in QA health paths with `REDISCLI_AUTH` and strengthened contracts. |
 | T162 Strict Workspace Native NPM SBOM Cleanup | Completed | Fixed npm peer layout so strict workspace SBOM generation passes and removed security gate fallback execution. |
+| T163 Remove Legacy Frontend SBOM Fallback Utility | Completed | Removed the unused fallback utility and added a security gate contract assertion preventing reintroduction. |
 | T127 CSP alert acknowledgement workflow | Completed | Added fingerprint-bound acknowledgement, required reasons, bounded snooze, Postgres/in-memory storage, and `/security` UI workflow. |
 | T128 CSP rate-limit subject diagnostics | Completed | Added secret-safe trusted-proxy subject diagnostics to the guarded dashboard payload and `/security` UI. |
 | T129 ephemeral operator token flow | Completed | Added bootstrap exchange, 15-minute issued tokens, hash-only store, revoke flow, and `/security` expiry-only UI. |
@@ -126,4 +127,4 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 
 ## Recommended Next Task
 
-T57 should run next. The next highest-priority gap is process-tree cleanup for QA harnesses.
+T167 should run next. The next highest-priority gap is CSP alert incident lifecycle history.
