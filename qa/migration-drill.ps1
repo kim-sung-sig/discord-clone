@@ -40,6 +40,9 @@ $apiSmokeLog = Join-Path $runDir 'api-smoke.log'
 $guardLog = Join-Path $runDir 'migration-guard.log'
 $backupLog = Join-Path $runDir 'db-backup.log'
 $restoreLog = Join-Path $runDir 'db-restore.log'
+$sourceSnapshotHashPath = Join-Path $runDir 'source-snapshot-hashes.tsv'
+$restoredSnapshotHashPath = Join-Path $runDir 'restored-snapshot-hashes.tsv'
+$snapshotHashDiffPath = Join-Path $runDir 'snapshot-hash-comparison.txt'
 $summaryPath = Join-Path $runDir 'restore-drill-summary.md'
 $backendProcess = $null
 
@@ -137,6 +140,8 @@ try {
     Start-Sleep -Seconds 2
   }
 
+  Write-DatabaseSnapshotHash $SourceJdbcUrl $PostgresUser $PostgresPassword $PostgresCliContainer $sourceSnapshotHashPath
+
   Invoke-LoggedCommand `
     'source database backup' `
     (Get-PowerShellCommand) `
@@ -155,6 +160,9 @@ try {
     @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $repoRoot 'qa/db-restore.ps1'), '-DumpPath', $dumpPath.FullName, '-SourceJdbcUrl', $SourceJdbcUrl, '-TargetJdbcUrl', $TargetJdbcUrl, '-PostgresUser', $PostgresUser, '-PostgresPassword', $PostgresPassword, '-ArtifactsDir', $runDir, '-PostgresCliContainer', $PostgresCliContainer, '-ConfirmCleanTarget') `
     $repoRoot `
     $restoreLog
+
+  Write-DatabaseSnapshotHash $TargetJdbcUrl $PostgresUser $PostgresPassword $PostgresCliContainer $restoredSnapshotHashPath
+  Compare-DatabaseSnapshotHashes $sourceSnapshotHashPath $restoredSnapshotHashPath $snapshotHashDiffPath
 
   if (Test-BackendHealth) {
     Write-DrillStep "reusing existing backend: $healthUrl"
@@ -183,6 +191,9 @@ try {
     'retention_keep_latest=5'
     "dump_file=$($dumpPath.FullName)"
     "source_seed_log=$sourceSeedLog"
+    "source_snapshot_hashes=$sourceSnapshotHashPath"
+    "restored_snapshot_hashes=$restoredSnapshotHashPath"
+    "snapshot_hash_comparison=PASS"
     "restore_api_smoke_log=$apiSmokeLog"
     'result=PASS'
     ''
