@@ -110,6 +110,12 @@ $allowedTools = [ordered]@{
   'process-tree-cleanup-contract' = New-Tool 'Validate QA process-tree cleanup helper wiring.' $repoRoot {
     @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/process-tree-cleanup.contract.ps1')
   }
+  'security-gate-contract' = New-Tool 'Validate dependency security gate wiring.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/security-gate.contract.ps1')
+  }
+  'security-gate' = New-Tool 'Run the dependency security gate.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/security-gate.ps1')
+  }
   'playwright-port-isolation-contract' = New-Tool 'Validate Playwright local port isolation behavior.' $repoRoot {
     @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/playwright-port-isolation.contract.ps1')
   }
