@@ -56,8 +56,8 @@ $allowedTools = [ordered]@{
   'web-build' = New-Tool 'Build the Nuxt web workspace.' $repoRoot {
     @((Get-NpmCommand), 'run', 'build', '--workspace', '@discord-clone/web')
   }
-  'web-e2e' = New-Tool 'Run web Playwright e2e tests.' $repoRoot {
-    @((Get-NpmCommand), 'run', 'e2e', '--workspace', '@discord-clone/web')
+  'web-e2e' = New-Tool 'Run web Playwright e2e tests on an isolated port.' $repoRoot {
+    @((Get-NpmCommand), 'run', 'e2e:web:isolated')
   }
   'openapi-check' = New-Tool 'Check generated OpenAPI contract drift.' $repoRoot {
     @((Get-NpmCommand), 'run', 'openapi:check')
@@ -109,6 +109,12 @@ $allowedTools = [ordered]@{
   }
   'process-tree-cleanup-contract' = New-Tool 'Validate QA process-tree cleanup helper wiring.' $repoRoot {
     @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/process-tree-cleanup.contract.ps1')
+  }
+  'playwright-port-isolation-contract' = New-Tool 'Validate Playwright local port isolation behavior.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/playwright-port-isolation.contract.ps1')
+  }
+  'subagent-role-packets-contract' = New-Tool 'Validate project subagent role packet documentation.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/subagent-role-packets.contract.ps1')
   }
   'frontend-lint' = New-Tool 'Run ESLint against frontend and shared TypeScript.' $repoRoot {
     @((Get-NpmCommand), 'run', 'lint:frontend')

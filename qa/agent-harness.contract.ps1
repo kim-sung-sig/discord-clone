@@ -47,6 +47,8 @@ $requiredSnippets = @(
   'review-packet-contract',
   'real-lint-contract',
   'process-tree-cleanup-contract',
+  'playwright-port-isolation-contract',
+  'subagent-role-packets-contract',
   'frontend-lint',
   'backend-lint',
   'format-check',
