@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process-tree-cleanup.ps1')
 
 function Test-IsWindows {
   return [System.Environment]::OSVersion.Platform -eq 'Win32NT'
@@ -248,4 +249,12 @@ function Remove-OldDrillArtifacts([string] $ArtifactRoot, [int] $KeepLatest = 5)
     Sort-Object Name -Descending |
     Select-Object -Skip $KeepLatest |
     Remove-Item -Recurse -Force
+}
+
+function Stop-ProcessTree([int] $ProcessId, [string] $Label = 'process') {
+  Stop-QaProcessTree -ProcessId $ProcessId -Label $Label -LogPrefix 'db-drill'
+}
+
+function Stop-BackendPortProcess([int] $Port, [string] $ExpectedCommandLinePattern, [string] $Label = 'backend port') {
+  Stop-QaListeningProcessByPort -Port $Port -ExpectedCommandLinePattern $ExpectedCommandLinePattern -Label $Label -LogPrefix 'db-drill'
 }

@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process-tree-cleanup.ps1')
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $backendBaseUrl = $BackendUrl.TrimEnd('/')
@@ -142,23 +143,18 @@ function Wait-BackendHealth {
 function Stop-OwnedBackendService {
   if ($null -ne $backendProcess -and -not $backendProcess.HasExited) {
     Write-Step "stopping backend process $($backendProcess.Id)"
-    Stop-Process -Id $backendProcess.Id -Force
+    Stop-QaProcessTree -ProcessId $backendProcess.Id -Label 'backend wrapper' -LogPrefix 'real-backend-e2e'
   }
 
   if (-not $backendStartedByScript) {
     return
   }
 
-  $listener = Get-NetTCPConnection -LocalPort $backendPort -ErrorAction SilentlyContinue | Select-Object -First 1
-  if ($null -eq $listener) {
-    return
-  }
-
-  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" -ErrorAction SilentlyContinue
-  if ($null -ne $process -and $process.CommandLine -like '*com.example.discord.DiscordApplication*') {
-    Write-Step "stopping backend child process $($listener.OwningProcess) on port $backendPort"
-    Stop-Process -Id $listener.OwningProcess -Force
-  }
+  Stop-QaListeningProcessByPort `
+    -Port $backendPort `
+    -ExpectedCommandLinePattern '*com.example.discord.DiscordApplication*' `
+    -Label 'backend' `
+    -LogPrefix 'real-backend-e2e'
 }
 
 function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $workingDirectory, $logPath, $environment = @{}) {

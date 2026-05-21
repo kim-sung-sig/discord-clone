@@ -107,6 +107,9 @@ $allowedTools = [ordered]@{
   'real-lint-contract' = New-Tool 'Validate real backend/frontend lint tool wiring.' $repoRoot {
     @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/real-lint.contract.ps1')
   }
+  'process-tree-cleanup-contract' = New-Tool 'Validate QA process-tree cleanup helper wiring.' $repoRoot {
+    @((Get-PowerShellCommand), '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'qa/process-tree-cleanup.contract.ps1')
+  }
   'frontend-lint' = New-Tool 'Run ESLint against frontend and shared TypeScript.' $repoRoot {
     @((Get-NpmCommand), 'run', 'lint:frontend')
   }

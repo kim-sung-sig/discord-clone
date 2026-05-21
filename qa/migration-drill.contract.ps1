@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $scriptPaths = @(
   (Join-Path $PSScriptRoot 'db-backup.ps1'),
   (Join-Path $PSScriptRoot 'db-restore.ps1'),
+  (Join-Path $PSScriptRoot 'process-tree-cleanup.ps1'),
   (Join-Path $PSScriptRoot 'migration-drill.ps1'),
   (Join-Path $PSScriptRoot 'migration-guard.contract.ps1')
 )
@@ -27,6 +28,7 @@ $restore = Get-Content -Path (Join-Path $PSScriptRoot 'db-restore.ps1') -Raw
 $drill = Get-Content -Path (Join-Path $PSScriptRoot 'migration-drill.ps1') -Raw
 $guard = Get-Content -Path (Join-Path $PSScriptRoot 'migration-guard.contract.ps1') -Raw
 $common = Get-Content -Path (Join-Path $PSScriptRoot 'db-drill-common.ps1') -Raw
+$processCleanup = Get-Content -Path (Join-Path $PSScriptRoot 'process-tree-cleanup.ps1') -Raw
 
 $requiredBackupSnippets = @(
   '[string] $SourceJdbcUrl',
@@ -67,6 +69,9 @@ $requiredDrillSnippets = @(
   '-EnsureTargetDatabase',
   'Write-DatabaseSnapshotHash',
   'Compare-DatabaseSnapshotHashes',
+  'Stop-ProcessTree',
+  'Stop-BackendPortProcess',
+  'com.example.discord.DiscordApplication',
   'source-snapshot-hashes.tsv',
   'restored-snapshot-hashes.tsv',
   'snapshot_hash_comparison=PASS',
@@ -96,5 +101,9 @@ foreach ($pattern in $destructivePatterns) {
 Assert (($backup + $common).Contains('production') -and ($backup + $common).Contains('prod')) 'db-backup.ps1 must refuse production-like URLs'
 Assert (($restore + $common).Contains('production') -and ($restore + $common).Contains('prod')) 'db-restore.ps1 must refuse production-like URLs'
 Assert ($drill.Contains('SourceJdbcUrl -eq TargetJdbcUrl')) 'migration-drill.ps1 must explicitly reject identical source and target URLs'
+Assert ($common.Contains(". (Join-Path `$PSScriptRoot 'process-tree-cleanup.ps1')")) 'db-drill-common.ps1 must load the shared process tree cleanup helper'
+Assert ($common.Contains('function Stop-ProcessTree') -and $common.Contains('Stop-QaProcessTree')) 'db-drill-common.ps1 must expose the legacy Stop-ProcessTree wrapper'
+Assert ($common.Contains('function Stop-BackendPortProcess') -and $common.Contains('Stop-QaListeningProcessByPort')) 'db-drill-common.ps1 must expose the legacy Stop-BackendPortProcess wrapper'
+Assert ($processCleanup.Contains('ParentProcessId=$ProcessId') -and $processCleanup.Contains('Get-CimInstance Win32_Process')) 'process-tree-cleanup.ps1 must provide a Windows process tree cleanup helper'
 
 Write-Output 'MIGRATION_DRILL_CONTRACT_PASS'

@@ -29,8 +29,10 @@ $requiredSnippets = @(
   'function Get-NpmCommand',
   'function Stop-OwnedBackendService',
   '$backendStartedByScript',
+  'process-tree-cleanup.ps1',
+  'Stop-QaProcessTree -ProcessId $backendProcess.Id',
+  'Stop-QaListeningProcessByPort',
   'com.example.discord.DiscordApplication',
-  'Get-NetTCPConnection -LocalPort $backendPort',
   '$backendPort',
   'SERVER_PORT',
   'backend_port=$backendPort',
@@ -52,8 +54,7 @@ $requiredSnippets = @(
   'http://127.0.0.1:3010',
   'tests/e2e/real-backend.spec.ts',
   'Push-Location $workingDirectory',
-  'Pop-Location',
-  'Stop-Process -Id $backendProcess.Id'
+  'Pop-Location'
 )
 
 foreach ($snippet in $requiredSnippets) {
