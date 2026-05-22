@@ -1,5 +1,8 @@
 import { defineEventHandler, getHeader, readRawBody, setResponseStatus } from 'h3'
-import { handleCspReportPayload } from '../../../utils/csp-report-handler'
+import { handleCspReportPayloadAsync } from '../../../utils/csp-report-handler'
+import { defaultCspReportRateLimiter } from '../../../utils/csp-report-rate-limiter'
+import { createTrustedProxyCidrs, rateLimitSubjectFor } from '../../../utils/csp-rate-limit-subject'
+import { defaultCspRateLimitTelemetryStore } from '../../../utils/csp-rate-limit-telemetry-store'
 import { defaultCspTelemetryStore } from '../../../utils/csp-telemetry-store'
 
 const requestIdFor = (incoming?: string): string =>
@@ -7,14 +10,24 @@ const requestIdFor = (incoming?: string): string =>
     ? incoming
     : `csp-${Date.now().toString(36)}`
 
+const trustedProxyCidrs = createTrustedProxyCidrs()
+
 export default defineEventHandler(async (event) => {
   const body = await readRawBody(event, 'utf8')
-  const result = handleCspReportPayload({
+  const result = await handleCspReportPayloadAsync({
     body: body ?? '',
     contentType: getHeader(event, 'content-type'),
     requestId: requestIdFor(getHeader(event, 'x-request-id')),
-    userAgent: getHeader(event, 'user-agent') ?? ''
+    userAgent: getHeader(event, 'user-agent') ?? '',
+    rateLimitSubject: rateLimitSubjectFor({
+      forwardedFor: getHeader(event, 'x-forwarded-for'),
+      realIp: getHeader(event, 'x-real-ip'),
+      remoteAddress: event.node.req.socket.remoteAddress,
+      trustedProxyCidrs
+    })
   }, {
+    rateLimiter: defaultCspReportRateLimiter,
+    rateLimitTelemetry: defaultCspRateLimitTelemetryStore,
     telemetryStore: defaultCspTelemetryStore
   })
 
