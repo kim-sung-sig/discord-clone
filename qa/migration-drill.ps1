@@ -104,9 +104,9 @@ function Wait-BackendHealth {
 
 function Stop-BackendService {
   if ($null -ne $backendProcess -and -not $backendProcess.HasExited) {
-    Write-DrillStep "stopping backend process $($backendProcess.Id)"
-    Stop-Process -Id $backendProcess.Id -Force
+    Stop-ProcessTree -ProcessId $backendProcess.Id -Label 'backend wrapper'
   }
+  Stop-BackendPortProcess -Port $backendPort -ExpectedCommandLinePattern '*com.example.discord.DiscordApplication*' -Label 'backend'
   $script:backendProcess = $null
 }
 

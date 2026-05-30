@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>T62 Discord Clone Screenshot Report</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --surface: #161b22;
+    --surface2: #1e2430;
+    --border: #2d3748;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #5865f2;
+    --green: #57f287;
+    --yellow: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+  }
+  h1 { margin: 0; font-size: 21px; }
+  .subtitle { color: var(--muted); margin-top: 4px; }
+  .meta { margin-left: auto; color: var(--muted); text-align: right; font-size: 12px; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat, .card, .summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .stat { padding: 14px; }
+  .stat strong { display: block; font-size: 20px; margin-bottom: 4px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .summary { padding: 16px; margin-bottom: 20px; line-height: 1.6; }
+  .summary b { color: var(--green); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .card { overflow: hidden; }
+  .card-body { padding: 14px; }
+  .card h2 { margin: 0 0 6px; font-size: 15px; }
+  .card p { color: var(--muted); margin: 0; line-height: 1.5; }
+  .tag {
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(88, 101, 242, 0.18);
+    color: #aeb8ff;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  img {
+    display: block;
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .note {
+    margin-top: 20px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  @media (max-width: 900px) {
+    body { padding: 14px; }
+    .header { align-items: flex-start; }
+    .meta { display: none; }
+    .stats, .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">DC</div>
+    <div>
+      <h1>T62 Subscription Reconciliation Screenshot Report</h1>
+      <div class="subtitle">Discord Clone Gateway resume/poll reconciliation evidence</div>
+    </div>
+    <div class="meta">
+      2026-05-21<br />
+      Template basis: Desktop discord-clone-review.html
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><strong>4</strong><span>Captured screenshots</span></div>
+    <div class="stat"><strong>PASS</strong><span>Playwright screenshot smoke</span></div>
+    <div class="stat"><strong>T62</strong><span>Gateway subscription reconciliation</span></div>
+    <div class="stat"><strong>Safe</strong><span>No token/header payload in report</span></div>
+  </section>
+
+  <section class="summary">
+    <b>Result:</b> resume/poll now re-register visible guild/channel subscriptions before delivery checks. The screenshots
+    below validate the current Discord clone UI surfaces that depend on realtime Gateway continuity: shell status, voice,
+    stage/premium, and mobile chat layout.
+  </section>
+
+  <main class="grid">
+    <article class="card">
+      <img src="../../output/playwright/t62-subscription-reconciliation/01-desktop-gateway-shell.png" alt="Desktop Discord shell with Gateway status panel" />
+      <div class="card-body">
+        <span class="tag">Gateway Shell</span>
+        <h2>Desktop shell and Gateway status</h2>
+        <p>Captures the main Discord-style workspace with Gateway READY, last sequence, heartbeat ACK, and resumed state visible.</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <img src="../../output/playwright/t62-subscription-reconciliation/02-voice-state.png" alt="Voice controls with mute and screen share state" />
+      <div class="card-body">
+        <span class="tag">Voice</span>
+        <h2>Voice control state</h2>
+        <p>Shows voice join state plus mute and screen-share toggles, covering a realtime feature area that relies on session continuity.</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <img src="../../output/playwright/t62-subscription-reconciliation/03-stage-premium.png" alt="Stage and premium panels after stage speaker approval" />
+      <div class="card-body">
+        <span class="tag">Stage</span>
+        <h2>Stage and premium workflow</h2>
+        <p>Captures stage start, request-to-speak approval, and adjacent premium surfaces in the same dense app shell.</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <img src="../../output/playwright/t62-subscription-reconciliation/04-mobile-chat.png" alt="Mobile Discord chat shell" />
+      <div class="card-body">
+        <span class="tag">Mobile</span>
+        <h2>Mobile chat shell</h2>
+        <p>Confirms the narrow viewport still presents the active channel and chat surface without relying on desktop-only layout.</p>
+      </div>
+    </article>
+  </main>
+
+  <p class="note">
+    Screenshot source: `apps/web/tests/e2e/t62-screenshot-report.spec.ts`. Artifacts are stored separately under
+    `output/playwright/t62-subscription-reconciliation/`.
+  </p>
+</body>
+</html>

@@ -109,6 +109,15 @@ const spec = {
         responses: { 201: { $ref: '#/components/responses/Guild' } }
       })
     },
+    '/api/users/@me/guilds': {
+      get: operation({
+        operationId: 'listCurrentUserGuilds',
+        tags: ['guilds'],
+        summary: 'List guilds and visible channels for the authenticated user shell.',
+        parameters: [authHeader],
+        responses: { 200: { $ref: '#/components/responses/UserGuildList' } }
+      })
+    },
     '/api/guilds/{guildId}/channels': {
       post: operation({
         operationId: 'createChannel',
@@ -171,6 +180,19 @@ const spec = {
         requestBody: jsonBody({ type: 'object', additionalProperties: true }),
         responses: { 204: { description: 'Report accepted.' } }
       })
+    },
+    '/api/admin/global-roles/audit-log': {
+      get: operation({
+        operationId: 'listGlobalRoleAuditLog',
+        tags: ['security'],
+        summary: 'List global admin role audit entries.',
+        parameters: [
+          authHeader,
+          { name: 'targetUserId', in: 'query', required: false, schema: uuid },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } }
+        ],
+        responses: { 200: { $ref: '#/components/responses/GlobalRoleAuditLog' } }
+      })
     }
   },
   components: {
@@ -217,11 +239,13 @@ const spec = {
 for (const [name, description] of [
   ['AuthSession', 'Authenticated session response.'],
   ['Guild', 'Guild response.'],
+  ['UserGuildList', 'Authenticated user guild list response.'],
   ['Channel', 'Channel response.'],
   ['Message', 'Message response.'],
   ['MessageList', 'Message list response.'],
   ['VoiceJoin', 'Voice join response.'],
-  ['GatewayEvents', 'Gateway events response.']
+  ['GatewayEvents', 'Gateway events response.'],
+  ['GlobalRoleAuditLog', 'Global role audit log response.']
 ]) {
   spec.components.responses[name] = {
     description,

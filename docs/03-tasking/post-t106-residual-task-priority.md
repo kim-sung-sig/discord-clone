@@ -21,22 +21,21 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 | 1 | T57 process-tree cleanup helper for QA harnesses | P2 | T39 | Failed startup can leave child Java processes if cleanup is interrupted. |
 | 2 | T189 Playwright local port isolation guard | P2 | T166 | Visual smoke can silently reuse an unrelated localhost:3000 service unless an isolated port/CI mode is enforced. |
 | 3 | T163 Remove Legacy Frontend SBOM Fallback Utility | P3 | T162 | The security gate no longer invokes the fallback generator; removing unused tooling later would reduce maintenance surface. |
-| 4 | T168 Privacy-reviewed subject distribution summary | P3 | T128 | Operators may later need aggregate subject distribution, but it needs privacy review before exposing more identifiers. |
-| 5 | T170 Operator token audit review UI | P3 | T129 | Audit entries exist in the store contract but are not yet reviewable from the dashboard. |
-| 6 | T171 Operator token retention and pruning policy | P3 | T169 | Durable token/audit rows should eventually have retention rules and cleanup automation. |
-| 7 | T172 Redis CSP limiter lifecycle alert thresholds | P3 | T131 | Lifecycle metrics are now visible; thresholds can later highlight repeated fail-closed or reconnect churn. |
-| 8 | T173 Global admin audit archive and legal hold workflow | P3 | T133 | Retention policy is visible, but archival automation and legal hold are still deferred. |
-| 9 | T174 Backend auth probe timeout and alert policy | P3 | T140 | Reachability is visible now; timeout tuning and alert thresholds should be explicit before production alerting. |
-| 10 | T175 Admin CLI custom smoke fixture non-mutating mode | P3 | T142 | Explicit `-SmokeUserId` can still seed/update caller-provided fixtures; a future mode should verify existing users without mutation or require stronger confirmation. |
-| 11 | T176 Admin CLI NOOP BootRun Smoke Coverage | P3 | T143 | Duplicate grant and missing-role revoke are unit-tested, but the real bootRun smoke covers only APPLIED mutation paths. |
-| 12 | T179 Kafka DLQ monitoring rule deployment | P3 | T178 | Runtime metrics exist, but Prometheus/Grafana/PagerDuty rule deployment is environment-specific and still needs production ownership. |
-| 13 | T180 CSP directive trend breakdown | P3 | T107 | Aggregate trend is visible now; later directive-level trends could distinguish style regressions from script regressions without exposing raw reports. |
-| 14 | T181 LiveKit media smoke CI service automation | P3 | T165 | The real media smoke is runnable and locally verified, but CI currently enforces the contract only. |
-| 15 | T184 Redis Gateway DLQ metric export and alert deployment | P3 | T63 | In-process DLQ counters and runbook exist; production monitoring rule deployment is environment-specific. |
-| 16 | T185 Gateway session TTL observability | P3 | T182 | TTL cleanup works, but operators may later need aggregate stale-prune counters and dashboard/metrics visibility. |
-| 17 | T186 Gateway subscription reconciliation metrics | P3 | T62 | Reconciliation is implemented, but aggregate counters for re-subscribed guilds/channels could help diagnose churn later. |
-| 18 | T187 Redis Gateway own-source skip observability | P3 | T183 | Same-node duplicate suppression is implemented, but aggregate skipped-own-record counters could help diagnose local publish/poll churn later. |
-| 19 | T188 Real backend Playwright color-warning cleanup | P3 | T164 | The real backend gate passes, but repeated `NO_COLOR` versus `FORCE_COLOR` warnings add noise to QA logs. |
+| 4 | T170 Operator token audit review UI | P3 | T129 | Audit entries exist in the store contract but are not yet reviewable from the dashboard. |
+| 5 | T171 Operator token retention and pruning policy | P3 | T169 | Durable token/audit rows should eventually have retention rules and cleanup automation. |
+| 6 | T172 Redis CSP limiter lifecycle alert thresholds | P3 | T131 | Lifecycle metrics are now visible; thresholds can later highlight repeated fail-closed or reconnect churn. |
+| 7 | T173 Global admin audit archive and legal hold workflow | P3 | T133 | Retention policy is visible, but archival automation and legal hold are still deferred. |
+| 8 | T174 Backend auth probe timeout and alert policy | P3 | T140 | Reachability is visible now; timeout tuning and alert thresholds should be explicit before production alerting. |
+| 9 | T175 Admin CLI custom smoke fixture non-mutating mode | P3 | T142 | Explicit `-SmokeUserId` can still seed/update caller-provided fixtures; a future mode should verify existing users without mutation or require stronger confirmation. |
+| 10 | T176 Admin CLI NOOP BootRun Smoke Coverage | P3 | T143 | Duplicate grant and missing-role revoke are unit-tested, but the real bootRun smoke covers only APPLIED mutation paths. |
+| 11 | T179 Kafka DLQ monitoring rule deployment | P3 | T178 | Runtime metrics exist, but Prometheus/Grafana/PagerDuty rule deployment is environment-specific and still needs production ownership. |
+| 12 | T180 CSP directive trend breakdown | P3 | T107 | Aggregate trend is visible now; later directive-level trends could distinguish style regressions from script regressions without exposing raw reports. |
+| 13 | T181 LiveKit media smoke CI service automation | P3 | T165 | The real media smoke is runnable and locally verified, but CI currently enforces the contract only. |
+| 14 | T184 Redis Gateway DLQ metric export and alert deployment | P3 | T63 | In-process DLQ counters and runbook exist; production monitoring rule deployment is environment-specific. |
+| 15 | T185 Gateway session TTL observability | P3 | T182 | TTL cleanup works, but operators may later need aggregate stale-prune counters and dashboard/metrics visibility. |
+| 16 | T186 Gateway subscription reconciliation metrics | P3 | T62 | Reconciliation is implemented, but aggregate counters for re-subscribed guilds/channels could help diagnose churn later. |
+| 17 | T187 Redis Gateway own-source skip observability | P3 | T183 | Same-node duplicate suppression is implemented, but aggregate skipped-own-record counters could help diagnose local publish/poll churn later. |
+| 18 | T188 Real backend Playwright color-warning cleanup | P3 | T164 | The real backend gate passes, but repeated `NO_COLOR` versus `FORCE_COLOR` warnings add noise to QA logs. |
 
 ## Superseded Or Completed
 
@@ -94,6 +93,7 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 | T162 Strict Workspace Native NPM SBOM Cleanup | Completed | Fixed npm peer layout so strict workspace SBOM generation passes and removed security gate fallback execution. |
 | T163 Remove Legacy Frontend SBOM Fallback Utility | Completed | Removed the unused fallback utility and added a security gate contract assertion preventing reintroduction. |
 | T167 CSP alert incident lifecycle history | Completed | Added bounded in-memory/Postgres incident events, acknowledgement/snooze append flow, guarded dashboard payload, and `/security` lifecycle history UI. |
+| T168 Privacy-reviewed subject distribution summary | Completed | Added identifier-free CSP rate-limit subject distribution summary with ranked counts and dashboard UI. |
 | T127 CSP alert acknowledgement workflow | Completed | Added fingerprint-bound acknowledgement, required reasons, bounded snooze, Postgres/in-memory storage, and `/security` UI workflow. |
 | T128 CSP rate-limit subject diagnostics | Completed | Added secret-safe trusted-proxy subject diagnostics to the guarded dashboard payload and `/security` UI. |
 | T129 ephemeral operator token flow | Completed | Added bootstrap exchange, 15-minute issued tokens, hash-only store, revoke flow, and `/security` expiry-only UI. |
@@ -127,4 +127,4 @@ Scope: Residual tasks discovered from T32, T39, T40, T51, T52, T53, T54, T59, T6
 
 ## Recommended Next Task
 
-T168 should run next. The next highest-priority gap is privacy-reviewed subject distribution summary.
+T170 should run next. The next highest-priority gap is operator token audit review UI.

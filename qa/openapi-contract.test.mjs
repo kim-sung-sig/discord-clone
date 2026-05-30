@@ -20,6 +20,7 @@ assert.deepEqual(Object.keys(spec.components.schemas.ApiErrorResponse.properties
 for (const path of [
   '/api/auth/login',
   '/api/guilds',
+  '/api/users/@me/guilds',
   '/api/channels/{channelId}/messages',
   '/api/voice/channels/{channelId}/join',
   '/api/gateway/sessions/{sessionId}/events',
@@ -31,4 +32,5 @@ for (const path of [
 assert.match(generatedTypes, /export interface ApiErrorResponse/)
 assert.match(generatedTypes, /export type ApiPath =/)
 assert.match(generatedTypes, /'\/api\/auth\/login'/)
+assert.match(generatedTypes, /'\/api\/users\/@me\/guilds'/)
 assert.match(generatedTypes, /'\/api\/channels\/\{channelId\}\/messages'/)
