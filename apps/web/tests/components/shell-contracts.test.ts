@@ -1,7 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import App from '../../app.vue'
+import App from '../../pages/app.vue'
 import { discordApiPaths, createDiscordRestClient } from '../../services/discord-api'
 import {
   createGatewaySocketLifecycle,

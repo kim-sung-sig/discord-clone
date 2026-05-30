@@ -1,0 +1,17 @@
+{
+  "id": "cosmos",
+  "label": "Cosmos",
+  "tokens": {
+    "workbenchBg": "#0f141d",
+    "activityBg": "#111820",
+    "sideBarBg": "#151d27",
+    "editorBg": "#111722",
+    "panelBg": "#0d131c",
+    "statusBg": "#0f766e",
+    "titleBg": "#17212d",
+    "foreground": "#eef4f8",
+    "muted": "#98a8b5",
+    "accent": "#22d3ee",
+    "border": "#263543"
+  }
+}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import ExpressionPanel from './ExpressionPanel.vue'
+import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
 
 const props = defineProps<{
@@ -8,6 +9,7 @@ const props = defineProps<{
 }>()
 
 const shell = useShellStore()
+const preferences = usePreferencesStore()
 const panelOpen = ref(false)
 const reactions = computed(() => shell.reactionsForMessage(props.messageId))
 
@@ -46,7 +48,7 @@ const closePanel = () => {
       :aria-controls="`expression-panel-${messageId}`"
       @click="togglePanel"
     >
-      Add reaction
+      {{ preferences.t('reaction.add') }}
     </button>
     <ExpressionPanel v-if="panelOpen" :message-id="messageId" @close="closePanel" />
   </div>

@@ -9,7 +9,10 @@ import {
   type CspAlertThresholdOptions,
   type CspTelemetryAlert
 } from './csp-alert-threshold'
-import type { CspRateLimitTelemetryStore } from './csp-rate-limit-telemetry-store'
+import type {
+  CspRateLimitSubjectDistribution,
+  CspRateLimitTelemetryStore
+} from './csp-rate-limit-telemetry-store'
 import type { CspRateLimitSubjectDiagnostics } from './csp-rate-limit-subject'
 import type { CspReportRateLimiter, CspReportRateLimiterLifecycleMetrics } from './csp-report-rate-limiter'
 import type {
@@ -76,6 +79,7 @@ export interface CspTelemetryDashboard {
   }
   rateLimit: {
     limitedTotal: number
+    subjectDistribution: CspRateLimitSubjectDistribution
     subjectDiagnostics?: CspRateLimitSubjectDiagnostics
     lifecycle?: CspReportRateLimiterLifecycleMetrics
   }
@@ -137,6 +141,10 @@ export const buildCspTelemetryDashboard = async (
     },
     rateLimit: {
       limitedTotal: rateLimitSummary?.limitedTotal ?? 0,
+      subjectDistribution: rateLimitSummary?.subjectDistribution ?? {
+        uniqueSubjects: 0,
+        topSubjects: []
+      },
       ...(options.rateLimitSubjectDiagnostics
         ? { subjectDiagnostics: options.rateLimitSubjectDiagnostics }
         : {}),

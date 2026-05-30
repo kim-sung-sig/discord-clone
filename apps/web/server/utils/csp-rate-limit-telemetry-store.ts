@@ -11,6 +11,18 @@ export interface CspRateLimitTelemetryInput {
 
 export interface CspRateLimitTelemetrySummary {
   limitedTotal: number
+  subjectDistribution: CspRateLimitSubjectDistribution
+}
+
+export interface CspRateLimitSubjectDistributionBucket {
+  rank: number
+  count: number
+  share: number
+}
+
+export interface CspRateLimitSubjectDistribution {
+  uniqueSubjects: number
+  topSubjects: CspRateLimitSubjectDistributionBucket[]
 }
 
 export interface CspRateLimitTelemetryStore {
@@ -49,8 +61,13 @@ export class InMemoryCspRateLimitTelemetryStore implements CspRateLimitTelemetry
   }
 
   summary(): CspRateLimitTelemetrySummary {
+    const counts = new Map<string, number>()
+    for (const entry of this.entries) {
+      counts.set(entry.subjectHash, (counts.get(entry.subjectHash) ?? 0) + 1)
+    }
     return {
-      limitedTotal: this.entries.length
+      limitedTotal: this.entries.length,
+      subjectDistribution: subjectDistributionFromCounts([...counts.values()])
     }
   }
 }
@@ -95,8 +112,24 @@ export class PostgresCspRateLimitTelemetryStore implements CspRateLimitTelemetry
       SELECT COUNT(*) AS total
       FROM csp_rate_limit_telemetry
     `
+    const subjectRows = await this.sql<Array<{ count: string }>>`
+      SELECT COUNT(*) AS count
+      FROM csp_rate_limit_telemetry
+      GROUP BY subject_hash
+      ORDER BY COUNT(*) DESC, subject_hash ASC
+      LIMIT 5
+    `
+    const uniqueRows = await this.sql<Array<{ total: string }>>`
+      SELECT COUNT(DISTINCT subject_hash) AS total
+      FROM csp_rate_limit_telemetry
+    `
     return {
-      limitedTotal: Number(rows[0]?.total ?? 0)
+      limitedTotal: Number(rows[0]?.total ?? 0),
+      subjectDistribution: subjectDistributionFromCounts(
+        subjectRows.map((row) => Number(row.count)),
+        Number(uniqueRows[0]?.total ?? 0),
+        Number(rows[0]?.total ?? 0)
+      )
     }
   }
 
@@ -144,6 +177,27 @@ const hashSubject = (subject: string): string =>
   createHash('sha256')
     .update(subject.trim() || 'unknown')
     .digest('hex')
+
+const subjectDistributionFromCounts = (
+  counts: number[],
+  uniqueSubjects = counts.length,
+  limitedTotalOverride?: number
+): CspRateLimitSubjectDistribution => {
+  const sortedCounts = counts
+    .filter((count) => Number.isFinite(count) && count > 0)
+    .sort((left, right) => right - left)
+  const limitedTotal = Number.isFinite(limitedTotalOverride)
+    ? Math.max(0, Math.trunc(limitedTotalOverride ?? 0))
+    : sortedCounts.reduce((total, count) => total + count, 0)
+  return {
+    uniqueSubjects: Math.max(0, Math.trunc(uniqueSubjects)),
+    topSubjects: sortedCounts.slice(0, 5).map((count, index) => ({
+      rank: index + 1,
+      count,
+      share: limitedTotal > 0 ? Number((count / limitedTotal).toFixed(4)) : 0
+    }))
+  }
+}
 
 export interface DefaultCspRateLimitTelemetryStoreOptions {
   databaseUrl?: string

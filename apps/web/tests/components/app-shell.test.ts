@@ -1,7 +1,9 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import App from '../../app.vue'
+import App from '../../pages/app.vue'
+import { useAuthStore } from '../../stores/auth'
+import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
 
 const jsonResponse = (body: unknown, status = 200) =>
@@ -13,6 +15,81 @@ const jsonResponse = (body: unknown, status = 200) =>
 describe('Discord app shell', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    useAuthStore().$reset()
+    useShellStore().$reset()
+    usePreferencesStore().$reset()
+    window.localStorage.clear()
+  })
+
+  it('renders a VS Code-inspired user workspace as the primary shell', async () => {
+    const wrapper = await mountSuspended(App)
+
+    expect(wrapper.get('[data-testid="vscode-shell"]').attributes('data-theme-id')).toBe('vscode-dark')
+    expect(wrapper.get('[data-testid="activity-bar"]').text()).toContain('Explorer')
+    expect(wrapper.get('[data-testid="workspace-explorer"]').text()).toContain('Text Channels')
+    expect(wrapper.get('[data-testid="editor-titlebar"]').text()).toContain('# general')
+    expect(wrapper.get('[data-testid="editor-chat"]').find('[data-testid="message-input"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="bottom-panel"]').text()).toContain('Gateway')
+    expect(wrapper.get('[data-testid="status-bar"]').text()).toContain('READY')
+    expect(wrapper.get('[data-testid="legacy-shell-contracts"]').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('switches VS Code activity views without leaving the authenticated app shell', async () => {
+    const wrapper = await mountSuspended(App)
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('explorer')
+    expect(wrapper.get('[data-testid="activity-explorer"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.get('[data-testid="editor-chat"]').find('[data-testid="message-input"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="activity-search"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('search')
+    expect(wrapper.get('[data-testid="activity-search"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.get('[data-testid="workbench-search-view"]').text()).toContain('Search messages and channels')
+    expect(wrapper.get('[data-testid="workbench-search-results"]').text()).toContain('general')
+    expect(wrapper.find('[data-testid="editor-chat"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="activity-calls"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('calls')
+    expect(wrapper.get('[data-testid="workbench-calls-view"]').text()).toContain('Voice rooms')
+    expect(wrapper.get('[data-testid="workbench-calls-view"]').text()).toContain('war-room')
+
+    await wrapper.get('[data-testid="activity-settings"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('settings')
+    expect(wrapper.get('[data-testid="workbench-settings-view"]').text()).toContain('Workspace settings')
+    expect(wrapper.get('[data-testid="settings-locale-select"]').element).toBeInstanceOf(HTMLSelectElement)
+
+    await wrapper.get('[data-testid="locale-select"]').setValue('ko-KR')
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="workbench-settings-view"]').text()).not.toContain('Workspace settings')
+    expect(wrapper.get('[data-testid="workbench-settings-view"]').text()).not.toContain('Theme')
+  })
+
+  it('switches locale and theme from JSON-backed user preferences', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="locale-select"]').setValue('ko-KR')
+    await wrapper.get('[data-testid="theme-select"]').setValue('cosmos')
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="workspace-explorer"]').text()).toContain('텍스트 채널')
+    expect(wrapper.get('[data-testid="editor-empty-hint"]').text()).toContain('VS Code 스타일')
+    expect(wrapper.get('[data-testid="member-sidebar"]').text()).not.toContain('Members')
+    expect(wrapper.get('[data-testid="gateway-status-panel"]').text()).not.toContain('Gateway')
+    expect(wrapper.get('[data-testid="voice-token-provider"]').text()).not.toContain('Provider')
+    expect(wrapper.get('[data-testid="voice-join-channel-war-room"]').text()).not.toContain('Join')
+    expect(wrapper.get('[data-testid="voice-leave"]').text()).not.toContain('Leave')
+    expect(wrapper.get('[data-testid="attachment-stage-demo"]').text()).not.toContain('Attach image')
+    expect(wrapper.get('[data-testid="message-send"]').text()).not.toContain('Send')
+    expect(wrapper.get('[data-testid="expression-toggle-message-general-welcome"]').text()).not.toContain('Add reaction')
+    expect(wrapper.get('[data-testid="vscode-shell"]').attributes('data-locale')).toBe('ko-KR')
+    expect(wrapper.get('[data-testid="vscode-shell"]').attributes('data-theme-id')).toBe('cosmos')
+    expect(document.documentElement.dataset.theme).toBe('cosmos')
+    expect(document.documentElement.style.getPropertyValue('--workbench-bg')).toBe('#0f141d')
+    expect((wrapper.get('[data-testid="vscode-shell"]').element as HTMLElement).style.getPropertyValue('--workbench-bg')).toBe('#0f141d')
   })
 
   it('renders guild, grouped channels, active channel, member sidebar, and user panel', async () => {
@@ -178,6 +255,394 @@ describe('Discord app shell', () => {
     expect(calls.every((call) => (call.init?.headers as Record<string, string>)['X-Request-Id']?.startsWith('web-shell-'))).toBe(true)
     expect(shell.apiLastRequestId).toMatch(/^web-shell-[a-z0-9-]+$/)
     expect(shell.apiError).toBeNull()
+  })
+
+  it('hydrates the user workspace from authenticated guild bootstrap response', async () => {
+    const wrapper = await mountSuspended(App)
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({
+          guilds: [
+            {
+              id: 'guild-user-home',
+              name: 'User Home',
+              ownerId: 'user-1',
+              channels: [
+                { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT', parentId: null },
+                { id: 'channel-design', name: 'design', type: 'GUILD_TEXT', parentId: null },
+                { id: 'channel-standup', name: 'standup', type: 'GUILD_VOICE', parentId: null }
+              ]
+            }
+          ]
+        })
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+    const shell = useShellStore()
+    const preferences = usePreferencesStore()
+    shell.$reset()
+    preferences.setLocale('en-US')
+
+    const guilds = await shell.loadCurrentUserGuilds('access-token')
+
+    expect(guilds).toHaveLength(1)
+    expect(shell.guild).toEqual({ id: 'guild-user-home', name: 'User Home' })
+    expect(shell.activeChannelId).toBe('channel-ops')
+    expect(shell.channelGroups.find((group) => group.id === 'text-channels')?.channels).toEqual([
+      { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT' },
+      { id: 'channel-design', name: 'design', type: 'GUILD_TEXT' }
+    ])
+    expect(shell.channelGroups.find((group) => group.id === 'voice-channels')?.channels).toEqual([
+      { id: 'channel-standup', name: 'standup', type: 'GUILD_VOICE' }
+    ])
+    await nextTick()
+    expect(wrapper.get('[data-testid="message-empty-state"]').text()).toContain('No messages yet')
+    expect(wrapper.get('[data-testid="message-empty-state"]').text()).toContain('# ops')
+    expect(calls).toHaveLength(1)
+    expect(String(calls[0].input)).toContain('/api/users/@me/guilds')
+    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
+    expect(shell.apiError).toBeNull()
+  })
+
+  it('loads active channel messages after authenticated shell bootstrap', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      if (path.endsWith('/api/auth/refresh')) {
+        return jsonResponse({
+          accessToken: 'access-token',
+          user: { id: 'user-1', username: 'user', displayName: 'User' }
+        })
+      }
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({
+          guilds: [
+            {
+              id: 'guild-user-home',
+              name: 'User Home',
+              ownerId: 'user-1',
+              channels: [
+                { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT', parentId: null },
+                { id: 'channel-standup', name: 'standup', type: 'GUILD_VOICE', parentId: null }
+              ]
+            }
+          ]
+        })
+      }
+      if (path.includes('/api/channels/channel-ops/messages')) {
+        return jsonResponse({
+          messages: [
+            {
+              id: 'message-server-backed',
+              channelId: 'channel-ops',
+              authorId: 'user-1',
+              content: 'Server-backed hello from ops',
+              mentions: [],
+              pinned: false,
+              deleted: false,
+              edited: false,
+              createdAt: '2026-05-22T07:30:00.000Z'
+            }
+          ],
+          nextCursor: null
+        })
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+
+    const wrapper = await mountSuspended(App)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Server-backed hello from ops')
+    })
+    expect(wrapper.find('[data-testid="message-empty-state"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="unread-badge-channel-ops"]').exists()).toBe(false)
+    expect(calls.some((call) => String(call.input).includes('/api/channels/channel-ops/messages'))).toBe(true)
+    expect(
+      calls
+        .filter((call) => String(call.input).includes('/api/channels/channel-ops/messages'))
+        .every((call) => (call.init?.headers as Record<string, string>).Authorization === 'Bearer access-token')
+    ).toBe(true)
+  })
+
+  it('loads older active channel messages with the backend cursor', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      if (path.endsWith('/api/auth/refresh')) {
+        return jsonResponse({
+          accessToken: 'access-token',
+          user: { id: 'user-1', username: 'user', displayName: 'User' }
+        })
+      }
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({
+          guilds: [
+            {
+              id: 'guild-user-home',
+              name: 'User Home',
+              ownerId: 'user-1',
+              channels: [
+                { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT', parentId: null }
+              ]
+            }
+          ]
+        })
+      }
+      if (path.includes('/api/channels/channel-ops/messages') && path.includes('before=cursor-oldest-loaded')) {
+        return jsonResponse({
+          messages: [
+            {
+              id: 'message-older',
+              channelId: 'channel-ops',
+              authorId: 'user-2',
+              content: 'Older server-backed context',
+              mentions: [],
+              pinned: false,
+              deleted: false,
+              edited: false,
+              createdAt: '2026-05-22T07:00:00.000Z'
+            }
+          ],
+          nextCursor: null
+        })
+      }
+      if (path.includes('/api/channels/channel-ops/messages')) {
+        return jsonResponse({
+          messages: [
+            {
+              id: 'message-newer',
+              channelId: 'channel-ops',
+              authorId: 'user-1',
+              content: 'Newest server-backed context',
+              mentions: [],
+              pinned: false,
+              deleted: false,
+              edited: false,
+              createdAt: '2026-05-22T07:30:00.000Z'
+            }
+          ],
+          nextCursor: 'cursor-oldest-loaded'
+        })
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+
+    const wrapper = await mountSuspended(App)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Newest server-backed context')
+    })
+    expect(wrapper.get('[data-testid="load-older-messages"]').text()).toContain('Load older messages')
+
+    await wrapper.get('[data-testid="load-older-messages"]').trigger('click')
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Older server-backed context')
+    })
+    const messageTexts = wrapper.findAll('[data-testid="message-card"]').map((message) => message.text())
+    expect(messageTexts[0]).toContain('Older server-backed context')
+    expect(messageTexts.at(-1)).toContain('Newest server-backed context')
+    expect(wrapper.find('[data-testid="load-older-messages"]').exists()).toBe(false)
+    const olderCall = calls.find((call) => String(call.input).includes('before=cursor-oldest-loaded'))
+    expect(olderCall).toBeDefined()
+    expect((olderCall!.init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
+  })
+
+  it('sends composer text through the authenticated backend message workflow', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      if (path.endsWith('/api/auth/refresh')) {
+        return jsonResponse({
+          accessToken: 'access-token',
+          user: { id: 'user-1', username: 'user', displayName: 'User' }
+        })
+      }
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({
+          guilds: [
+            {
+              id: 'guild-user-home',
+              name: 'User Home',
+              ownerId: 'user-1',
+              channels: [
+                { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT', parentId: null },
+                { id: 'channel-standup', name: 'standup', type: 'GUILD_VOICE', parentId: null }
+              ]
+            }
+          ]
+        })
+      }
+      if (path.includes('/api/channels/channel-ops/messages') && init?.method === 'GET') {
+        return jsonResponse({ messages: [], nextCursor: null })
+      }
+      if (path.endsWith('/api/channels/channel-ops/messages') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body))
+        return jsonResponse({
+          id: 'message-authenticated-send',
+          channelId: 'channel-ops',
+          authorId: 'user-1',
+          content: body.content,
+          mentions: ['cto-bot'],
+          pinned: false,
+          deleted: false,
+          edited: false,
+          createdAt: '2026-05-22T08:30:00.000Z'
+        }, 201)
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+
+    const wrapper = await mountSuspended(App)
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="editor-titlebar"]').text()).toContain('# ops')
+    })
+
+    await wrapper.get('[data-testid="message-input"]').setValue('Authenticated hello @cto-bot')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Authenticated hello @cto-bot')
+    })
+
+    const messagePost = calls.find(
+      (call) => String(call.input).endsWith('/api/channels/channel-ops/messages') && call.init?.method === 'POST'
+    )
+    expect(messagePost).toBeDefined()
+    expect((messagePost!.init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
+    expect((messagePost!.init?.headers as Record<string, string>)['X-Request-Id']).toMatch(/^web-shell-/)
+    expect(JSON.parse(String(messagePost!.init?.body))).toMatchObject({
+      content: 'Authenticated hello @cto-bot'
+    })
+    expect(JSON.parse(String(messagePost!.init?.body)).clientEventId).toMatch(/^web-shell:/)
+    await vi.waitFor(() => {
+      expect((wrapper.get('[data-testid="message-input"]').element as HTMLInputElement).value).toBe('')
+    })
+    expect(useShellStore().pendingMutations).toHaveLength(0)
+    expect(useShellStore().failedMutations).toHaveLength(0)
+  })
+
+  it('uploads and attaches staged composer images through the authenticated backend workflow', async () => {
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const path = String(input)
+      if (path.endsWith('/api/auth/refresh')) {
+        return jsonResponse({
+          accessToken: 'access-token',
+          user: { id: 'user-1', username: 'user', displayName: 'User' }
+        })
+      }
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({
+          guilds: [
+            {
+              id: 'guild-user-home',
+              name: 'User Home',
+              ownerId: 'user-1',
+              channels: [
+                { id: 'channel-ops', name: 'ops', type: 'GUILD_TEXT', parentId: null }
+              ]
+            }
+          ]
+        })
+      }
+      if (path.includes('/api/channels/channel-ops/messages') && init?.method === 'GET') {
+        return jsonResponse({ messages: [], nextCursor: null })
+      }
+      if (path.endsWith('/api/attachments/uploads') && init?.method === 'POST') {
+        return jsonResponse({
+          attachmentId: 'attachment-live',
+          objectKey: 'guild-user-home/channel-ops/attachment-live/qa-snapshot.png',
+          uploadUrl: 'https://uploads.example.test/attachment-live'
+        }, 201)
+      }
+      if (path === 'https://uploads.example.test/attachment-live' && init?.method === 'PUT') {
+        return new Response(null, { status: 200 })
+      }
+      if (path.endsWith('/api/attachments/attachment-live/uploaded') && init?.method === 'PUT') {
+        return jsonResponse({
+          id: 'attachment-live',
+          guildId: 'guild-user-home',
+          channelId: 'channel-ops',
+          ownerId: 'user-1',
+          messageId: null,
+          filename: 'qa-snapshot.png',
+          contentType: 'image/png',
+          sizeBytes: 1234,
+          objectKey: 'guild-user-home/channel-ops/attachment-live/qa-snapshot.png',
+          status: 'UPLOADED',
+          createdAt: '2026-05-22T08:30:00.000Z',
+          updatedAt: '2026-05-22T08:30:00.000Z'
+        })
+      }
+      if (path.endsWith('/api/channels/channel-ops/messages') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body))
+        return jsonResponse({
+          id: 'message-with-attachment',
+          channelId: 'channel-ops',
+          authorId: 'user-1',
+          content: body.content,
+          mentions: [],
+          pinned: false,
+          deleted: false,
+          edited: false,
+          createdAt: '2026-05-22T08:31:00.000Z'
+        }, 201)
+      }
+      if (path.endsWith('/api/channels/channel-ops/messages/message-with-attachment/attachments/attachment-live') && init?.method === 'POST') {
+        return jsonResponse({
+          id: 'attachment-live',
+          guildId: 'guild-user-home',
+          channelId: 'channel-ops',
+          ownerId: 'user-1',
+          messageId: 'message-with-attachment',
+          filename: 'qa-snapshot.png',
+          contentType: 'image/png',
+          sizeBytes: 1234,
+          objectKey: 'guild-user-home/channel-ops/attachment-live/qa-snapshot.png',
+          status: 'ATTACHED',
+          createdAt: '2026-05-22T08:30:00.000Z',
+          updatedAt: '2026-05-22T08:31:00.000Z'
+        })
+      }
+      return jsonResponse({ message: `unexpected path ${path}` }, 404)
+    })
+
+    const wrapper = await mountSuspended(App)
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="editor-titlebar"]').text()).toContain('# ops')
+    })
+
+    await wrapper.get('[data-testid="attachment-stage-demo"]').trigger('click')
+    await wrapper.get('[data-testid="message-input"]').setValue('Authenticated attachment')
+    await wrapper.get('[data-testid="message-composer"]').trigger('submit')
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-testid="message-attachment-attachment-live"]').text()).toContain('qa-snapshot.png')
+    })
+    expect(wrapper.get('[data-testid="chat-viewport"]').text()).toContain('Authenticated attachment')
+    expect(wrapper.find('[data-testid="attachment-preview"]').exists()).toBe(false)
+
+    const uploadRequest = calls.find((call) => String(call.input).endsWith('/api/attachments/uploads'))
+    expect(uploadRequest).toBeDefined()
+    expect((uploadRequest!.init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
+    expect(JSON.parse(String(uploadRequest!.init?.body))).toMatchObject({
+      channelId: 'channel-ops',
+      filename: 'qa-snapshot.png',
+      contentType: 'image/png',
+      sizeBytes: 1234
+    })
+    expect(calls.some((call) => String(call.input) === 'https://uploads.example.test/attachment-live' && call.init?.method === 'PUT')).toBe(true)
+    expect(calls.some((call) => String(call.input).endsWith('/api/attachments/attachment-live/uploaded') && call.init?.method === 'PUT')).toBe(true)
+    expect(calls.some((call) => String(call.input).endsWith('/api/channels/channel-ops/messages/message-with-attachment/attachments/attachment-live') && call.init?.method === 'POST')).toBe(true)
   })
 
   it('does not mutate shell state when a real-backend action is rejected', async () => {

@@ -428,6 +428,42 @@ describe('browser security dashboard', () => {
     expect(panel.text()).not.toContain('10.0.0.25')
   })
 
+  it('renders privacy-reviewed CSP rate-limit subject distribution without subject identifiers', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse({
+      summary: {
+        total: 0,
+        byEffectiveDirective: {},
+        topDirectives: []
+      },
+      recent: [],
+      rateLimit: {
+        limitedTotal: 6,
+        subjectDistribution: {
+          uniqueSubjects: 3,
+          topSubjects: [
+            { rank: 1, count: 4, share: 0.6667 },
+            { rank: 2, count: 2, share: 0.3333 }
+          ]
+        }
+      }
+    }))
+
+    const wrapper = await mountSuspended(SecurityPage, {
+      global: { plugins: [pinia] }
+    })
+    await flushDashboard()
+
+    const panel = wrapper.get('[data-testid="csp-rate-limit-subject-distribution"]')
+    expect(panel.text()).toContain('Subject distribution')
+    expect(wrapper.get('[data-testid="csp-rate-limit-unique-subjects"]').text()).toContain('3')
+    expect(wrapper.get('[data-testid="csp-rate-limit-distribution-total"]').text()).toContain('6')
+    expect(wrapper.get('[data-testid="csp-rate-limit-subject-rank-1"]').text()).toContain('Subject #1')
+    expect(wrapper.get('[data-testid="csp-rate-limit-subject-rank-1"]').text()).toContain('4')
+    expect(wrapper.get('[data-testid="csp-rate-limit-subject-rank-1"]').text()).toContain('67%')
+    expect(panel.text()).not.toContain('203.0.113')
+    expect(panel.text()).not.toContain('abc123def456')
+  })
+
   it('renders Redis CSP limiter lifecycle metrics without exposing connection secrets', async () => {
     vi.stubGlobal('fetch', async () => jsonResponse({
       summary: {

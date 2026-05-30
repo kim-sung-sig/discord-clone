@@ -1,0 +1,17 @@
+{
+  "id": "vscode-dark",
+  "label": "VS Code Dark",
+  "tokens": {
+    "workbenchBg": "#1e1e1e",
+    "activityBg": "#333333",
+    "sideBarBg": "#252526",
+    "editorBg": "#1e1e1e",
+    "panelBg": "#181818",
+    "statusBg": "#007acc",
+    "titleBg": "#3c3c3c",
+    "foreground": "#d4d4d4",
+    "muted": "#9da5b4",
+    "accent": "#0078d4",
+    "border": "#3c3c3c"
+  }
+}

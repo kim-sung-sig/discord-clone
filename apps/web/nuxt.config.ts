@@ -8,7 +8,7 @@ const viteFsAllow = localWorkspaceRoot ? [workspaceRoot, localWorkspaceRoot] : [
 export default defineNuxtConfig({
   compatibilityDate: '2026-05-13',
   modules: ['@pinia/nuxt'],
-  css: ['~/assets/css/main.css', '~/assets/css/discord-vscode-theme.css'],
+  css: ['~/assets/css/main.css', '~/assets/css/discord-vscode-theme.css', '~/assets/css/workbench-density.css'],
   devtools: { enabled: false },
   alias: {
     '@discord-clone/ui-contracts/screens': packageSource('ui-contracts/src/screens.ts'),

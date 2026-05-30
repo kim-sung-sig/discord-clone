@@ -12,6 +12,397 @@
   font-family: "Segoe UI", "Pretendard", sans-serif;
 }
 
+/* Workbench visual polish: keep this at EOF so legacy shell rules cannot override it. */
+.vscode-shell.app-shell {
+  height: 100vh;
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.vscode-shell.app-shell .activity-bar {
+  width: 52px;
+  padding: 6px 0;
+  place-items: center;
+}
+
+.vscode-shell.app-shell .activity-bar .server-pill,
+.vscode-shell.app-shell .activity-bar button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  border-radius: 0;
+}
+
+.vscode-shell.app-shell .activity-bar .brand,
+.vscode-shell.app-shell .activity-bar button span,
+.vscode-shell.app-shell .activity-bar button strong {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.vscode-shell.app-shell .activity-bar button::before {
+  display: block;
+  color: currentColor;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+  content: "▦";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+  content: "⌕";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+  content: "◉";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+  content: "⚙";
+}
+
+.vscode-shell.app-shell .workbench.workspace {
+  grid-template-columns: 276px minmax(520px, 1fr) 224px;
+  grid-template-rows: minmax(0, 1fr) 148px 24px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+  display: none !important;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar {
+  padding: 2px 8px 12px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-item {
+  min-height: 28px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .editor-titlebar {
+  height: 35px;
+  padding: 0 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .chat-header {
+  padding: 18px 16px 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-list {
+  padding: 16px 14px 10px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-card {
+  width: min(760px, 100%);
+  padding: 13px 16px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .message-empty-state {
+  display: grid;
+  width: min(520px, 100%);
+  gap: 8px;
+  padding: 16px;
+  color: var(--workbench-muted);
+  background: color-mix(in srgb, var(--editor-bg) 78%, var(--workbench-accent) 8%);
+  border: 1px solid var(--workbench-border);
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .message-empty-state strong {
+  color: var(--workbench-fg);
+  font-size: 16px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-composer {
+  grid-template-columns: 128px minmax(0, 1fr) 72px;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-composer input,
+.vscode-shell.app-shell .editor-workbench .attachment-stage-button,
+.vscode-shell.app-shell .editor-workbench .message-composer button[type="submit"] {
+  height: 40px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .bottom-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.vscode-shell.app-shell .bottom-panel .gateway-status-panel,
+.vscode-shell.app-shell .bottom-panel .voice-panel {
+  height: 148px;
+  padding: 12px 14px;
+  overflow: hidden;
+}
+
+/* Effective workbench layer: keep last so shell transitions and polish win. */
+.vscode-shell.app-shell {
+  grid-template-columns: 50px 1fr;
+  grid-template-rows: 32px 28px minmax(0, 1fr);
+  min-height: 100vh;
+  color: var(--workbench-fg);
+  background: var(--workbench-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vscode-shell.app-shell * {
+  letter-spacing: 0;
+}
+
+.vscode-shell.app-shell .workbench-titlebar {
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, auto) minmax(280px, 1fr);
+  height: 32px;
+  padding: 0 12px;
+}
+
+.vscode-shell.app-shell .workbench-banner {
+  justify-content: flex-start;
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
+}
+
+.vscode-shell.app-shell .workbench-banner button {
+  height: 22px;
+  padding: 0 10px;
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
+  border-radius: 3px;
+}
+
+.vscode-shell.app-shell .activity-bar {
+  width: 50px;
+  padding: 8px 0;
+  background: var(--activity-bg);
+}
+
+.vscode-shell.app-shell .activity-bar .server-pill,
+.vscode-shell.app-shell .activity-bar button {
+  position: relative;
+  width: 50px;
+  height: 42px;
+  min-height: 42px;
+}
+
+.vscode-shell.app-shell .activity-bar button:hover,
+.vscode-shell.app-shell .activity-bar button[aria-current="page"] {
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--workbench-fg) 8%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[aria-current="page"]::after {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  content: "";
+  background: var(--workbench-accent);
+}
+
+.vscode-shell.app-shell .activity-bar button::before {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  content: "";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+  border: 1px solid currentColor;
+  box-shadow:
+    inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
+    inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: 7px 8px 0 -6px currentColor;
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+  width: 17px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+  width: 16px;
+  height: 16px;
+  background:
+    radial-gradient(circle, transparent 0 4px, currentColor 4px 6px, transparent 6px),
+    conic-gradient(from 0deg, currentColor 0 12%, transparent 12% 25%, currentColor 25% 37%, transparent 37% 50%, currentColor 50% 62%, transparent 62% 75%, currentColor 75% 87%, transparent 87%);
+  border-radius: 50%;
+}
+
+.vscode-shell.app-shell .workbench.workspace {
+  grid-template-columns: 264px minmax(480px, 1fr) 220px;
+  grid-template-rows: minmax(0, 1fr) 142px 24px;
+  background: color-mix(in srgb, var(--workbench-bg) 94%, black 6%);
+}
+
+.vscode-shell.app-shell .editor-workbench .chat-header {
+  background: color-mix(in srgb, var(--editor-bg) 94%, var(--workbench-fg) 6%);
+}
+
+.vscode-shell.app-shell .editor-workbench .message-card {
+  background: color-mix(in srgb, var(--editor-bg) 88%, var(--workbench-fg) 8%);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-composer button[type="submit"],
+.vscode-shell.app-shell .voice-panel button:not(:disabled) {
+  color: #061317;
+  background: var(--workbench-accent);
+  border-color: var(--workbench-accent);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view {
+  grid-column: 1 / 4;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  padding: 22px 24px;
+  overflow: auto;
+  background: var(--editor-bg);
+  border-right: 1px solid var(--workbench-border);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header {
+  display: grid;
+  gap: 7px;
+  max-width: 760px;
+  margin-bottom: 18px;
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header p,
+.vscode-shell.app-shell .workbench-list-row small,
+.vscode-shell.app-shell .workbench-field {
+  color: var(--workbench-muted);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header h2 {
+  margin: 0;
+  color: var(--workbench-fg);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.vscode-shell.app-shell .workbench-field {
+  display: grid;
+  gap: 7px;
+  max-width: 520px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vscode-shell.app-shell .workbench-field input,
+.vscode-shell.app-shell .workbench-field select {
+  height: 36px;
+  padding: 0 11px;
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--editor-bg) 88%, var(--workbench-fg) 10%);
+  border: 1px solid var(--workbench-border);
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .workbench-list {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.vscode-shell.app-shell .workbench-list-row,
+.vscode-shell.app-shell .workbench-settings-summary div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--workbench-fg) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workbench-border) 72%, transparent);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .workbench-list-row strong {
+  min-width: 24px;
+  padding: 2px 8px;
+  color: #061317;
+  text-align: center;
+  background: var(--workbench-accent);
+  border-radius: 999px;
+}
+
+.vscode-shell.app-shell .workbench-calls-view {
+  grid-template-columns: minmax(260px, 420px) minmax(360px, 1fr);
+  gap: 18px;
+}
+
+.vscode-shell.app-shell .workbench-calls-view > header,
+.vscode-shell.app-shell .workbench-calls-view .workbench-list {
+  grid-column: 1;
+}
+
+.vscode-shell.app-shell .workbench-calls-view .voice-panel {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  min-height: 0;
+  padding: 16px;
+  background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--editor-bg) 18%);
+  border: 1px solid var(--workbench-border);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin: 6px 0 0;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary dt,
+.vscode-shell.app-shell .workbench-settings-summary dd {
+  margin: 0;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary dt {
+  color: var(--workbench-muted);
+  font-size: 12px;
+}
+
+.vscode-shell.app-shell .status-bar {
+  height: 24px;
+  background: var(--status-bg);
+}
+
+
 * {
   box-sizing: border-box;
 }
@@ -240,13 +631,15 @@ body {
   overflow-wrap: anywhere;
 }
 
-.retention-breakdown {
+.retention-breakdown,
+.subject-distribution-summary {
   display: grid;
   gap: 6px;
   margin: 0;
 }
 
-.retention-breakdown div {
+.retention-breakdown div,
+.subject-distribution-summary div {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -255,17 +648,21 @@ body {
 }
 
 .retention-breakdown dt,
-.retention-breakdown dd {
+.retention-breakdown dd,
+.subject-distribution-summary dt,
+.subject-distribution-summary dd {
   margin: 0;
 }
 
-.retention-breakdown dt {
+.retention-breakdown dt,
+.subject-distribution-summary dt {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
 }
 
-.retention-breakdown dd {
+.retention-breakdown dd,
+.subject-distribution-summary dd {
   color: var(--ink);
   font-size: 13px;
   font-weight: 900;
@@ -937,6 +1334,22 @@ input {
 .message-list {
   min-height: 0;
   overflow: auto;
+}
+
+.load-older-messages {
+  display: block;
+  min-height: 34px;
+  margin: 0 auto 12px;
+  padding: 0 14px;
+  color: var(--workbench-fg, var(--ink));
+  background: color-mix(in srgb, var(--workbench-accent, var(--accent)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workbench-accent, var(--accent)) 55%, transparent);
+  border-radius: 4px;
+}
+
+.load-older-messages:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .chat-header {
@@ -2441,4 +2854,366 @@ input {
     cursor: wait;
     opacity: 0.56;
   }
+}
+
+/* Workbench visual polish: keep this at EOF so legacy shell rules cannot override it. */
+.vscode-shell.app-shell {
+  height: 100vh;
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.vscode-shell.app-shell .activity-bar {
+  width: 52px;
+  padding: 6px 0;
+  place-items: center;
+}
+
+.vscode-shell.app-shell .activity-bar .server-pill,
+.vscode-shell.app-shell .activity-bar button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  border-radius: 0;
+}
+
+.vscode-shell.app-shell .activity-bar .brand,
+.vscode-shell.app-shell .activity-bar button span,
+.vscode-shell.app-shell .activity-bar button strong {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.vscode-shell.app-shell .activity-bar button::before {
+  display: block;
+  color: currentColor;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+  content: "▦";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+  content: "⌕";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+  content: "◉";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+  content: "⚙";
+}
+
+.vscode-shell.app-shell .workbench.workspace {
+  grid-template-columns: 276px minmax(520px, 1fr) 224px;
+  grid-template-rows: minmax(0, 1fr) 148px 24px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+  display: none !important;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar {
+  padding: 2px 8px 12px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-item {
+  min-height: 28px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .editor-titlebar {
+  height: 35px;
+  padding: 0 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .chat-header {
+  padding: 18px 16px 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-list {
+  padding: 16px 14px 10px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-card {
+  width: min(760px, 100%);
+  padding: 13px 16px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-composer {
+  grid-template-columns: 128px minmax(0, 1fr) 72px;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.vscode-shell.app-shell .editor-workbench .message-composer input,
+.vscode-shell.app-shell .editor-workbench .attachment-stage-button,
+.vscode-shell.app-shell .editor-workbench .message-composer button[type="submit"] {
+  height: 40px;
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .bottom-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.vscode-shell.app-shell .bottom-panel .gateway-status-panel,
+.vscode-shell.app-shell .bottom-panel .voice-panel {
+  height: 148px;
+  padding: 12px 14px;
+  overflow: hidden;
+}
+
+/* Effective workbench layer: keep this last so shell transitions and polish win. */
+.vscode-shell.app-shell {
+  grid-template-columns: 50px 1fr;
+  grid-template-rows: 32px 28px minmax(0, 1fr);
+  min-height: 100vh;
+  color: var(--workbench-fg);
+  background: var(--workbench-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vscode-shell.app-shell * {
+  letter-spacing: 0;
+}
+
+.vscode-shell.app-shell .workbench-titlebar {
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, auto) minmax(280px, 1fr);
+  height: 32px;
+  padding: 0 12px;
+}
+
+.vscode-shell.app-shell .workbench-banner {
+  justify-content: flex-start;
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
+}
+
+.vscode-shell.app-shell .workbench-banner button {
+  height: 22px;
+  padding: 0 10px;
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
+  border-radius: 3px;
+}
+
+.vscode-shell.app-shell .activity-bar {
+  width: 50px;
+  padding: 8px 0;
+  background: var(--activity-bg);
+}
+
+.vscode-shell.app-shell .activity-bar .server-pill,
+.vscode-shell.app-shell .activity-bar button {
+  position: relative;
+  width: 50px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  border-radius: 0;
+}
+
+.vscode-shell.app-shell .activity-bar button:hover,
+.vscode-shell.app-shell .activity-bar button[aria-current="page"] {
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--workbench-fg) 8%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[aria-current="page"]::after {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 2px;
+  content: "";
+  background: var(--workbench-accent);
+}
+
+.vscode-shell.app-shell .activity-bar button::before {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  content: "";
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+  border: 1px solid currentColor;
+  box-shadow:
+    inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
+    inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: 7px 8px 0 -6px currentColor;
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+  width: 17px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+  width: 16px;
+  height: 16px;
+  background:
+    radial-gradient(circle, transparent 0 4px, currentColor 4px 6px, transparent 6px),
+    conic-gradient(from 0deg, currentColor 0 12%, transparent 12% 25%, currentColor 25% 37%, transparent 37% 50%, currentColor 50% 62%, transparent 62% 75%, currentColor 75% 87%, transparent 87%);
+  border-radius: 50%;
+}
+
+.vscode-shell.app-shell .workbench.workspace {
+  grid-template-columns: 264px minmax(480px, 1fr) 220px;
+  grid-template-rows: minmax(0, 1fr) 142px 24px;
+  background: color-mix(in srgb, var(--workbench-bg) 94%, black 6%);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view {
+  grid-column: 1 / 4;
+  grid-row: 1 / 3;
+  min-width: 0;
+  min-height: 0;
+  padding: 22px 24px;
+  overflow: auto;
+  background: var(--editor-bg);
+  border-right: 1px solid var(--workbench-border);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header {
+  display: grid;
+  gap: 7px;
+  max-width: 760px;
+  margin-bottom: 18px;
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header p,
+.vscode-shell.app-shell .workbench-list-row small,
+.vscode-shell.app-shell .workbench-field {
+  color: var(--workbench-muted);
+}
+
+.vscode-shell.app-shell .workbench-secondary-view > header h2 {
+  margin: 0;
+  color: var(--workbench-fg);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.vscode-shell.app-shell .workbench-field {
+  display: grid;
+  gap: 7px;
+  max-width: 520px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vscode-shell.app-shell .workbench-field input,
+.vscode-shell.app-shell .workbench-field select {
+  height: 36px;
+  padding: 0 11px;
+  color: var(--workbench-fg);
+  background: color-mix(in srgb, var(--editor-bg) 88%, var(--workbench-fg) 10%);
+  border: 1px solid var(--workbench-border);
+  border-radius: 4px;
+}
+
+.vscode-shell.app-shell .workbench-list,
+.vscode-shell.app-shell .workbench-settings-summary {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.vscode-shell.app-shell .workbench-list-row,
+.vscode-shell.app-shell .workbench-settings-summary div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--workbench-fg) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workbench-border) 72%, transparent);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .workbench-list-row strong {
+  min-width: 24px;
+  padding: 2px 8px;
+  color: #061317;
+  text-align: center;
+  background: var(--workbench-accent);
+  border-radius: 999px;
+}
+
+.vscode-shell.app-shell .workbench-calls-view {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(360px, 1fr);
+  gap: 18px;
+}
+
+.vscode-shell.app-shell .workbench-calls-view > header,
+.vscode-shell.app-shell .workbench-calls-view .workbench-list {
+  grid-column: 1;
+}
+
+.vscode-shell.app-shell .workbench-calls-view .voice-panel {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  min-height: 0;
+  padding: 16px;
+  background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--editor-bg) 18%);
+  border: 1px solid var(--workbench-border);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary {
+  max-width: 520px;
+  margin: 6px 0 0;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary dt,
+.vscode-shell.app-shell .workbench-settings-summary dd {
+  margin: 0;
+}
+
+.vscode-shell.app-shell .workbench-settings-summary dt {
+  color: var(--workbench-muted);
+  font-size: 12px;
+}
+
+.vscode-shell.app-shell .status-bar {
+  height: 24px;
+  background: var(--status-bg);
 }

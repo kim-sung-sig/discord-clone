@@ -31,6 +31,15 @@ interface BackendChannelResponse {
   type: ShellChannelType
 }
 
+interface BackendUserGuildResponse extends BackendGuildResponse {
+  ownerId: string
+  channels: Array<BackendChannelResponse & { parentId: string | null }>
+}
+
+interface BackendUserGuildsResponse {
+  guilds: BackendUserGuildResponse[]
+}
+
 interface BackendMessageResponse {
   id: string
   channelId: string
@@ -46,6 +55,21 @@ interface BackendMessageResponse {
 interface BackendMessagePageResponse {
   messages: BackendMessageResponse[]
   nextCursor: string | null
+}
+
+interface BackendAttachmentUploadResponse {
+  attachmentId: string
+  objectKey: string
+  uploadUrl: string
+}
+
+interface BackendAttachmentResponse {
+  id: string
+  filename: string
+  contentType: string
+  sizeBytes: number
+  objectKey: string
+  status: string
 }
 
 interface BackendVoiceJoinResponse {
@@ -481,6 +505,22 @@ const createShellRequestId = (): string => {
   return `web-shell-${timePart}-${randomPart}`
 }
 
+const attachmentUploadBody = (attachment: ShellAttachment): BodyInit => {
+  const [, encoded = ''] = attachment.previewUrl.split(',', 2)
+  return encoded || attachment.previewUrl
+}
+
+const toShellAttachment = (
+  attachment: BackendAttachmentResponse,
+  previewUrl: string
+): ShellAttachment => ({
+  id: attachment.id,
+  filename: attachment.filename,
+  contentType: attachment.contentType,
+  sizeBytes: attachment.sizeBytes,
+  previewUrl
+})
+
 export const useShellStore = defineStore('shell', {
   state: () => ({
     apiError: null as string | null,
@@ -674,6 +714,7 @@ export const useShellStore = defineStore('shell', {
     pendingMutations: [] satisfies ShellPendingMutation[],
     failedMutations: [] satisfies ShellFailedMutation[],
     resyncRequired: false,
+    messagePageCursors: {} as Record<string, string | null>,
     social: {
       activeSelection: {
         type: 'GROUP',
@@ -895,6 +936,8 @@ export const useShellStore = defineStore('shell', {
         .find((channel) => channel.id === state.activeChannelId),
     activeMessages: (state): ShellMessage[] =>
       state.messages.filter((message) => message.channelId === state.activeChannelId),
+    activeMessagePageCursor: (state): string | null =>
+      state.activeChannelId ? state.messagePageCursors[state.activeChannelId] ?? null : null,
     presenceStatusForUser: (state) => (userId: string): ShellPresenceStatus => {
       const record = state.presence.users[userId]
 
@@ -1194,11 +1237,29 @@ export const useShellStore = defineStore('shell', {
         this.markChannelRead(channelId)
       }
     },
-    sendMessage() {
+    async sendMessage(bearerToken?: string | null) {
       const body = this.composerBody.trim()
       const attachment = this.stagedAttachment
 
       if (!body && !attachment) {
+        return
+      }
+      if (!this.activeChannelId) {
+        return
+      }
+      if (bearerToken && body && !attachment) {
+        await this.sendBackendMessage(this.activeChannelId, body, bearerToken)
+        return
+      }
+      if (bearerToken && body && attachment) {
+        const uploadedAttachment = await this.uploadBackendAttachment(this.activeChannelId, attachment, bearerToken)
+        if (!uploadedAttachment) {
+          return
+        }
+        const message = await this.sendBackendMessage(this.activeChannelId, body, bearerToken, [uploadedAttachment])
+        if (message) {
+          await this.attachBackendAttachment(this.activeChannelId, message.id, uploadedAttachment, bearerToken)
+        }
         return
       }
 
@@ -1231,6 +1292,76 @@ export const useShellStore = defineStore('shell', {
         }
         return this.guild
       })
+    },
+    async loadCurrentUserGuilds(bearerToken: string): Promise<BackendUserGuildResponse[] | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const response = await client.get<BackendUserGuildsResponse>(
+          discordApiPaths.auth.guilds(),
+          { bearerToken, requestId }
+        )
+        const firstGuild = response.guilds[0]
+        if (!firstGuild) {
+          return response.guilds
+        }
+
+        this.guild = {
+          id: firstGuild.id,
+          name: firstGuild.name
+        }
+
+        const textChannels = firstGuild.channels
+          .filter((channel) => channel.type !== 'GUILD_VOICE')
+          .map((channel) => ({
+            id: channel.id,
+            name: channel.name,
+            type: channel.type
+          }) satisfies ShellChannel)
+        const voiceChannels = firstGuild.channels
+          .filter((channel) => channel.type === 'GUILD_VOICE')
+          .map((channel) => ({
+            id: channel.id,
+            name: channel.name,
+            type: channel.type
+          }) satisfies ShellChannel)
+
+        this.channelGroups = [
+          {
+            id: 'text-channels',
+            name: 'Text Channels',
+            channels: textChannels
+          },
+          {
+            id: 'voice-channels',
+            name: 'Voice Channels',
+            channels: voiceChannels
+          }
+        ]
+
+        const preferredActiveChannel = textChannels[0] ?? voiceChannels[0]
+        if (preferredActiveChannel) {
+          this.activeChannelId = preferredActiveChannel.id
+          this.presence.readMarkers[preferredActiveChannel.id] ??= {
+            channelId: preferredActiveChannel.id,
+            lastReadSequence: 0
+          }
+        }
+
+        return response.guilds
+      })
+    },
+    async bootstrapCurrentUserWorkspace(bearerToken: string): Promise<BackendUserGuildResponse[] | null> {
+      const guilds = await this.loadCurrentUserGuilds(bearerToken)
+      if (!guilds) {
+        return null
+      }
+
+      const activeChannel = this.activeChannel
+      if (activeChannel && activeChannel.type !== 'GUILD_VOICE') {
+        await this.resyncChannelMessages(activeChannel.id, bearerToken)
+        this.markChannelRead(activeChannel.id)
+      }
+
+      return guilds
     },
     async createBackendChannel(
       guildId: string,
@@ -1269,9 +1400,80 @@ export const useShellStore = defineStore('shell', {
         return shellChannel
       })
     },
-    async sendBackendMessage(channelId: string, content: string, bearerToken: string): Promise<ShellMessage | null> {
+    async uploadBackendAttachment(
+      channelId: string,
+      attachment: ShellAttachment,
+      bearerToken: string
+    ): Promise<ShellAttachment | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const upload = await client.post<BackendAttachmentUploadResponse>(
+          discordApiPaths.attachment.uploads(),
+          {
+            channelId,
+            filename: attachment.filename,
+            contentType: attachment.contentType,
+            sizeBytes: attachment.sizeBytes
+          },
+          { bearerToken, requestId }
+        )
+        const uploadResponse = await globalThis.fetch(upload.uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': attachment.contentType
+          },
+          body: attachmentUploadBody(attachment)
+        })
+        if (!uploadResponse.ok) {
+          throw new Error(`attachment upload failed with ${uploadResponse.status}`)
+        }
+        const uploaded = await client.put<BackendAttachmentResponse>(
+          discordApiPaths.attachment.uploaded(upload.attachmentId),
+          undefined,
+          { bearerToken, requestId }
+        )
+        return toShellAttachment(uploaded, attachment.previewUrl)
+      })
+    },
+    async attachBackendAttachment(
+      channelId: string,
+      messageId: string,
+      attachment: ShellAttachment,
+      bearerToken: string
+    ): Promise<ShellAttachment | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const attached = await client.post<BackendAttachmentResponse>(
+          discordApiPaths.channel.messageAttachment(channelId, messageId, attachment.id),
+          undefined,
+          { bearerToken, requestId }
+        )
+        const shellAttachment = toShellAttachment(attached, attachment.previewUrl)
+        this.messages = this.messages.map((message) => {
+          if (message.id !== messageId) {
+            return message
+          }
+
+          return {
+            ...message,
+            attachments: [
+              ...message.attachments.filter((candidate) => candidate.id !== shellAttachment.id),
+              shellAttachment
+            ]
+          }
+        })
+        return shellAttachment
+      })
+    },
+    async sendBackendMessage(
+      channelId: string,
+      content: string,
+      bearerToken: string,
+      attachments: ShellAttachment[] = []
+    ): Promise<ShellMessage | null> {
       return this.withBackendRequest(async (client, requestId) => {
         const body = content.trim()
+        if (!body) {
+          return null
+        }
         const clientEventId = createShellClientEventId()
         const localMessageId = `local-${clientEventId}`
         const optimisticMessage: ShellMessage = {
@@ -1285,7 +1487,7 @@ export const useShellStore = defineStore('shell', {
           pinned: false,
           deleted: false,
           mentions: extractMentions(body),
-          attachments: [],
+          attachments: attachments.map((attachment) => ({ ...attachment })),
           status: 'sending',
           clientEventId,
           requestId
@@ -1403,9 +1605,55 @@ export const useShellStore = defineStore('shell', {
           ...this.messages.filter((message) => message.channelId !== channelId),
           ...messages
         ]
+        this.messagePageCursors[channelId] = page.nextCursor
         this.resyncRequired = false
         return messages
       })
+    },
+    async loadOlderChannelMessages(channelId: string, bearerToken: string, limit = 50): Promise<ShellMessage[] | null> {
+      const before = this.messagePageCursors[channelId]
+      if (!before) {
+        return []
+      }
+
+      return this.withBackendRequest(async (client, requestId) => {
+        const page = await client.get<BackendMessagePageResponse>(
+          discordApiPaths.channel.messages(channelId, { before, limit }),
+          { bearerToken, requestId }
+        )
+        const existingIds = new Set(this.messages.map((message) => message.id))
+        const nextSequence = nextShellMessageSequence(this.messages)
+        const olderMessages = page.messages
+          .filter((message) => !existingIds.has(message.id))
+          .map((message, index) => ({
+            id: message.id,
+            channelId: message.channelId,
+            sequence: nextSequence + index,
+            author: message.authorId,
+            body: message.content,
+            createdAt: message.createdAt,
+            edited: message.edited,
+            pinned: message.pinned,
+            deleted: message.deleted,
+            mentions: message.mentions,
+            attachments: [],
+            status: 'sent'
+          }) satisfies ShellMessage)
+
+        this.messages = [
+          ...olderMessages,
+          ...this.messages
+        ]
+        this.messagePageCursors[channelId] = page.nextCursor
+        return olderMessages
+      })
+    },
+    async loadOlderActiveChannelMessages(bearerToken: string): Promise<ShellMessage[] | null> {
+      if (!this.activeChannelId) {
+        return []
+      }
+
+      return this.loadOlderChannelMessages(this.activeChannelId, bearerToken)
     },
     async joinBackendVoice(channelId: string, bearerToken: string): Promise<BackendVoiceJoinResponse | null> {
       return this.withBackendRequest(async (client, requestId) => {

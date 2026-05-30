@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import UnreadBadge from './UnreadBadge.vue'
+import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
+const preferences = usePreferencesStore()
 const isHydrated = ref(false)
 
 onMounted(() => {
@@ -26,7 +28,7 @@ onMounted(() => {
         class="channel-loading"
         role="status"
       >
-        Channels will be selectable after the page finishes loading.
+        {{ preferences.t('channel.loading') }}
       </p>
       <button
         v-for="channel in group.channels"
@@ -40,7 +42,7 @@ onMounted(() => {
         :aria-current="channel.id === shell.activeChannelId ? 'page' : undefined"
         @click="shell.selectChannel(channel.id)"
       >
-        <span>{{ channel.type === 'GUILD_TEXT' ? '#' : channel.type === 'GUILD_FORUM' ? 'Forum' : 'Voice' }}</span>
+        <span>{{ channel.type === 'GUILD_TEXT' ? '#' : channel.type === 'GUILD_FORUM' ? preferences.t('channel.kind.forum') : preferences.t('channel.kind.voice') }}</span>
         <span>{{ channel.name }}</span>
         <UnreadBadge
           :count="shell.unreadCountForChannel(channel.id)"

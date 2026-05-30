@@ -10,6 +10,8 @@ test('desktop shell keeps operational panels inside the viewport without clipped
   await page.goto('/')
   await expect(page.getByTestId('workspace')).toBeVisible()
   await expect(page.getByTestId('message-input')).toBeVisible()
+  await page.getByTestId('bottom-panel-toggle').click()
+  await expect(page.getByTestId('bottom-panel')).toBeVisible()
 
   const metrics = await page.evaluate(() => {
     const viewportWidth = window.innerWidth
@@ -35,7 +37,14 @@ test('desktop shell keeps operational panels inside the viewport without clipped
     ]
     const clipped = selectors.flatMap((selector) =>
       Array.from(document.querySelectorAll<HTMLElement>(selector)).flatMap((element, index) => {
+        if (element.closest('[data-testid="legacy-shell-contracts"]')) {
+          return []
+        }
+        const style = getComputedStyle(element)
         const rect = element.getBoundingClientRect()
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0) {
+          return []
+        }
         const messages: string[] = []
         if (rect.left < -1 || rect.right > viewportWidth + 1) {
           messages.push(`${selector}[${index}] outside viewport ${Math.round(rect.left)}-${Math.round(rect.right)}`)

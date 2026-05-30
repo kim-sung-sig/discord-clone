@@ -82,7 +82,14 @@ describe.runIf(process.env.NUXT_RUN_POSTGRES_TESTS === 'true')('Postgres CSP tel
       })
 
       expect(await store.summary()).toEqual({
-        limitedTotal: 2
+        limitedTotal: 2,
+        subjectDistribution: {
+          uniqueSubjects: 2,
+          topSubjects: [
+            { rank: 1, count: 1, share: 0.5 },
+            { rank: 2, count: 1, share: 0.5 }
+          ]
+        }
       })
     } finally {
       await store.close()

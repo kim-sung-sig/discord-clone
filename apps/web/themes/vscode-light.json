@@ -1,0 +1,17 @@
+{
+  "id": "vscode-light",
+  "label": "VS Code Light",
+  "tokens": {
+    "workbenchBg": "#f3f3f3",
+    "activityBg": "#2c2c2c",
+    "sideBarBg": "#ffffff",
+    "editorBg": "#ffffff",
+    "panelBg": "#f8f8f8",
+    "statusBg": "#007acc",
+    "titleBg": "#dddddd",
+    "foreground": "#1f2328",
+    "muted": "#5f6a7a",
+    "accent": "#005fb8",
+    "border": "#d0d7de"
+  }
+}

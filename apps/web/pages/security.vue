@@ -24,6 +24,8 @@ const topDirectiveCount = computed(() => dashboard.value?.summary.topDirectives.
 const telemetryStorageHealth = computed(() => dashboard.value?.health?.storage)
 const telemetryWriteFailures = computed(() => telemetryStorageHealth.value?.writeFailures ?? 0)
 const rateLimitSubjectDiagnostics = computed(() => dashboard.value?.rateLimit?.subjectDiagnostics)
+const rateLimitSubjectDistribution = computed(() => dashboard.value?.rateLimit?.subjectDistribution)
+const rateLimitTopSubjects = computed(() => rateLimitSubjectDistribution.value?.topSubjects ?? [])
 const rateLimitLifecycle = computed(() => dashboard.value?.rateLimit?.lifecycle)
 const rateLimitRedisLifecycle = computed(() => rateLimitLifecycle.value?.redis)
 const trendMaxTotal = computed(() => Math.max(1, ...(dashboard.value?.trend?.buckets.map((bucket) => bucket.total) ?? [0])))
@@ -540,6 +542,50 @@ const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashbo
             <li>
               <span>Subject hash</span>
               <strong data-testid="csp-subject-hash-prefix">{{ rateLimitSubjectDiagnostics.subjectHashPrefix }}</strong>
+            </li>
+          </ul>
+        </article>
+
+        <article
+          v-if="rateLimitSubjectDistribution"
+          class="security-dashboard-panel"
+          data-testid="csp-rate-limit-subject-distribution"
+        >
+          <header>
+            <p>CSP rate limit</p>
+            <h2>Subject distribution</h2>
+          </header>
+          <dl class="subject-distribution-summary">
+            <div>
+              <dt>Unique subjects</dt>
+              <dd data-testid="csp-rate-limit-unique-subjects">
+                {{ rateLimitSubjectDistribution.uniqueSubjects }}
+              </dd>
+            </div>
+            <div>
+              <dt>Limited reports</dt>
+              <dd data-testid="csp-rate-limit-distribution-total">{{ dashboard.rateLimit.limitedTotal }}</dd>
+            </div>
+          </dl>
+          <p
+            v-if="rateLimitTopSubjects.length === 0"
+            class="security-dashboard-state"
+            data-testid="csp-rate-limit-subject-distribution-empty"
+          >
+            No limited subject distribution yet.
+          </p>
+          <ul
+            v-else
+            class="subject-diagnostics-list"
+            aria-label="CSP rate-limit subject distribution"
+          >
+            <li
+              v-for="subject in rateLimitTopSubjects"
+              :key="subject.rank"
+              :data-testid="`csp-rate-limit-subject-rank-${subject.rank}`"
+            >
+              <span>Subject #{{ subject.rank }}</span>
+              <strong>{{ subject.count }} · {{ Math.round(subject.share * 100) }}%</strong>
             </li>
           </ul>
         </article>

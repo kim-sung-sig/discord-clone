@@ -286,13 +286,25 @@ describe('Nuxt HTML security headers', () => {
     })
     expect(store.recent()).toHaveLength(2)
     expect(rateLimitTelemetry.summary()).toEqual({
-      limitedTotal: 1
+      limitedTotal: 1,
+      subjectDistribution: {
+        uniqueSubjects: 1,
+        topSubjects: [
+          { rank: 1, count: 1, share: 1 }
+        ]
+      }
     })
 
     expect(submit('req-csp-rate-4', new Date('2026-05-18T00:01:01.000Z')).accepted).toBe(true)
     expect(store.recent()).toHaveLength(3)
     expect(rateLimitTelemetry.summary()).toEqual({
-      limitedTotal: 1
+      limitedTotal: 1,
+      subjectDistribution: {
+        uniqueSubjects: 1,
+        topSubjects: [
+          { rank: 1, count: 1, share: 1 }
+        ]
+      }
     })
   })
 
@@ -308,7 +320,20 @@ describe('Nuxt HTML security headers', () => {
         recorded = true
       },
       async summary() {
-        return { limitedTotal: recorded ? 1 : 0 }
+        return {
+          limitedTotal: recorded ? 1 : 0,
+          subjectDistribution: recorded
+            ? {
+                uniqueSubjects: 1,
+                topSubjects: [
+                  { rank: 1, count: 1, share: 1 }
+                ]
+              }
+            : {
+                uniqueSubjects: 0,
+                topSubjects: []
+              }
+        }
       }
     }
 
@@ -430,6 +455,16 @@ describe('Nuxt HTML security headers', () => {
       at: new Date('2026-05-19T00:00:03.000Z'),
       resetAt: '2026-05-19T00:01:00.000Z'
     })
+    rateLimitTelemetry.recordLimited({
+      subject: '203.0.113.10',
+      at: new Date('2026-05-19T00:00:04.000Z'),
+      resetAt: '2026-05-19T00:01:00.000Z'
+    })
+    rateLimitTelemetry.recordLimited({
+      subject: '198.51.100.20',
+      at: new Date('2026-05-19T00:00:05.000Z'),
+      resetAt: '2026-05-19T00:01:00.000Z'
+    })
 
     const dashboard = await buildCspTelemetryDashboard(store, {
       recentLimit: 2,
@@ -450,7 +485,14 @@ describe('Nuxt HTML security headers', () => {
       ]
     })
     expect(dashboard.alert.fingerprint).toMatch(/^[a-f0-9]{24}$/)
-    expect(dashboard.rateLimit.limitedTotal).toBe(1)
+    expect(dashboard.rateLimit.limitedTotal).toBe(3)
+    expect(dashboard.rateLimit.subjectDistribution).toEqual({
+      uniqueSubjects: 2,
+      topSubjects: [
+        { rank: 1, count: 2, share: 0.6667 },
+        { rank: 2, count: 1, share: 0.3333 }
+      ]
+    })
     expect(dashboard.summary.topDirectives).toEqual([
       { directive: 'style-src', count: 2 },
       { directive: 'script-src', count: 1 }
@@ -476,13 +518,25 @@ describe('Nuxt HTML security headers', () => {
     expect(JSON.stringify(dashboard)).not.toContain('secret')
     expect(JSON.stringify(dashboard)).not.toContain('document.cookie')
     expect(JSON.stringify(dashboard)).not.toContain('Sensitive Browser')
+    expect(JSON.stringify(dashboard.rateLimit.subjectDistribution)).not.toContain('203.0.113')
+    expect(JSON.stringify(dashboard.rateLimit.subjectDistribution)).not.toContain('198.51.100')
   })
 
   it('builds the CSP dashboard with an async rate-limit telemetry summary', async () => {
     const dashboard = await buildCspTelemetryDashboard(new InMemoryCspTelemetryStore(), {
       rateLimitTelemetryStore: {
         recordLimited: async () => {},
-        summary: async () => ({ limitedTotal: 7 })
+        summary: async () => ({
+          limitedTotal: 7,
+          subjectDistribution: {
+            uniqueSubjects: 3,
+            topSubjects: [
+              { rank: 1, count: 4, share: 0.5714 },
+              { rank: 2, count: 2, share: 0.2857 },
+              { rank: 3, count: 1, share: 0.1429 }
+            ]
+          }
+        })
       },
       rateLimiter: {
         consume: () => ({
@@ -508,6 +562,12 @@ describe('Nuxt HTML security headers', () => {
     })
 
     expect(dashboard.rateLimit.limitedTotal).toBe(7)
+    expect(dashboard.rateLimit.subjectDistribution.uniqueSubjects).toBe(3)
+    expect(dashboard.rateLimit.subjectDistribution.topSubjects[0]).toEqual({
+      rank: 1,
+      count: 4,
+      share: 0.5714
+    })
     expect(dashboard.rateLimit.lifecycle).toEqual({
       backend: 'redis',
       failClosedDecisions: 2,

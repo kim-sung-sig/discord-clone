@@ -42,7 +42,8 @@ const authPaths = {
   refresh: () => '/api/auth/refresh',
   sessions: () => '/api/auth/sessions',
   session: (sessionId: string) => `/api/auth/sessions/${segment(sessionId)}`,
-  me: () => '/api/users/@me'
+  me: () => '/api/users/@me',
+  guilds: () => '/api/users/@me/guilds'
 } as const
 
 const guildPaths = Object.assign(
@@ -72,8 +73,16 @@ const channelPaths = {
     `/api/channels/${segment(channelId)}/messages/${segment(messageId)}`,
   messagePin: (channelId: string, messageId: string) =>
     `/api/channels/${segment(channelId)}/messages/${segment(messageId)}/pin`,
+  messageAttachment: (channelId: string, messageId: string, attachmentId: string) =>
+    `/api/channels/${segment(channelId)}/messages/${segment(messageId)}/attachments/${segment(attachmentId)}`,
   searchMessages: (channelId: string, query: { q: string; limit?: number }) =>
     withQuery(`/api/channels/${segment(channelId)}/messages/search`, query)
+} as const
+
+const attachmentPaths = {
+  uploads: () => '/api/attachments/uploads',
+  uploaded: (attachmentId: string) => `/api/attachments/${segment(attachmentId)}/uploaded`,
+  download: (attachmentId: string) => `/api/attachments/${segment(attachmentId)}/download`
 } as const
 
 const invitePaths = {
@@ -100,6 +109,7 @@ export const discordApiPaths = {
   auth: authPaths,
   guild: guildPaths,
   channel: channelPaths,
+  attachment: attachmentPaths,
   invite: invitePaths,
   gateway: gatewayPaths
 } as const
