@@ -8,6 +8,7 @@ export interface ApiErrorResponse {
 }
 
 export type ApiPath =
+  | '/api/admin/global-roles/audit-log'
   | '/api/auth/login'
   | '/api/auth/logout'
   | '/api/channels/{channelId}/messages'
@@ -15,6 +16,7 @@ export type ApiPath =
   | '/api/guilds'
   | '/api/guilds/{guildId}/channels'
   | '/api/security/csp-report'
+  | '/api/users/@me/guilds'
   | '/api/voice/channels/{channelId}/join'
 
 export type ApiMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
@@ -26,6 +28,11 @@ export interface ApiOperation {
 }
 
 export const apiOperations = [
+  {
+    "method": "GET",
+    "path": "/api/admin/global-roles/audit-log",
+    "operationId": "listGlobalRoleAuditLog"
+  },
   {
     "method": "POST",
     "path": "/api/auth/login",
@@ -65,6 +72,11 @@ export const apiOperations = [
     "method": "POST",
     "path": "/api/security/csp-report",
     "operationId": "submitCspReport"
+  },
+  {
+    "method": "GET",
+    "path": "/api/users/@me/guilds",
+    "operationId": "listCurrentUserGuilds"
   },
   {
     "method": "POST",

@@ -3,8 +3,12 @@ package com.example.discord.auth;
 import com.example.discord.identity.EmailAddress;
 import com.example.discord.identity.RefreshSession;
 import com.example.discord.user.UserProfile;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,13 +18,15 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@Profile("!postgres")
+@Profile("!postgres & !production & !admin-cli")
 class InMemoryAuthStore implements AuthStore {
     private final ConcurrentMap<String, AuthAccount> accountsByEmail = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, AuthAccount> accountsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Boolean> revokedAccessTokens = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, RefreshSession> refreshSessionsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UUID> refreshSessionIdsByTokenHash = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, java.util.Set<String>> globalRolesByUserId = new ConcurrentHashMap<>();
+    private final List<GlobalRoleAuditEntry> globalRoleAuditLog = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
     @Override
     public boolean saveIfAbsent(AuthAccount account) {
@@ -44,12 +50,12 @@ class InMemoryAuthStore implements AuthStore {
 
     @Override
     public void revokeAccessToken(String token) {
-        revokedAccessTokens.put(token, true);
+        revokedAccessTokens.put(tokenHash(token), true);
     }
 
     @Override
     public boolean isAccessTokenRevoked(String token) {
-        return revokedAccessTokens.containsKey(token);
+        return revokedAccessTokens.containsKey(tokenHash(token));
     }
 
     @Override
@@ -95,5 +101,68 @@ class InMemoryAuthStore implements AuthStore {
     public void revokeAllRefreshSessions(UUID userId, Instant revokedAt) {
         refreshSessionsForUser(userId)
             .forEach(session -> saveRefreshSession(session.revoke(revokedAt)));
+    }
+
+    @Override
+    public boolean grantGlobalRole(UUID userId, String role) {
+        String canonicalRole = GlobalRole.canonical(role);
+        return globalRolesByUserId.computeIfAbsent(userId, ignored -> ConcurrentHashMap.newKeySet()).add(canonicalRole);
+    }
+
+    @Override
+    public boolean revokeGlobalRole(UUID userId, String role) {
+        java.util.Set<String> roles = globalRolesByUserId.get(userId);
+        return roles != null && roles.remove(GlobalRole.canonical(role));
+    }
+
+    @Override
+    public List<String> globalRolesForUser(UUID userId) {
+        return globalRolesByUserId.getOrDefault(userId, java.util.Set.of()).stream()
+            .sorted()
+            .toList();
+    }
+
+    @Override
+    public void recordGlobalRoleAudit(GlobalRoleAuditEntry entry) {
+        globalRoleAuditLog.add(entry);
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId) {
+        synchronized (globalRoleAuditLog) {
+            return globalRoleAuditLog.stream()
+                .filter(entry -> entry.targetUserId().equals(userId))
+                .toList();
+        }
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId, int limit) {
+        synchronized (globalRoleAuditLog) {
+            return globalRoleAuditLog.stream()
+                .filter(entry -> entry.targetUserId().equals(userId))
+                .sorted(Comparator.comparing(GlobalRoleAuditEntry::occurredAt).reversed())
+                .limit(Math.max(0, limit))
+                .toList();
+        }
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(int limit) {
+        synchronized (globalRoleAuditLog) {
+            return globalRoleAuditLog.stream()
+                .sorted(Comparator.comparing(GlobalRoleAuditEntry::occurredAt).reversed())
+                .limit(Math.max(0, limit))
+                .toList();
+        }
+    }
+
+    private static String tokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 }

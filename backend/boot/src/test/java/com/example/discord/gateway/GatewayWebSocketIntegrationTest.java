@@ -261,7 +261,8 @@ class GatewayWebSocketIntegrationTest {
     }
 
     private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
-        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andReturn();
 

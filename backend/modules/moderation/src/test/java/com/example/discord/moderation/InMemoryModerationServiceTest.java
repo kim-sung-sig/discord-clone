@@ -120,4 +120,28 @@ class InMemoryModerationServiceTest {
             .extracting(AuditLogEntry::action)
             .containsExactly(AuditLogAction.MESSAGE_REPORT_RESOLVED, AuditLogAction.MESSAGE_REPORTED);
     }
+
+    @Test
+    void auditLogReadsAreBoundedNewestFirst() {
+        InMemoryModerationService service = new InMemoryModerationService();
+        UUID guildId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        for (int index = 0; index < 60; index++) {
+            service.appendAudit(
+                guildId,
+                AuditLogAction.MESSAGE_REPORTED,
+                actorId,
+                UUID.randomUUID(),
+                "report-" + index
+            );
+        }
+
+        assertThat(service.auditLogs(guildId))
+            .hasSize(50)
+            .first()
+            .extracting(AuditLogEntry::reason)
+            .isEqualTo("report-59");
+        assertThat(service.auditLogs(guildId, null, null, null, 5)).hasSize(5);
+    }
 }

@@ -43,9 +43,98 @@ class GuildControllerTest {
             .andExpect(jsonPath("$.type").value("GUILD_TEXT"));
 
         mockMvc.perform(get("/api/guilds/{guildId}/channels/visible", guildId)
-                .param("memberId", owner.userId().toString()))
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].name").value("general"));
+    }
+
+    @Test
+    void rejectsVisibleChannelsWithoutBearerToken() throws Exception {
+        AuthSession owner = signup("vis_missing_owner");
+        String guildId = createGuild(owner);
+
+        mockMvc.perform(get("/api/guilds/{guildId}/channels/visible", guildId)
+                .param("memberId", owner.userId().toString()))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void visibleChannelsUsesAuthenticatedUserInsteadOfQueryMemberId() throws Exception {
+        AuthSession owner = signup("visible_channels_owner_subject");
+        AuthSession member = signup("visible_channels_member_subject");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "staff", owner);
+        addMember(guildId, member.userId(), owner);
+        String everyoneRoleId = firstRoleId(guildId, owner);
+
+        mockMvc.perform(put(
+                "/api/guilds/{guildId}/channels/{channelId}/overwrites/roles/{roleId}",
+                guildId,
+                channelId,
+                everyoneRoleId
+            )
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "allow": [],
+                      "deny": ["VIEW_CHANNEL"]
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/guilds/{guildId}/channels/visible", guildId)
+                .header("Authorization", member.bearer())
+                .param("memberId", owner.userId().toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void listsAuthenticatedUsersGuildsWithVisibleChannelsForShellBootstrap() throws Exception {
+        AuthSession owner = signup("shell_owner");
+        AuthSession member = signup("shell_member");
+        AuthSession outsider = signup("shell_outsider");
+        String ownedGuildId = createGuild(owner);
+        String memberGuildId = createGuild(member);
+        String hiddenChannelId = createChannel(memberGuildId, "staff", member);
+        String everyoneRoleId = firstRoleId(memberGuildId, member);
+
+        addMember(memberGuildId, owner.userId(), member);
+        mockMvc.perform(put(
+                "/api/guilds/{guildId}/channels/{channelId}/overwrites/roles/{roleId}",
+                memberGuildId,
+                hiddenChannelId,
+                everyoneRoleId
+            )
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "allow": [],
+                      "deny": ["VIEW_CHANNEL"]
+                    }
+                    """))
+            .andExpect(status().isOk());
+        createGuild(outsider);
+        createChannel(ownedGuildId, "general", owner);
+
+        mockMvc.perform(get("/api/users/@me/guilds")
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.guilds", Matchers.hasSize(2)))
+            .andExpect(jsonPath("$.guilds[0].id").value(ownedGuildId))
+            .andExpect(jsonPath("$.guilds[0].ownerId").value(owner.userId().toString()))
+            .andExpect(jsonPath("$.guilds[0].channels[0].name").value("general"))
+            .andExpect(jsonPath("$.guilds[0].channels[0].type").value("GUILD_TEXT"))
+            .andExpect(jsonPath("$.guilds[1].id").value(memberGuildId))
+            .andExpect(jsonPath("$.guilds[1].channels").isEmpty());
+    }
+
+    @Test
+    void rejectsAuthenticatedGuildShellBootstrapWithoutBearerToken() throws Exception {
+        mockMvc.perform(get("/api/users/@me/guilds"))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -88,7 +177,8 @@ class GuildControllerTest {
 
         String roleId = JsonPath.read(roleResult.getResponse().getContentAsString(), "$.id");
 
-        mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+        mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].name").value("@everyone"))
             .andExpect(jsonPath("$[1].id").value(roleId))
@@ -131,9 +221,29 @@ class GuildControllerTest {
             .andExpect(jsonPath("$.id").value(staffChannelId));
 
         mockMvc.perform(get("/api/guilds/{guildId}/channels/visible", guildId)
-                .param("memberId", owner.userId().toString()))
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void rejectsRoleListWithoutBearerToken() throws Exception {
+        AuthSession owner = signup("roles_missing_token_owner");
+        String guildId = createGuild(owner);
+
+        mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectsRoleListForNonMember() throws Exception {
+        AuthSession owner = signup("roles_owner_subject");
+        AuthSession outsider = signup("roles_outsider_subject");
+        String guildId = createGuild(owner);
+
+        mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", outsider.bearer()))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -557,8 +667,18 @@ class GuildControllerTest {
         return JsonPath.read(roleResult.getResponse().getContentAsString(), "$.id");
     }
 
+    private String firstRoleId(String guildId, AuthSession requester) throws Exception {
+        MvcResult roleResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", requester.bearer()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        return JsonPath.read(roleResult.getResponse().getContentAsString(), "$[0].id");
+    }
+
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
+                .header("X-Forwarded-For", testClientIp(username))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -576,6 +696,10 @@ class GuildControllerTest {
             JsonPath.read(body, "$.accessToken"),
             UUID.fromString(JsonPath.read(body, "$.user.id"))
         );
+    }
+
+    private static String testClientIp(String username) {
+        return "2001:db8::" + Integer.toHexString(username.hashCode());
     }
 
     private void addMember(String guildId, UUID memberId, AuthSession owner) throws Exception {

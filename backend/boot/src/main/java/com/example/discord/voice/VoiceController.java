@@ -108,8 +108,9 @@ class VoiceController {
     List<VoiceStateEventResponse> events(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
-        authenticatedUserResolver.requireUserId(authorization);
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         return voiceService.events().stream()
+            .filter(event -> guildService.canViewChannel(event.guildId(), event.channelId(), requesterId))
             .map(VoiceStateEventResponse::from)
             .toList();
     }

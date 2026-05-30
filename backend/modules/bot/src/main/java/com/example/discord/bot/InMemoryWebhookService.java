@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class InMemoryWebhookService {
+    private static final int MAX_AUDIT_EVENTS = 500;
+
     private final Map<UUID, StoredWebhook> webhooks = new LinkedHashMap<>();
     private final List<WebhookAuditEvent> auditEvents = new ArrayList<>();
 
@@ -51,7 +53,7 @@ public final class InMemoryWebhookService {
             throw new SecurityException("webhook send permission is required");
         }
         StoredWebhook stored = webhooks.get(webhookId);
-        if (stored == null || !stored.tokenHash().equals(sha256(token))) {
+        if (stored == null || !secureEquals(stored.tokenHash(), sha256(token))) {
             throw new SecurityException("webhook token is invalid");
         }
         Webhook webhook = stored.webhook();
@@ -76,6 +78,9 @@ public final class InMemoryWebhookService {
 
     private void appendAudit(UUID guildId, UUID actorId, UUID webhookId, WebhookAuditAction action) {
         auditEvents.add(new WebhookAuditEvent(UUID.randomUUID(), guildId, actorId, webhookId, action, Instant.now()));
+        while (auditEvents.size() > MAX_AUDIT_EVENTS) {
+            auditEvents.removeFirst();
+        }
     }
 
     private static String sha256(String token) {
@@ -85,6 +90,13 @@ public final class InMemoryWebhookService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
+    }
+
+    private static boolean secureEquals(String expected, String actual) {
+        return MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8),
+            actual.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private record StoredWebhook(Webhook webhook, String tokenHash) {

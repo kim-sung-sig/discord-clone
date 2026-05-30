@@ -6,6 +6,7 @@ import com.example.discord.channel.ChannelType;
 import com.example.discord.guild.Channel;
 import com.example.discord.guild.Guild;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.Role;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
 import java.time.Clock;
@@ -14,10 +15,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class InMemoryGatewayServiceTest {
+    private static final int EXPECTED_MAX_RETAINED_EVENTS = 1_000;
+
     private final MutableClock clock = new MutableClock(Instant.parse("2026-05-13T00:00:00Z"));
     private final InMemoryGuildService guildService = new InMemoryGuildService();
     private final InMemoryGatewayService gatewayService =
@@ -133,6 +138,24 @@ class InMemoryGatewayServiceTest {
     }
 
     @Test
+    void pollDoesNotReplayMoreThanRetainedEventWindow() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+
+        for (int index = 0; index <= EXPECTED_MAX_RETAINED_EVENTS; index++) {
+            gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "event-" + index));
+        }
+
+        List<GatewayEvent> delivered = gatewayService.poll(identified.session().id(), ownerId, 0L);
+        assertThat(delivered).hasSize(EXPECTED_MAX_RETAINED_EVENTS);
+        assertThat(delivered)
+            .extracting(event -> event.payload().get("name"))
+            .doesNotContain("event-0")
+            .contains("event-1", "event-" + EXPECTED_MAX_RETAINED_EVENTS);
+    }
+
+    @Test
     void pollingFiltersChannelEventsHiddenFromSessionUser() {
         UUID ownerId = UUID.randomUUID();
         UUID memberId = UUID.randomUUID();
@@ -185,6 +208,112 @@ class InMemoryGatewayServiceTest {
     }
 
     @Test
+    void sharedSessionRegistryAllowsResumeOnDifferentGatewayNode() {
+        InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
+        InMemoryGatewaySessionRegistry sessionRegistry = new InMemoryGatewaySessionRegistry();
+        InMemoryGatewayService nodeA = new InMemoryGatewayService(
+            guildService,
+            clock,
+            Duration.ofSeconds(30),
+            eventBus,
+            sessionRegistry
+        );
+        InMemoryGatewayService nodeB = new InMemoryGatewayService(
+            guildService,
+            clock,
+            Duration.ofSeconds(30),
+            eventBus,
+            sessionRegistry
+        );
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel channel = guildService.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        GatewayIdentifyResult identifiedOnNodeA = nodeA.identify(ownerId);
+        GatewayEvent publishedOnNodeA = nodeA.publish(
+            "MESSAGE_CREATE",
+            guild.id(),
+            channel.id(),
+            Map.of("content", "missed while reconnecting")
+        );
+
+        GatewayResumeResult resumedOnNodeB = nodeB.resume(identifiedOnNodeA.session().id(), ownerId, 0L);
+
+        assertThat(resumedOnNodeB.resumed().type()).isEqualTo("RESUMED");
+        assertThat(resumedOnNodeB.events()).extracting(GatewayEvent::busEventId).containsExactly(publishedOnNodeA.busEventId());
+        assertThat(resumedOnNodeB.events())
+            .extracting(event -> event.payload().get("content"))
+            .containsExactly("missed while reconnecting");
+        assertThat(sessionRegistry.find(identifiedOnNodeA.session().id()).orElseThrow().lastDeliveredSequence())
+            .isEqualTo(resumedOnNodeB.events().getFirst().sequence());
+    }
+
+    @Test
+    void resumeOnDifferentNodeRegistersVisibleChannelSubscriptions() {
+        RecordingGatewayEventBus nodeABus = new RecordingGatewayEventBus();
+        RecordingGatewayEventBus nodeBBus = new RecordingGatewayEventBus();
+        InMemoryGatewaySessionRegistry sessionRegistry = new InMemoryGatewaySessionRegistry();
+        InMemoryGatewayService nodeA = new InMemoryGatewayService(
+            guildService,
+            clock,
+            Duration.ofSeconds(30),
+            nodeABus,
+            sessionRegistry
+        );
+        InMemoryGatewayService nodeB = new InMemoryGatewayService(
+            guildService,
+            clock,
+            Duration.ofSeconds(30),
+            nodeBBus,
+            sessionRegistry
+        );
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel channel = guildService.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        GatewayIdentifyResult identifiedOnNodeA = nodeA.identify(ownerId);
+
+        nodeB.resume(identifiedOnNodeA.session().id(), ownerId, 0L);
+
+        assertThat(nodeBBus.subscribedGuilds()).contains(guild.id());
+        assertThat(nodeBBus.subscribedChannels()).contains(channel.id());
+    }
+
+    @Test
+    void pollReconcilesChannelsThatBecameVisibleAfterIdentify() {
+        RecordingGatewayEventBus eventBus = new RecordingGatewayEventBus();
+        InMemoryGatewayService node = new InMemoryGatewayService(
+            guildService,
+            clock,
+            Duration.ofSeconds(30),
+            eventBus
+        );
+        UUID ownerId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel hidden = guildService.createChannel(guild.id(), "staff", ChannelType.GUILD_TEXT, null);
+        guildService.addMember(guild.id(), memberId);
+        denyEveryoneView(guild, hidden);
+        GatewayIdentifyResult identified = node.identify(memberId);
+        assertThat(eventBus.subscribedChannels()).doesNotContain(hidden.id());
+        Role staffRole = guildService.createRole(
+            guild.id(),
+            "staff",
+            PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
+        );
+        guildService.assignRoleToMember(guild.id(), memberId, staffRole.id());
+        guildService.addChannelRoleOverwrite(
+            guild.id(),
+            hidden.id(),
+            staffRole.id(),
+            PermissionSet.empty().grant(Permission.VIEW_CHANNEL),
+            PermissionSet.empty()
+        );
+
+        node.poll(identified.session().id(), memberId, 0L);
+
+        assertThat(eventBus.subscribedChannels()).contains(hidden.id());
+    }
+
+    @Test
     void crossNodeFanoutStillFiltersHiddenChannelEventsAtDeliveryTime() {
         InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
         InMemoryGatewayService nodeA = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
@@ -233,6 +362,51 @@ class InMemoryGatewayServiceTest {
             PermissionSet.empty(),
             PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
         );
+    }
+
+    private static final class RecordingGatewayEventBus implements GatewayEventBus {
+        private final Set<UUID> subscribedGuilds = new java.util.LinkedHashSet<>();
+        private final Set<UUID> subscribedChannels = new java.util.LinkedHashSet<>();
+        private final List<Consumer<GatewayBusEvent>> listeners = new java.util.ArrayList<>();
+
+        @Override
+        public GatewayBusEvent publish(GatewayBusPublishCommand command) {
+            GatewayBusEvent event = new GatewayBusEvent(
+                UUID.randomUUID().toString(),
+                command.type(),
+                command.guildId(),
+                command.channelId(),
+                command.payload(),
+                Instant.parse("2026-05-13T00:00:00Z")
+            );
+            for (Consumer<GatewayBusEvent> listener : List.copyOf(listeners)) {
+                listener.accept(event);
+            }
+            return event;
+        }
+
+        @Override
+        public void addEventListener(Consumer<GatewayBusEvent> listener) {
+            listeners.add(listener);
+        }
+
+        @Override
+        public void subscribeGuild(UUID guildId) {
+            subscribedGuilds.add(guildId);
+        }
+
+        @Override
+        public void subscribeChannel(UUID channelId) {
+            subscribedChannels.add(channelId);
+        }
+
+        Set<UUID> subscribedGuilds() {
+            return Set.copyOf(subscribedGuilds);
+        }
+
+        Set<UUID> subscribedChannels() {
+            return Set.copyOf(subscribedChannels);
+        }
     }
 
     private static final class MutableClock extends Clock {

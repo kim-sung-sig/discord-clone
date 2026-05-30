@@ -30,4 +30,18 @@ interface AuthStore {
     boolean revokeRefreshSession(UUID userId, UUID sessionId, Instant revokedAt);
 
     void revokeAllRefreshSessions(UUID userId, Instant revokedAt);
+
+    boolean grantGlobalRole(UUID userId, String role);
+
+    boolean revokeGlobalRole(UUID userId, String role);
+
+    List<String> globalRolesForUser(UUID userId);
+
+    void recordGlobalRoleAudit(GlobalRoleAuditEntry entry);
+
+    List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId);
+
+    List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId, int limit);
+
+    List<GlobalRoleAuditEntry> globalRoleAuditLog(int limit);
 }

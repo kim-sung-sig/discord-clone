@@ -12,12 +12,14 @@ import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("postgres")
+@EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
 class PostgresAuthStoreTest {
     @Autowired
     private AuthStore store;
@@ -37,6 +39,8 @@ class PostgresAuthStoreTest {
             statement.executeUpdate("DELETE FROM guilds");
             statement.executeUpdate("DELETE FROM auth_refresh_sessions");
             statement.executeUpdate("DELETE FROM auth_revoked_access_tokens");
+            statement.executeUpdate("DELETE FROM user_global_role_audit_log");
+            statement.executeUpdate("DELETE FROM user_global_roles");
             statement.executeUpdate("DELETE FROM auth_accounts");
             statement.executeUpdate("DELETE FROM users");
         }
@@ -114,5 +118,64 @@ class PostgresAuthStoreTest {
             .get()
             .extracting(RefreshSession::revokedAt)
             .isEqualTo(Optional.of(Instant.parse("2026-01-03T00:00:00Z")));
+    }
+
+    @Test
+    void storesGlobalRolesInPostgresWithoutDuplicates() {
+        UUID userId = UUID.randomUUID();
+        EmailAddress email = EmailAddress.from("global-role-" + userId + "@example.com");
+        UserProfile profile = UserProfile.create(
+            userId,
+            Username.from("role" + userId.toString().substring(0, 8)),
+            "Global Role User",
+            Instant.parse("2026-01-01T00:00:00Z")
+        );
+        assertThat(store.saveIfAbsent(new AuthAccount(email, "hashed-password", profile))).isTrue();
+
+        assertThat(store.grantGlobalRole(userId, "security_admin")).isTrue();
+        assertThat(store.grantGlobalRole(userId, "SECURITY_ADMIN")).isFalse();
+        assertThat(store.grantGlobalRole(userId, "SUPPORT_ADMIN")).isTrue();
+
+        assertThat(store.globalRolesForUser(userId)).containsExactly("SECURITY_ADMIN", "SUPPORT_ADMIN");
+        assertThat(store.revokeGlobalRole(userId, "SECURITY_ADMIN")).isTrue();
+        assertThat(store.revokeGlobalRole(userId, "SECURITY_ADMIN")).isFalse();
+        assertThat(store.globalRolesForUser(userId)).containsExactly("SUPPORT_ADMIN");
+        assertThat(store.globalRolesForUser(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void storesGlobalRoleAuditLogInPostgres() {
+        UUID userId = UUID.randomUUID();
+        EmailAddress email = EmailAddress.from("global-role-audit-" + userId + "@example.com");
+        UserProfile profile = UserProfile.create(
+            userId,
+            Username.from("audit" + userId.toString().substring(0, 8)),
+            "Global Role Audit User",
+            Instant.parse("2026-01-01T00:00:00Z")
+        );
+        assertThat(store.saveIfAbsent(new AuthAccount(email, "hashed-password", profile))).isTrue();
+
+        GlobalRoleAuditEntry grant = new GlobalRoleAuditEntry(
+            userId,
+            "security_admin",
+            GlobalRoleAuditAction.GRANT,
+            "ops@example.com",
+            GlobalRoleAuditResult.APPLIED,
+            Instant.parse("2026-05-19T01:00:00Z")
+        );
+        GlobalRoleAuditEntry revokeNoop = new GlobalRoleAuditEntry(
+            userId,
+            "SECURITY_ADMIN",
+            GlobalRoleAuditAction.REVOKE,
+            "ops@example.com",
+            GlobalRoleAuditResult.NOOP,
+            Instant.parse("2026-05-19T01:01:00Z")
+        );
+
+        store.recordGlobalRoleAudit(grant);
+        store.recordGlobalRoleAudit(revokeNoop);
+
+        assertThat(store.globalRoleAuditLog(userId)).containsExactly(grant, revokeNoop);
+        assertThat(store.globalRoleAuditLog(UUID.randomUUID())).isEmpty();
     }
 }

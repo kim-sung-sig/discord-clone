@@ -28,6 +28,8 @@ import org.springframework.web.server.ResponseStatusException;
 class AuthService {
     private static final Logger LOG = LoggerFactory.getLogger(AuthService.class);
     private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
+    private static final int GLOBAL_ROLE_AUDIT_RETENTION_DAYS = 365;
+    private static final int GLOBAL_ROLE_AUDIT_MAX_EXPORT_ENTRIES = 100;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AuthStore store;
@@ -142,8 +144,33 @@ class AuthService {
     AuthController.UserResponse profileForToken(String token) {
         UUID userId = userIdForToken(token);
         return store.findById(userId)
-            .map(AuthService::userResponse)
+            .map(profile -> userResponse(profile, store.globalRolesForUser(profile.id())))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "user not found"));
+    }
+
+    AuthController.GlobalRoleAuditLogResponse globalRoleAuditLog(String token, UUID targetUserId, int limit) {
+        UUID requesterId = userIdForToken(token);
+        if (!store.globalRolesForUser(requesterId).contains(GlobalRole.SECURITY_ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden");
+        }
+        int boundedLimit = Math.min(Math.max(limit, 1), GLOBAL_ROLE_AUDIT_MAX_EXPORT_ENTRIES);
+        Instant retentionCutoff = clock.instant().minus(Duration.ofDays(GLOBAL_ROLE_AUDIT_RETENTION_DAYS));
+        List<GlobalRoleAuditEntry> entries = targetUserId == null
+            ? store.globalRoleAuditLog(boundedLimit)
+            : store.globalRoleAuditLog(targetUserId, boundedLimit);
+        return new AuthController.GlobalRoleAuditLogResponse(entries.stream()
+            .filter(entry -> !entry.occurredAt().isBefore(retentionCutoff))
+            .map(AuthController.GlobalRoleAuditEntryResponse::from)
+            .toList(),
+            new AuthController.GlobalRoleAuditRetentionPolicyResponse(
+                GLOBAL_ROLE_AUDIT_RETENTION_DAYS,
+                retentionCutoff
+            ),
+            new AuthController.GlobalRoleAuditExportPolicyResponse(
+                List.of("json"),
+                GLOBAL_ROLE_AUDIT_MAX_EXPORT_ENTRIES,
+                GlobalRole.SECURITY_ADMIN
+            ));
     }
 
     private UUID userIdForToken(String token) {
@@ -165,7 +192,7 @@ class AuthService {
     }
 
     private AuthController.AuthResponse authResponse(UserProfile profile) {
-        return new AuthController.AuthResponse(accessTokenService.issue(profile.id()), userResponse(profile));
+        return new AuthController.AuthResponse(accessTokenService.issue(profile.id()), userResponse(profile, store.globalRolesForUser(profile.id())));
     }
 
     private AuthResult authResult(UserProfile profile, String deviceName) {
@@ -216,12 +243,32 @@ class AuthService {
         return normalized.length() <= 160 ? normalized : normalized.substring(0, 160);
     }
 
-    private static AuthController.UserResponse userResponse(UserProfile profile) {
+    private static AuthController.UserResponse userResponse(UserProfile profile, List<String> roles) {
         return new AuthController.UserResponse(
             profile.id(),
             profile.username().value(),
-            profile.displayName()
+            profile.displayName(),
+            roles,
+            roles.contains(GlobalRole.SECURITY_ADMIN)
         );
+    }
+}
+
+final class GlobalRole {
+    static final String SECURITY_ADMIN = "SECURITY_ADMIN";
+
+    private GlobalRole() {
+    }
+
+    static String canonical(String role) {
+        if (role == null || role.isBlank()) {
+            throw new IllegalArgumentException("global role is required");
+        }
+        String canonical = role.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!canonical.matches("[A-Z0-9_]{1,64}")) {
+            throw new IllegalArgumentException("global role is invalid");
+        }
+        return canonical;
     }
 }
 

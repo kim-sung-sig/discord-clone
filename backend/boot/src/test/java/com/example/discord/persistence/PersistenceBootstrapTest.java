@@ -8,12 +8,14 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("postgres")
+@EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
 class PersistenceBootstrapTest {
     @Autowired
     private DataSource dataSource;
@@ -24,6 +26,10 @@ class PersistenceBootstrapTest {
     @Test
     void postgresProfileRunsFlywayAndCreatesCoreTables() throws Exception {
         assertThat(flyway.info().current()).isNotNull();
+        assertThat(flyway.getConfiguration().getLocations())
+            .extracting(location -> location.getDescriptor())
+            .contains("classpath:db/migration");
+        assertThat(flyway.getConfiguration().isBaselineOnMigrate()).isTrue();
 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {

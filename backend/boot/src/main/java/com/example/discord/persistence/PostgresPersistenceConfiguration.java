@@ -25,11 +25,15 @@ class PostgresPersistenceConfiguration {
     }
 
     @Bean(initMethod = "migrate")
-    Flyway postgresFlyway(DataSource postgresDataSource) {
+    Flyway postgresFlyway(
+        DataSource postgresDataSource,
+        @Value("${spring.flyway.locations:classpath:db/migration}") String locations,
+        @Value("${spring.flyway.baseline-on-migrate:true}") boolean baselineOnMigrate
+    ) {
         return Flyway.configure()
             .dataSource(postgresDataSource)
-            .locations("classpath:db/migration")
-            .baselineOnMigrate(true)
+            .locations(locations)
+            .baselineOnMigrate(baselineOnMigrate)
             .load();
     }
 }

@@ -10,6 +10,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class InMemoryModerationService {
+    private static final int DEFAULT_PAGE_SIZE = 50;
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_AUDIT_LOGS_PER_GUILD = 500;
+    private static final int MAX_SECURITY_ALERTS_PER_GUILD = 500;
+    private static final int MAX_MESSAGE_REPORTS_PER_GUILD = 500;
+
     private final Map<UUID, List<OnboardingQuestion>> onboardingQuestionsByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<AutoModRule>> autoModRulesByGuild = new LinkedHashMap<>();
     private final Map<UUID, List<AuditLogEntry>> auditLogsByGuild = new LinkedHashMap<>();
@@ -91,7 +97,7 @@ public final class InMemoryModerationService {
     }
 
     public synchronized List<AuditLogEntry> auditLogs(UUID guildId) {
-        return auditLogs(guildId, null, null, null);
+        return auditLogs(guildId, null, null, null, DEFAULT_PAGE_SIZE);
     }
 
     public synchronized List<AuditLogEntry> auditLogs(
@@ -100,18 +106,32 @@ public final class InMemoryModerationService {
         UUID actorId,
         UUID targetId
     ) {
+        return auditLogs(guildId, action, actorId, targetId, DEFAULT_PAGE_SIZE);
+    }
+
+    public synchronized List<AuditLogEntry> auditLogs(
+        UUID guildId,
+        AuditLogAction action,
+        UUID actorId,
+        UUID targetId,
+        int limit
+    ) {
         List<AuditLogEntry> entries = new ArrayList<>(auditLogsByGuild.getOrDefault(guildId, List.of()));
         entries.removeIf(entry -> action != null && entry.action() != action);
         entries.removeIf(entry -> actorId != null && !entry.actorId().equals(actorId));
         entries.removeIf(entry -> targetId != null && !entry.targetId().equals(targetId));
         entries.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
-        return List.copyOf(entries);
+        return entries.stream().limit(pageSize(limit)).toList();
     }
 
     public synchronized List<SecurityAlert> securityAlerts(UUID guildId) {
+        return securityAlerts(guildId, DEFAULT_PAGE_SIZE);
+    }
+
+    public synchronized List<SecurityAlert> securityAlerts(UUID guildId, int limit) {
         List<SecurityAlert> alerts = new ArrayList<>(securityAlertsByGuild.getOrDefault(guildId, List.of()));
         alerts.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
-        return List.copyOf(alerts);
+        return alerts.stream().limit(pageSize(limit)).toList();
     }
 
     public synchronized MessageReport reportMessage(ReportMessageCommand command) {
@@ -132,7 +152,11 @@ public final class InMemoryModerationService {
             now,
             now
         );
-        messageReportsByGuild.computeIfAbsent(command.guildId(), ignored -> new ArrayList<>()).add(report);
+        appendBounded(
+            messageReportsByGuild.computeIfAbsent(command.guildId(), ignored -> new ArrayList<>()),
+            report,
+            MAX_MESSAGE_REPORTS_PER_GUILD
+        );
         appendAudit(command.guildId(), AuditLogAction.MESSAGE_REPORTED, command.reporterId(), command.messageId(), "message reported");
         return report;
     }
@@ -177,16 +201,26 @@ public final class InMemoryModerationService {
     }
 
     public synchronized List<MessageReport> pendingMessageReports(UUID guildId) {
+        return pendingMessageReports(guildId, DEFAULT_PAGE_SIZE);
+    }
+
+    public synchronized List<MessageReport> pendingMessageReports(UUID guildId, int limit) {
         return messageReportsByGuild.getOrDefault(guildId, List.of()).stream()
             .filter(report -> report.status() == MessageReportStatus.OPEN)
+            .limit(pageSize(limit))
             .toList();
     }
 
     public synchronized List<MessageReport> messageReports(UUID guildId, UUID messageId) {
+        return messageReports(guildId, messageId, DEFAULT_PAGE_SIZE);
+    }
+
+    public synchronized List<MessageReport> messageReports(UUID guildId, UUID messageId, int limit) {
         require(guildId, "guildId");
         require(messageId, "messageId");
         return messageReportsByGuild.getOrDefault(guildId, List.of()).stream()
             .filter(report -> report.messageId().equals(messageId))
+            .limit(pageSize(limit))
             .toList();
     }
 
@@ -198,7 +232,11 @@ public final class InMemoryModerationService {
             throw new IllegalArgumentException("action is required");
         }
         AuditLogEntry entry = new AuditLogEntry(UUID.randomUUID(), guildId, action, actorId, targetId, reason, nextAuditInstant());
-        auditLogsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(entry);
+        appendBounded(
+            auditLogsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()),
+            entry,
+            MAX_AUDIT_LOGS_PER_GUILD
+        );
     }
 
     private Instant nextAuditInstant() {
@@ -212,7 +250,11 @@ public final class InMemoryModerationService {
 
     private void appendSecurityAlert(UUID guildId, UUID actorId, UUID targetId, String type, String severity, String reason) {
         SecurityAlert alert = new SecurityAlert(UUID.randomUUID(), guildId, actorId, targetId, type, severity, reason, Instant.now());
-        securityAlertsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()).add(alert);
+        appendBounded(
+            securityAlertsByGuild.computeIfAbsent(guildId, ignored -> new ArrayList<>()),
+            alert,
+            MAX_SECURITY_ALERTS_PER_GUILD
+        );
     }
 
     private static boolean containsKeyword(String normalizedContent, List<String> keywords) {
@@ -222,6 +264,20 @@ public final class InMemoryModerationService {
     private static void require(UUID value, String name) {
         if (value == null) {
             throw new IllegalArgumentException(name + " is required");
+        }
+    }
+
+    private static int pageSize(int limit) {
+        if (limit < 1) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(limit, MAX_PAGE_SIZE);
+    }
+
+    private static <T> void appendBounded(List<T> entries, T entry, int maxEntries) {
+        entries.add(entry);
+        while (entries.size() > maxEntries) {
+            entries.removeFirst();
         }
     }
 }

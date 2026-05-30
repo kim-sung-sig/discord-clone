@@ -232,6 +232,147 @@ class JdbcAuthStore implements AuthStore {
         }
     }
 
+    @Override
+    public boolean grantGlobalRole(UUID userId, String role) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 INSERT INTO user_global_roles(user_id, role)
+                 VALUES (?, ?)
+                 ON CONFLICT (user_id, role) DO NOTHING
+                 """)) {
+            statement.setObject(1, userId);
+            statement.setString(2, GlobalRole.canonical(role));
+            return statement.executeUpdate() > 0;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to grant global role", exception);
+        }
+    }
+
+    @Override
+    public boolean revokeGlobalRole(UUID userId, String role) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 DELETE FROM user_global_roles
+                 WHERE user_id = ?
+                   AND role = ?
+                 """)) {
+            statement.setObject(1, userId);
+            statement.setString(2, GlobalRole.canonical(role));
+            return statement.executeUpdate() > 0;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to revoke global role", exception);
+        }
+    }
+
+    @Override
+    public List<String> globalRolesForUser(UUID userId) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT role
+                 FROM user_global_roles
+                 WHERE user_id = ?
+                 ORDER BY role ASC
+                 """)) {
+            statement.setObject(1, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<String> roles = new java.util.ArrayList<>();
+                while (resultSet.next()) {
+                    roles.add(resultSet.getString("role"));
+                }
+                return List.copyOf(roles);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list global roles", exception);
+        }
+    }
+
+    @Override
+    public void recordGlobalRoleAudit(GlobalRoleAuditEntry entry) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 INSERT INTO user_global_role_audit_log(target_user_id, role, action, actor, result, occurred_at)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 """)) {
+            statement.setObject(1, entry.targetUserId());
+            statement.setString(2, GlobalRole.canonical(entry.role()));
+            statement.setString(3, entry.action().name());
+            statement.setString(4, entry.actor());
+            statement.setString(5, entry.result().name());
+            statement.setTimestamp(6, Timestamp.from(entry.occurredAt()));
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to record global role audit log", exception);
+        }
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT target_user_id, role, action, actor, result, occurred_at
+                 FROM user_global_role_audit_log
+                 WHERE target_user_id = ?
+                 ORDER BY occurred_at ASC
+                 """)) {
+            statement.setObject(1, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<GlobalRoleAuditEntry> entries = new java.util.ArrayList<>();
+                while (resultSet.next()) {
+                    entries.add(mapGlobalRoleAuditEntry(resultSet));
+                }
+                return List.copyOf(entries);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list global role audit log", exception);
+        }
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(UUID userId, int limit) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT target_user_id, role, action, actor, result, occurred_at
+                 FROM user_global_role_audit_log
+                 WHERE target_user_id = ?
+                 ORDER BY occurred_at DESC
+                 LIMIT ?
+                 """)) {
+            statement.setObject(1, userId);
+            statement.setInt(2, Math.max(0, limit));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<GlobalRoleAuditEntry> entries = new java.util.ArrayList<>();
+                while (resultSet.next()) {
+                    entries.add(mapGlobalRoleAuditEntry(resultSet));
+                }
+                return List.copyOf(entries);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list global role audit log", exception);
+        }
+    }
+
+    @Override
+    public List<GlobalRoleAuditEntry> globalRoleAuditLog(int limit) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT target_user_id, role, action, actor, result, occurred_at
+                 FROM user_global_role_audit_log
+                 ORDER BY occurred_at DESC
+                 LIMIT ?
+                 """)) {
+            statement.setInt(1, Math.max(0, limit));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<GlobalRoleAuditEntry> entries = new java.util.ArrayList<>();
+                while (resultSet.next()) {
+                    entries.add(mapGlobalRoleAuditEntry(resultSet));
+                }
+                return List.copyOf(entries);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list global role audit log", exception);
+        }
+    }
+
     private static void insertUser(Connection connection, UserProfile profile) throws SQLException {
         try (var statement = connection.prepareStatement("""
             INSERT INTO users(id, username, display_name, created_at, updated_at)
@@ -312,6 +453,17 @@ class JdbcAuthStore implements AuthStore {
             Username.from(resultSet.getString("username")),
             resultSet.getString("display_name"),
             createdAt
+        );
+    }
+
+    private static GlobalRoleAuditEntry mapGlobalRoleAuditEntry(ResultSet resultSet) throws SQLException {
+        return new GlobalRoleAuditEntry(
+            resultSet.getObject("target_user_id", UUID.class),
+            resultSet.getString("role"),
+            GlobalRoleAuditAction.valueOf(resultSet.getString("action")),
+            resultSet.getString("actor"),
+            GlobalRoleAuditResult.valueOf(resultSet.getString("result")),
+            resultSet.getTimestamp("occurred_at").toInstant()
         );
     }
 

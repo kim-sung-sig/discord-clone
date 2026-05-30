@@ -136,6 +136,19 @@ class ThreadControllerTest {
             .andExpect(jsonPath("$.tagIds[0]").value(tagId));
     }
 
+    @Test
+    void archiveExpiredRequiresBearerToken() throws Exception {
+        AuthSession user = signup("thread_archive_expired_user");
+
+        mockMvc.perform(post("/api/threads/archive-expired"))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/threads/archive-expired")
+                .header("Authorization", user.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.archivedCount").value(0));
+    }
+
     private String createGuild(AuthSession owner) throws Exception {
         MvcResult guildResult = mockMvc.perform(post("/api/guilds")
                 .header("Authorization", owner.bearer())
@@ -215,7 +228,8 @@ class ThreadControllerTest {
     }
 
     private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
-        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -239,6 +253,7 @@ class ThreadControllerTest {
 
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
+                .header("X-Forwarded-For", testClientIp(username))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -256,6 +271,10 @@ class ThreadControllerTest {
             JsonPath.read(body, "$.accessToken"),
             UUID.fromString(JsonPath.read(body, "$.user.id"))
         );
+    }
+
+    private static String testClientIp(String username) {
+        return "2001:db8::" + Integer.toHexString(username.hashCode());
     }
 
     private record AuthSession(String accessToken, UUID userId) {

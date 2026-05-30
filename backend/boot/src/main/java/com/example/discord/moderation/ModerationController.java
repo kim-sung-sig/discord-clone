@@ -109,10 +109,11 @@ class ModerationController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestParam(required = false) AuditLogAction action,
         @RequestParam(required = false) UUID actorId,
-        @RequestParam(required = false) UUID targetId
+        @RequestParam(required = false) UUID targetId,
+        @RequestParam(defaultValue = "50") int limit
     ) {
         requireManageMessages(guildId, authorization);
-        return moderationService.auditLogs(guildId, action, actorId, targetId).stream()
+        return moderationService.auditLogs(guildId, action, actorId, targetId, limit).stream()
             .map(AuditLogEntryResponse::from)
             .toList();
     }
@@ -120,10 +121,11 @@ class ModerationController {
     @GetMapping("/security-alerts")
     List<SecurityAlertResponse> securityAlerts(
         @PathVariable UUID guildId,
-        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestParam(defaultValue = "50") int limit
     ) {
         requireManageMessages(guildId, authorization);
-        return moderationService.securityAlerts(guildId).stream()
+        return moderationService.securityAlerts(guildId, limit).stream()
             .map(SecurityAlertResponse::from)
             .toList();
     }

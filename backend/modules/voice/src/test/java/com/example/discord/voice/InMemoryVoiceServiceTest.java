@@ -2,6 +2,7 @@ package com.example.discord.voice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -9,6 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class InMemoryVoiceServiceTest {
+    private static final int EXPECTED_MAX_RETAINED_EVENTS = 1_000;
     private static final UUID GUILD_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000102");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000103");
@@ -99,5 +101,24 @@ class InMemoryVoiceServiceTest {
             true,
             NOW
         ));
+    }
+
+    @Test
+    void eventLogRetainsOnlyMostRecentVoiceStateEvents() {
+        UUID firstUserId = userId(0);
+
+        for (int index = 0; index <= EXPECTED_MAX_RETAINED_EVENTS; index++) {
+            service.join(GUILD_ID, CHANNEL_ID, userId(index));
+        }
+
+        assertThat(service.events()).hasSize(EXPECTED_MAX_RETAINED_EVENTS);
+        assertThat(service.events())
+            .extracting(VoiceStateEvent::userId)
+            .doesNotContain(firstUserId)
+            .contains(userId(1), userId(EXPECTED_MAX_RETAINED_EVENTS));
+    }
+
+    private static UUID userId(int index) {
+        return UUID.nameUUIDFromBytes(("voice-user-" + index).getBytes(StandardCharsets.UTF_8));
     }
 }

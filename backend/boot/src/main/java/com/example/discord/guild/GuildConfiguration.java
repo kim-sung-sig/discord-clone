@@ -15,7 +15,7 @@ class GuildConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
-    @Profile("!postgres")
+    @Profile("!postgres & !production & !admin-cli")
     InMemoryGuildService inMemoryGuildService() {
         return new InMemoryGuildService();
     }

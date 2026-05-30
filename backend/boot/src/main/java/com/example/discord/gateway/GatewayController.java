@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -107,8 +109,13 @@ class GatewayController {
         if (!guildService.isGuildMemberOrOwner(request.guildId(), userId)) {
             throw new GatewayForbiddenException("guild membership required");
         }
-        if (request.channelId() != null && !guildService.channelBelongsToGuild(request.guildId(), request.channelId())) {
-            throw new IllegalArgumentException("channel does not belong to guild");
+        if (request.channelId() != null) {
+            if (!guildService.channelBelongsToGuild(request.guildId(), request.channelId())) {
+                throw new IllegalArgumentException("channel does not belong to guild");
+            }
+            if (!guildService.canViewChannel(request.guildId(), request.channelId(), userId)) {
+                throw new GatewayForbiddenException("channel visibility required");
+            }
         }
         GatewayEvent event = gatewayService.publish(request.type(), request.guildId(), request.channelId(), request.payload());
         return ResponseEntity.status(HttpStatus.CREATED).body(EventResponse.from(event));
@@ -118,9 +125,19 @@ class GatewayController {
         if (internalPublisherToken == null || internalPublisherToken.isBlank()) {
             throw new GatewayForbiddenException("internal gateway publisher disabled");
         }
-        if (!internalPublisherToken.equals(internalPublisher)) {
+        if (!secureEquals(internalPublisherToken, internalPublisher)) {
             throw new GatewayForbiddenException("internal gateway publisher required");
         }
+    }
+
+    private static boolean secureEquals(String expected, String actual) {
+        if (expected == null || actual == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8),
+            actual.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private static void requireRequest(Object request) {

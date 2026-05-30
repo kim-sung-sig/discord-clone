@@ -1,6 +1,7 @@
 package com.example.discord.presence;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
+import com.example.discord.guild.InMemoryGuildService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -19,15 +20,22 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/presence")
 class PresenceController {
     private final InMemoryPresenceService presenceService;
+    private final InMemoryGuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    PresenceController(InMemoryPresenceService presenceService, AuthenticatedUserResolver authenticatedUserResolver) {
+    PresenceController(
+        InMemoryPresenceService presenceService,
+        InMemoryGuildService guildService,
+        AuthenticatedUserResolver authenticatedUserResolver
+    ) {
         this.presenceService = presenceService;
+        this.guildService = guildService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -58,6 +66,7 @@ class PresenceController {
         @RequestBody TypingRequest request
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireCanViewChannel(channelId, requesterId);
         requireRequest(request);
         presenceService.startTyping(channelId, requesterId, ttl(request.ttlSeconds()));
         return ResponseEntity.noContent().build();
@@ -68,7 +77,8 @@ class PresenceController {
         @PathVariable UUID channelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
-        authenticatedUserResolver.requireUserId(authorization);
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireCanViewChannel(channelId, requesterId);
         return new TypingUsersResponse(presenceService.typingUsers(channelId));
     }
 
@@ -79,6 +89,7 @@ class PresenceController {
         @RequestBody ReadMarkerRequest request
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireCanViewChannel(channelId, requesterId);
         requireRequest(request);
         return ReadMarkerResponse.from(presenceService.markRead(channelId, requesterId, request.lastReadSequence()));
     }
@@ -90,6 +101,7 @@ class PresenceController {
         @RequestBody UnreadCountRequest request
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireCanViewChannel(channelId, requesterId);
         requireRequest(request);
         return new UnreadCountResponse(presenceService.unreadCount(
             channelId,
@@ -97,6 +109,13 @@ class PresenceController {
             request.lastMessageSequence(),
             request.authoredSequences()
         ));
+    }
+
+    private void requireCanViewChannel(UUID channelId, UUID requesterId) {
+        UUID guildId = guildService.guildIdForChannel(channelId);
+        if (!guildService.canViewChannel(guildId, channelId, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
+        }
     }
 
     private static void requireRequest(Object request) {

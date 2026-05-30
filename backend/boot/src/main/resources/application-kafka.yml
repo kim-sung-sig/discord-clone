@@ -1,0 +1,10 @@
+spring:
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:29092}
+
+discord:
+  kafka:
+    enabled: ${DISCORD_KAFKA_ENABLED:true}
+    topic-prefix: ${DISCORD_KAFKA_TOPIC_PREFIX:discord}
+    gateway-dlq-retention-hours: ${DISCORD_KAFKA_GATEWAY_DLQ_RETENTION_HOURS:168}
+    gateway-dlq-alert-threshold: ${DISCORD_KAFKA_GATEWAY_DLQ_ALERT_THRESHOLD:1}

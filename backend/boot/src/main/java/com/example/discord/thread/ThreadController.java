@@ -142,7 +142,10 @@ class ThreadController {
     }
 
     @PostMapping("/api/threads/archive-expired")
-    ArchiveExpiredResponse archiveExpired() {
+    ArchiveExpiredResponse archiveExpired(
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        authenticatedUserResolver.requireUserId(authorization);
         return new ArchiveExpiredResponse(threadService.archiveExpired());
     }
 

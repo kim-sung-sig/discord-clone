@@ -3,3 +3,6 @@ spring:
     url: ${POSTGRES_JDBC_URL:jdbc:postgresql://127.0.0.1:15432/discord}
     username: ${POSTGRES_USER:dev_user}
     password: ${POSTGRES_PASSWORD:dev_password}
+  flyway:
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}

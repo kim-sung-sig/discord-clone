@@ -112,6 +112,34 @@ class AttachmentControllerTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void cleanupOnlyDeletesRequestersOwnOrphans() throws Exception {
+        AuthSession owner = signup("attachment_cleanup_scoped_owner");
+        AuthSession other = signup("attachment_cleanup_scoped_other");
+        String ownerGuildId = createGuild(owner);
+        String ownerChannelId = createChannel(ownerGuildId, "general", owner);
+        String otherGuildId = createGuild(other);
+        String otherChannelId = createChannel(otherGuildId, "general", other);
+        String ownerAttachmentId = requestUpload(ownerChannelId, "owner-orphan.png", "image/png", owner);
+        String otherAttachmentId = requestUpload(otherChannelId, "other-orphan.png", "image/png", other);
+        markUploaded(ownerAttachmentId, owner);
+        markUploaded(otherAttachmentId, other);
+        Thread.sleep(5);
+
+        mockMvc.perform(delete("/api/attachments/orphans")
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.deletedCount").value(1));
+
+        mockMvc.perform(get("/api/attachments/{attachmentId}/download", ownerAttachmentId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/attachments/orphans")
+                .header("Authorization", other.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.deletedCount").value(1));
+    }
+
     private String requestUpload(String channelId, String filename, String contentType, AuthSession requester) throws Exception {
         MvcResult upload = mockMvc.perform(post("/api/attachments/uploads")
                 .header("Authorization", requester.bearer())

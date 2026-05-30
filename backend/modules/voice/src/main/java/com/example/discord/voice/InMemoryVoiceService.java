@@ -13,6 +13,7 @@ import java.util.UUID;
 
 public final class InMemoryVoiceService {
     private static final long TOKEN_TTL_SECONDS = 900L;
+    static final int MAX_RETAINED_EVENTS = 1_000;
 
     private final Clock clock;
     private final VoiceTokenSigner tokenSigner;
@@ -37,7 +38,7 @@ public final class InMemoryVoiceService {
             now
         );
         participants.put(new VoiceKey(guildId, channelId, userId), participant);
-        events.add(VoiceStateEvent.from(VoiceStateEvent.JOINED, participant, now));
+        appendEvent(VoiceStateEvent.from(VoiceStateEvent.JOINED, participant, now));
         return new VoiceJoinResult(participant, tokenSigner.sign(new VoiceTokenSigningRequest(
             guildId,
             channelId,
@@ -52,7 +53,7 @@ public final class InMemoryVoiceService {
         if (removed != null) {
             Instant now = clock.instant();
             VoiceParticipantState left = removed.withState(false, false, false, false, now);
-            events.add(VoiceStateEvent.from(VoiceStateEvent.LEFT, left, now));
+            appendEvent(VoiceStateEvent.from(VoiceStateEvent.LEFT, left, now));
             return Optional.of(left);
         }
         return Optional.empty();
@@ -73,7 +74,7 @@ public final class InMemoryVoiceService {
             now
         );
         participants.put(key, updated);
-        events.add(VoiceStateEvent.from(VoiceStateEvent.UPDATED, updated, now));
+        appendEvent(VoiceStateEvent.from(VoiceStateEvent.UPDATED, updated, now));
         return updated;
     }
 
@@ -86,6 +87,13 @@ public final class InMemoryVoiceService {
 
     public synchronized List<VoiceStateEvent> events() {
         return List.copyOf(events);
+    }
+
+    private void appendEvent(VoiceStateEvent event) {
+        events.add(event);
+        while (events.size() > MAX_RETAINED_EVENTS) {
+            events.remove(0);
+        }
     }
 
     private record VoiceKey(UUID guildId, UUID channelId, UUID userId) {

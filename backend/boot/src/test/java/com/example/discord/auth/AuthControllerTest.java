@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
+import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,23 +22,29 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
 class AuthControllerTest {
     private static final String REFRESH_COOKIE = "dc_refresh";
+    private static final AtomicInteger SIGNUP_IP_COUNTER = new AtomicInteger(10);
     private static final AtomicInteger LOGIN_IP_COUNTER = new AtomicInteger(10);
 
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private AuthStore authStore;
+
     @Test
     void signsUpAndReturnsAccessTokenWithProfile() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        MvcResult signup = mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -50,12 +58,37 @@ class AuthControllerTest {
             .andExpect(cookie().httpOnly(REFRESH_COOKIE, true))
             .andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
             .andExpect(jsonPath("$.user.username").value("vibe_signup"))
-            .andExpect(jsonPath("$.user.displayName").value("Vibe Signup"));
+            .andExpect(jsonPath("$.user.displayName").value("Vibe Signup"))
+            .andReturn();
+
+        assertRefreshSetCookie(signup)
+            .contains("HttpOnly", "Path=/api/auth", "Max-Age=604800", "SameSite=Lax")
+            .doesNotContain("Secure");
+    }
+
+    @Test
+    void forwardedHttpsSignupMarksRefreshCookieSecure() throws Exception {
+        MvcResult signup = mockMvc.perform(signupRequest()
+                .header("X-Forwarded-Proto", "https")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "secure-cookie@example.com",
+                      "username": "vibe_secure_cookie",
+                      "displayName": "Vibe Secure Cookie",
+                      "password": "correct horse battery staple"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        assertRefreshSetCookie(signup)
+            .contains("Secure", "SameSite=Lax", "Path=/api/auth");
     }
 
     @Test
     void logsInAndUsesBearerTokenForMeProfile() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -91,8 +124,116 @@ class AuthControllerTest {
     }
 
     @Test
+    void exposesBackendOwnedGlobalAdminRoleOnMeProfile() throws Exception {
+        MvcResult signup = mockMvc.perform(signupRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "security-admin@example.com",
+                      "username": "security_admin",
+                      "displayName": "Security Admin",
+                      "password": "correct horse battery staple"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.user.admin").value(false))
+            .andExpect(jsonPath("$.user.roles", hasSize(0)))
+            .andReturn();
+
+        String token = com.jayway.jsonpath.JsonPath.read(signup.getResponse().getContentAsString(), "$.accessToken");
+        String userId = com.jayway.jsonpath.JsonPath.read(signup.getResponse().getContentAsString(), "$.user.id");
+        authStore.grantGlobalRole(java.util.UUID.fromString(userId), "SECURITY_ADMIN");
+
+        mockMvc.perform(get("/api/users/@me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.username").value("security_admin"))
+            .andExpect(jsonPath("$.roles[0]").value("SECURITY_ADMIN"))
+            .andExpect(jsonPath("$.admin").value(true));
+    }
+
+    @Test
+    void securityAdminCanReviewGlobalRoleAuditEntries() throws Exception {
+        MvcResult adminSignup = signupResult("audit-review-admin@example.com", "audit_admin", "Audit Admin");
+        String adminToken = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.accessToken");
+        String adminId = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.user.id");
+        authStore.grantGlobalRole(UUID.fromString(adminId), "SECURITY_ADMIN");
+
+        MvcResult targetSignup = signupResult("audit-review-target@example.com", "audit_target", "Audit Target");
+        UUID targetUserId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(
+            targetSignup.getResponse().getContentAsString(),
+            "$.user.id"
+        ));
+        authStore.recordGlobalRoleAudit(new GlobalRoleAuditEntry(
+            targetUserId,
+            "SECURITY_ADMIN",
+            GlobalRoleAuditAction.GRANT,
+            "ops-console",
+            GlobalRoleAuditResult.APPLIED,
+            Instant.parse("2026-05-20T00:00:00Z")
+        ));
+
+        mockMvc.perform(get("/api/admin/global-roles/audit-log")
+                .queryParam("targetUserId", targetUserId.toString())
+                .queryParam("limit", "1")
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.entries", hasSize(1)))
+            .andExpect(jsonPath("$.entries[0].targetUserId").value(targetUserId.toString()))
+            .andExpect(jsonPath("$.entries[0].role").value("SECURITY_ADMIN"))
+            .andExpect(jsonPath("$.entries[0].action").value("GRANT"))
+            .andExpect(jsonPath("$.entries[0].actor").value("ops-console"))
+            .andExpect(jsonPath("$.entries[0].result").value("APPLIED"))
+            .andExpect(jsonPath("$.entries[0].occurredAt").value("2026-05-20T00:00:00Z"))
+            .andExpect(jsonPath("$.retention.maxAgeDays").value(365))
+            .andExpect(jsonPath("$.export.formats[0]").value("json"))
+            .andExpect(jsonPath("$.export.maxEntriesPerRequest").value(100))
+            .andExpect(jsonPath("$.export.requiresRole").value("SECURITY_ADMIN"));
+    }
+
+    @Test
+    void globalRoleAuditReviewOmitsEntriesOutsideRetentionPolicy() throws Exception {
+        MvcResult adminSignup = signupResult("audit-retention-admin@example.com", "audit_retention_admin", "Audit Retention Admin");
+        String adminToken = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.accessToken");
+        String adminId = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.user.id");
+        authStore.grantGlobalRole(UUID.fromString(adminId), "SECURITY_ADMIN");
+
+        MvcResult targetSignup = signupResult("audit-retention-target@example.com", "audit_retention_target", "Audit Retention Target");
+        UUID targetUserId = UUID.fromString(com.jayway.jsonpath.JsonPath.read(
+            targetSignup.getResponse().getContentAsString(),
+            "$.user.id"
+        ));
+        authStore.recordGlobalRoleAudit(new GlobalRoleAuditEntry(
+            targetUserId,
+            "SECURITY_ADMIN",
+            GlobalRoleAuditAction.GRANT,
+            "ops-console",
+            GlobalRoleAuditResult.APPLIED,
+            Instant.parse("2020-01-01T00:00:00Z")
+        ));
+
+        mockMvc.perform(get("/api/admin/global-roles/audit-log")
+                .queryParam("targetUserId", targetUserId.toString())
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.entries", hasSize(0)))
+            .andExpect(jsonPath("$.retention.maxAgeDays").value(365));
+    }
+
+    @Test
+    void rejectsNonSecurityAdminGlobalRoleAuditReview() throws Exception {
+        MvcResult signup = signupResult("audit-review-member@example.com", "audit_member", "Audit Member");
+        String token = com.jayway.jsonpath.JsonPath.read(signup.getResponse().getContentAsString(), "$.accessToken");
+
+        mockMvc.perform(get("/api/admin/global-roles/audit-log")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value("forbidden"));
+    }
+
+    @Test
     void locksLoginAfterRepeatedInvalidPasswordAttempts() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -132,7 +273,7 @@ class AuthControllerTest {
 
     @Test
     void duplicateSignupReturnsConflictAndDoesNotOverwriteExistingAccount() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -144,7 +285,7 @@ class AuthControllerTest {
                     """))
             .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -180,7 +321,7 @@ class AuthControllerTest {
 
     @Test
     void logoutRevokesBearerToken() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -309,7 +450,7 @@ class AuthControllerTest {
 
     @Test
     void invalidSignupEmailReturnsBadRequest() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -329,8 +470,27 @@ class AuthControllerTest {
             .andExpect(status().isNoContent());
     }
 
+    @Test
+    void logoutClearsRefreshCookieWithMatchingAttributes() throws Exception {
+        MvcResult signup = signupResult("clear-cookie@example.com", "vibe_clear_cookie", "Vibe Clear Cookie");
+        Cookie refreshCookie = refreshCookie(signup);
+
+        MvcResult logout = mockMvc.perform(post("/api/auth/logout")
+                .cookie(refreshCookie))
+            .andExpect(status().isNoContent())
+            .andReturn();
+
+        assertRefreshSetCookie(logout)
+            .contains("dc_refresh=", "HttpOnly", "Path=/api/auth", "Max-Age=0", "SameSite=Lax")
+            .doesNotContain("Secure");
+    }
+
     private void signup(String email, String username, String displayName) throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        signupResult(email, username, displayName);
+    }
+
+    private MvcResult signupResult(String email, String username, String displayName) throws Exception {
+        return mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -340,7 +500,13 @@ class AuthControllerTest {
                       "password": "correct horse battery staple"
                     }
                     """.formatted(email, username, displayName)))
-            .andExpect(status().isCreated());
+            .andExpect(status().isCreated())
+            .andReturn();
+    }
+
+    private static MockHttpServletRequestBuilder signupRequest() {
+        return post("/api/auth/signup")
+            .header("X-Forwarded-For", "203.0.113." + SIGNUP_IP_COUNTER.getAndIncrement());
     }
 
     private MvcResult login(String email, String password, String userAgent) throws Exception {
@@ -362,5 +528,11 @@ class AuthControllerTest {
         Cookie cookie = result.getResponse().getCookie(REFRESH_COOKIE);
         org.assertj.core.api.Assertions.assertThat(cookie).isNotNull();
         return cookie;
+    }
+
+    private static org.assertj.core.api.AbstractStringAssert<?> assertRefreshSetCookie(MvcResult result) {
+        return assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+            .isNotNull()
+            .startsWith(REFRESH_COOKIE + "=");
     }
 }

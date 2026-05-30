@@ -50,7 +50,8 @@ class PresenceControllerTest {
     @Test
     void typingEndpointReturnsAuthenticatedTypingUser() throws Exception {
         AuthSession user = signup("presence_typing_user");
-        UUID channelId = UUID.fromString("00000000-0000-0000-0000-000000000101");
+        String guildId = createGuild(user);
+        String channelId = createChannel(guildId, "presence-typing", user);
 
         mockMvc.perform(put("/api/presence/channels/{channelId}/typing", channelId)
                 .header("Authorization", user.bearer())
@@ -71,7 +72,8 @@ class PresenceControllerTest {
     @Test
     void readMarkerAndUnreadEndpointUseAuthenticatedUser() throws Exception {
         AuthSession user = signup("presence_read_user");
-        UUID channelId = UUID.fromString("00000000-0000-0000-0000-000000000102");
+        String guildId = createGuild(user);
+        String channelId = createChannel(guildId, "presence-read", user);
 
         mockMvc.perform(put("/api/presence/channels/{channelId}/read", channelId)
                 .header("Authorization", user.bearer())
@@ -82,7 +84,7 @@ class PresenceControllerTest {
                     }
                     """))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.channelId").value(channelId.toString()))
+            .andExpect(jsonPath("$.channelId").value(channelId))
             .andExpect(jsonPath("$.userId").value(user.userId().toString()))
             .andExpect(jsonPath("$.lastReadSequence").value(42));
 
@@ -99,8 +101,116 @@ class PresenceControllerTest {
             .andExpect(jsonPath("$.unreadCount").value(6));
     }
 
+    @Test
+    void rejectsChannelScopedPresenceOperationsForHiddenChannel() throws Exception {
+        AuthSession owner = signup("presence_hidden_owner");
+        AuthSession member = signup("presence_hidden_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "presence-hidden", owner);
+        addMember(guildId, member.userId(), owner);
+        denyEveryoneView(guildId, channelId, owner);
+
+        mockMvc.perform(put("/api/presence/channels/{channelId}/typing", channelId)
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "ttlSeconds": 5
+                    }
+                    """))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/presence/channels/{channelId}/typing", channelId)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/presence/channels/{channelId}/read", channelId)
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastReadSequence": 42
+                    }
+                    """))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/presence/channels/{channelId}/unread-count", channelId)
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "lastMessageSequence": 50,
+                      "authoredSequences": []
+                    }
+                    """))
+            .andExpect(status().isForbidden());
+    }
+
+    private String createGuild(AuthSession owner) throws Exception {
+        MvcResult guildResult = mockMvc.perform(post("/api/guilds")
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Presence Guild"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        return JsonPath.read(guildResult.getResponse().getContentAsString(), "$.id");
+    }
+
+    private String createChannel(String guildId, String name, AuthSession requester) throws Exception {
+        MvcResult channelResult = mockMvc.perform(post("/api/guilds/{guildId}/channels", guildId)
+                .header("Authorization", requester.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "%s",
+                      "type": "GUILD_TEXT",
+                      "parentId": null
+                    }
+                    """.formatted(name)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        return JsonPath.read(channelResult.getResponse().getContentAsString(), "$.id");
+    }
+
+    private void addMember(String guildId, UUID memberId, AuthSession owner) throws Exception {
+        mockMvc.perform(put("/api/guilds/{guildId}/members/{memberId}", guildId, memberId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk());
+    }
+
+    private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String everyoneRoleId = JsonPath.read(rolesResult.getResponse().getContentAsString(), "$[0].id");
+        mockMvc.perform(put(
+                "/api/guilds/{guildId}/channels/{channelId}/overwrites/roles/{roleId}",
+                guildId,
+                channelId,
+                everyoneRoleId
+            )
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "allow": [],
+                      "deny": ["VIEW_CHANNEL"]
+                    }
+                    """))
+            .andExpect(status().isOk());
+    }
+
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
+                .header("X-Forwarded-For", testClientIp(username))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -118,6 +228,10 @@ class PresenceControllerTest {
             JsonPath.read(body, "$.accessToken"),
             UUID.fromString(JsonPath.read(body, "$.user.id"))
         );
+    }
+
+    private static String testClientIp(String username) {
+        return "2001:db8::" + Integer.toHexString(username.hashCode());
     }
 
     private record AuthSession(String accessToken, UUID userId) {

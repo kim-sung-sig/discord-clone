@@ -11,9 +11,15 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 class GatewayConfiguration {
     @Bean
-    @Profile("!redis")
+    @Profile("!redis & !kafka")
     GatewayEventBus gatewayEventBus(Clock authClock) {
         return new InMemoryGatewayEventBus(authClock);
+    }
+
+    @Bean
+    @Profile("!redis")
+    GatewaySessionRegistry gatewaySessionRegistry() {
+        return new InMemoryGatewaySessionRegistry();
     }
 
     @Bean
@@ -21,8 +27,15 @@ class GatewayConfiguration {
         InMemoryGuildService guildService,
         Clock authClock,
         @Value("${discord.gateway.heartbeat-timeout-ms:30000}") long heartbeatTimeoutMillis,
-        GatewayEventBus gatewayEventBus
+        GatewayEventBus gatewayEventBus,
+        GatewaySessionRegistry gatewaySessionRegistry
     ) {
-        return new InMemoryGatewayService(guildService, authClock, Duration.ofMillis(heartbeatTimeoutMillis), gatewayEventBus);
+        return new InMemoryGatewayService(
+            guildService,
+            authClock,
+            Duration.ofMillis(heartbeatTimeoutMillis),
+            gatewayEventBus,
+            gatewaySessionRegistry
+        );
     }
 }

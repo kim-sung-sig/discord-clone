@@ -117,8 +117,8 @@ class AttachmentController {
     CleanupResponse cleanupOrphans(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
-        authenticatedUserResolver.requireUserId(authorization);
-        return new CleanupResponse(attachmentService.cleanupOrphans());
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        return new CleanupResponse(attachmentService.cleanupOrphans(requesterId));
     }
 
     private UUID guildIdFor(UUID channelId) {

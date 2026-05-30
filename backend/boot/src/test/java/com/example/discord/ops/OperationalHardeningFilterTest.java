@@ -181,6 +181,92 @@ class OperationalHardeningFilterTest {
     }
 
     @Test
+    void authLoginRateLimitIgnoresSpoofedForwardedForFromUntrustedRemote() throws Exception {
+        String remoteAddr = "198.51.100.77";
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                    .with(request -> {
+                        request.setRemoteAddr(remoteAddr);
+                        return request;
+                    })
+                    .header("X-Forwarded-For", "203.0.113." + (90 + i))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "email": "xff-spoof-%d@example.com",
+                          "password": "wrong password"
+                        }
+                        """.formatted(i)))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(request -> {
+                    request.setRemoteAddr(remoteAddr);
+                    return request;
+                })
+                .header("X-Forwarded-For", "203.0.113.99")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "xff-spoof-final@example.com",
+                      "password": "wrong password"
+                    }
+                    """))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "2"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
+    void authSignupRateLimitRejectsByClientIpBeforeAccountValidation() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            mockMvc.perform(post("/api/auth/signup")
+                    .header("X-Forwarded-For", "203.0.113.201")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "email": "not-an-email",
+                          "username": "rate_limit_signup_%d",
+                          "displayName": "Rate Limit Signup",
+                          "password": "correct horse battery staple"
+                        }
+                        """.formatted(i)))
+                .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(post("/api/auth/signup")
+                .header("X-Forwarded-For", "203.0.113.201")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "not-an-email",
+                      "username": "rate_limit_signup_final",
+                      "displayName": "Rate Limit Signup",
+                      "password": "correct horse battery staple"
+                    }
+                    """))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "20"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
+    void authRefreshRateLimitRejectsRepeatedRefreshAttemptsByClientIp() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(post("/api/auth/refresh")
+                    .header("X-Forwarded-For", "203.0.113.202"))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .header("X-Forwarded-For", "203.0.113.202"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "10"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
     void messageCreateRateLimitUsesBearerSubjectAndNormalizesChannelId() throws Exception {
         String channelA = "28b67f6d-b715-4e36-9259-b8c61237f8af";
         String channelB = "9d8a0e21-d39f-4a3d-8200-73e329d5e215";

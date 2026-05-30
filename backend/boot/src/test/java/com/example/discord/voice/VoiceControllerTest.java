@@ -131,6 +131,33 @@ class VoiceControllerTest {
     }
 
     @Test
+    void voiceEventsOnlyIncludeChannelsVisibleToRequester() throws Exception {
+        AuthSession owner = signup("voice_events_visible_owner");
+        AuthSession member = signup("voice_events_visible_member");
+        String guildId = createGuild(owner);
+        String visibleChannelId = createVoiceChannel(guildId, "Visible Voice Events", owner);
+        String hiddenChannelId = createVoiceChannel(guildId, "Hidden Voice Events", owner);
+        addMember(guildId, member.userId(), owner);
+        denyEveryoneView(guildId, hiddenChannelId, owner);
+
+        join(hiddenChannelId, owner);
+        join(visibleChannelId, owner);
+
+        MvcResult events = mockMvc.perform(get("/api/voice/events")
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        List<Map<String, Object>> body = JsonPath.read(events.getResponse().getContentAsString(), "$[*]");
+        assertThat(body).anySatisfy(event ->
+            assertThat(event.get("channelId")).isEqualTo(visibleChannelId)
+        );
+        assertThat(body).noneSatisfy(event ->
+            assertThat(event.get("channelId")).isEqualTo(hiddenChannelId)
+        );
+    }
+
+    @Test
     void voiceMutationsPublishGatewayEventsOnlyToChannelVisibleSessions() throws Exception {
         AuthSession owner = signup("voice_gateway_owner");
         AuthSession hiddenMember = signup("voice_gateway_hidden_member");
@@ -254,7 +281,8 @@ class VoiceControllerTest {
     }
 
     private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
-        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -278,6 +306,7 @@ class VoiceControllerTest {
 
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
+                .header("X-Forwarded-For", testClientIp(username))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -295,6 +324,10 @@ class VoiceControllerTest {
             JsonPath.read(body, "$.accessToken"),
             UUID.fromString(JsonPath.read(body, "$.user.id"))
         );
+    }
+
+    private static String testClientIp(String username) {
+        return "2001:db8::" + Integer.toHexString(username.hashCode());
     }
 
     private record AuthSession(String accessToken, UUID userId) {

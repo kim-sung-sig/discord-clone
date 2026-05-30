@@ -65,6 +65,7 @@ class ProductionSecretConfiguration {
         requireNonDefault(environment, failures, "spring.datasource.username", List.of("dev_user"));
         requireNonDefault(environment, failures, "spring.datasource.url", List.of("jdbc:postgresql://127.0.0.1:15432/discord"));
         requireNonDefault(environment, failures, "spring.data.redis.host", List.of("127.0.0.1", "localhost"));
+        rejectDefaultIfPresent(environment, failures, "spring.data.redis.password", List.of("dev_password"));
 
         if (!failures.isEmpty()) {
             throw new IllegalStateException("production secret/config validation failed: " + String.join(", ", failures));
@@ -99,6 +100,21 @@ class ProductionSecretConfiguration {
         String value = environment.getProperty(key);
         if (value == null || value.isBlank()) {
             failures.add(key + " is required");
+            return;
+        }
+        if (forbiddenValues.contains(value)) {
+            failures.add(key + " must not use development/test defaults");
+        }
+    }
+
+    private static void rejectDefaultIfPresent(
+        Environment environment,
+        List<String> failures,
+        String key,
+        List<String> forbiddenValues
+    ) {
+        String value = environment.getProperty(key);
+        if (value == null || value.isBlank()) {
             return;
         }
         if (forbiddenValues.contains(value)) {

@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 class MessageConfiguration {
     @Bean
-    @Profile("!postgres")
+    @Profile("!postgres & !production & !admin-cli")
     InMemoryMessageService inMemoryMessageService() {
         return new InMemoryMessageService();
     }

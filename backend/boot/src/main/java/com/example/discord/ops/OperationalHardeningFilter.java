@@ -8,6 +8,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -20,6 +22,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -44,10 +48,12 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
 
     private final MeterRegistry meterRegistry;
     private final RateLimitStore rateLimitStore;
+    private final Environment environment;
 
-    public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore) {
+    public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore, Environment environment) {
         this.meterRegistry = meterRegistry;
         this.rateLimitStore = rateLimitStore;
+        this.environment = environment;
     }
 
     @Override
@@ -85,7 +91,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
             }
 
             Optional<RateLimitPolicy> policy = ApiRateLimitPolicy.forRequest(method, normalizedPath);
-            if (policy.isPresent()) {
+            if (policy.isPresent() && shouldApplyRateLimit(request, policy.get())) {
                 RateLimitDecision decision = rateLimitStore.consume(
                     new RateLimitKey(policy.get().id(), rateLimitSubjectFor(request, policy.get())),
                     policy.get(),
@@ -105,6 +111,18 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
             logOutcome(status);
             clearMdc();
         }
+    }
+
+    private boolean shouldApplyRateLimit(HttpServletRequest request, RateLimitPolicy policy) {
+        if (!"auth-signup".equals(policy.id())) {
+            return true;
+        }
+        return environment.acceptsProfiles(Profiles.of("production")) || !isDirectLoopbackRequest(request);
+    }
+
+    private static boolean isDirectLoopbackRequest(HttpServletRequest request) {
+        return firstForwardedFor(request.getHeader("X-Forwarded-For")) == null
+            && isLoopback(request.getRemoteAddr());
     }
 
     private static void applyCors(HttpServletRequest request, HttpServletResponse response) {
@@ -187,11 +205,54 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     }
 
     private static String ipSubject(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        String ip = forwardedFor == null || forwardedFor.isBlank()
-            ? request.getRemoteAddr()
-            : forwardedFor.split(",", 2)[0].trim();
-        return "ip:" + sha256(ip);
+        return "ip:" + sha256(clientIpFor(request));
+    }
+
+    private static String clientIpFor(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        if (isTrustedProxy(remoteAddr)) {
+            String forwardedFor = firstForwardedFor(request.getHeader("X-Forwarded-For"));
+            if (forwardedFor != null) {
+                return forwardedFor;
+            }
+        }
+        return remoteAddr == null ? "" : remoteAddr;
+    }
+
+    private static String firstForwardedFor(String forwardedFor) {
+        if (forwardedFor == null || forwardedFor.isBlank()) {
+            return null;
+        }
+        String clientIp = forwardedFor.split(",", 2)[0].trim();
+        return clientIp.isBlank() ? null : clientIp;
+    }
+
+    private static boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return false;
+        }
+        try {
+            InetAddress address = InetAddress.getByName(remoteAddr);
+            return address.isLoopbackAddress() || address.isSiteLocalAddress() || isUniqueLocalIpv6(address);
+        } catch (UnknownHostException exception) {
+            return false;
+        }
+    }
+
+    private static boolean isLoopback(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return false;
+        }
+        try {
+            return InetAddress.getByName(remoteAddr).isLoopbackAddress();
+        } catch (UnknownHostException exception) {
+            return false;
+        }
+    }
+
+    private static boolean isUniqueLocalIpv6(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
     }
 
     private static String sha256(String value) {

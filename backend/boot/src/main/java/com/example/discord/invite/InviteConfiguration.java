@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 class InviteConfiguration {
     @Bean
-    @Profile("!postgres")
+    @Profile("!postgres & !production & !admin-cli")
     InMemoryInviteService inMemoryInviteService(Clock authClock) {
         return new InMemoryInviteService(authClock);
     }

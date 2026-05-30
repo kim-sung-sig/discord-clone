@@ -51,14 +51,34 @@ class ProductionSecretValidationTest {
                 "spring.datasource.url=jdbc:postgresql://127.0.0.1:15432/discord",
                 "spring.datasource.username=dev_user",
                 "spring.datasource.password=dev_password",
-                "spring.data.redis.host=127.0.0.1"
+                "spring.data.redis.host=127.0.0.1",
+                "spring.data.redis.password=dev_password"
             )
             .run(context -> assertThat(context.getStartupFailure())
                 .hasMessageContaining("production secret/config validation failed")
                 .hasMessageContaining("discord.auth.access-token-secret")
                 .hasMessageContaining("discord.gateway.internal-publisher-token")
                 .hasMessageContaining("spring.datasource.password")
+                .hasMessageContaining("spring.data.redis.password")
                 .hasMessageContaining("spring.data.redis.host"));
+    }
+
+    @Test
+    void productionProfileFailsWhenDefaultRedisPasswordIsUsed() {
+        contextRunner
+            .withPropertyValues(
+                "spring.profiles.active=production,postgres,redis",
+                "discord.auth.access-token-secret=prod-auth-secret-prod-auth-secret",
+                "discord.gateway.internal-publisher-token=prod-gateway-token-prod-gateway-token",
+                "spring.datasource.url=jdbc:postgresql://postgres:5432/discord",
+                "spring.datasource.username=discord_prod",
+                "spring.datasource.password=prod-db-password-prod-db-password",
+                "spring.data.redis.host=redis",
+                "spring.data.redis.password=dev_password"
+            )
+            .run(context -> assertThat(context.getStartupFailure())
+                .hasMessageContaining("production secret/config validation failed")
+                .hasMessageContaining("spring.data.redis.password"));
     }
 
     @Test

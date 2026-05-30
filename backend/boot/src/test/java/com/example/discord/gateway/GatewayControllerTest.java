@@ -178,6 +178,32 @@ class GatewayControllerTest {
             .andExpect(status().isForbidden());
     }
 
+    @Test
+    void rejectsGatewayPublishToChannelRequesterCannotView() throws Exception {
+        AuthSession owner = signup("gateway_publish_hidden_owner");
+        AuthSession member = signup("gateway_publish_hidden_member");
+        String guildId = createGuild(owner);
+        String hiddenChannelId = createChannel(guildId, "ops", owner);
+        addMember(guildId, member.userId(), owner);
+        denyEveryoneView(guildId, hiddenChannelId, owner);
+
+        mockMvc.perform(post("/api/gateway/events")
+                .header("Authorization", member.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "type": "MESSAGE_CREATE",
+                      "guildId": "%s",
+                      "channelId": "%s",
+                      "payload": {
+                        "content": "hidden"
+                      }
+                    }
+                    """.formatted(guildId, hiddenChannelId)))
+            .andExpect(status().isForbidden());
+    }
+
     private org.springframework.test.web.servlet.ResultActions identify(AuthSession user) throws Exception {
         return mockMvc.perform(post("/api/gateway/identify")
             .header("Authorization", user.bearer()));
@@ -249,7 +275,8 @@ class GatewayControllerTest {
     }
 
     private void denyEveryoneView(String guildId, String channelId, AuthSession owner) throws Exception {
-        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId))
+        MvcResult rolesResult = mockMvc.perform(get("/api/guilds/{guildId}/roles", guildId)
+                .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andReturn();
 

@@ -2,9 +2,11 @@ package com.example.discord.message;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Set;
@@ -30,6 +32,22 @@ class InMemoryMessageServiceTest {
         assertThat(firstPage.nextCursor()).isNotBlank();
         assertThat(secondPage.messages()).extracting(Message::id).containsExactly(first.id());
         assertThat(secondPage.nextCursor()).isNull();
+    }
+
+    @Test
+    void maintainsPerChannelOrderedIndexForListOperations() {
+        assertThat(Arrays.stream(InMemoryMessageService.class.getDeclaredFields()).map(Field::getName))
+            .contains("messagesByChannel");
+
+        InMemoryMessageService service = service();
+        UUID otherChannelId = UUID.fromString("00000000-0000-0000-0000-000000000005");
+        Message older = service.create(new CreateMessageCommand(GUILD_ID, CHANNEL_ID, AUTHOR_ID, "older"));
+        service.create(new CreateMessageCommand(GUILD_ID, otherChannelId, AUTHOR_ID, "other channel"));
+        Message newer = service.create(new CreateMessageCommand(GUILD_ID, CHANNEL_ID, AUTHOR_ID, "newer"));
+
+        assertThat(service.messages(GUILD_ID, CHANNEL_ID, null, 10).messages())
+            .extracting(Message::id)
+            .containsExactly(newer.id(), older.id());
     }
 
     @Test

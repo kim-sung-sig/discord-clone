@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -70,14 +69,22 @@ class GuildController {
     }
 
     @GetMapping("/{guildId}/channels/visible")
-    List<ChannelResponse> visibleChannels(@PathVariable UUID guildId, @RequestParam UUID memberId) {
-        return guildService.visibleChannels(guildId, memberId).stream()
+    List<ChannelResponse> visibleChannels(
+        @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        UUID requesterId = requireGuildMember(guildId, authorization);
+        return guildService.visibleChannels(guildId, requesterId).stream()
             .map(ChannelResponse::from)
             .toList();
     }
 
     @GetMapping("/{guildId}/roles")
-    List<RoleResponse> roles(@PathVariable UUID guildId) {
+    List<RoleResponse> roles(
+        @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        requireGuildMember(guildId, authorization);
         return guildService.roles(guildId).stream()
             .map(RoleResponse::from)
             .toList();
@@ -169,6 +176,14 @@ class GuildController {
         if (!guildService.canManageChannels(guildId, requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage channels permission required");
         }
+    }
+
+    private UUID requireGuildMember(UUID guildId, String authorization) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        if (!guildService.isGuildMemberOrOwner(guildId, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "guild membership required");
+        }
+        return requesterId;
     }
 
     private void requireGrantableRolePermissions(UUID guildId, UUID requesterId, PermissionSet permissions) {

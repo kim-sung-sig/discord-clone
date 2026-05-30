@@ -143,12 +143,17 @@ public final class InMemoryAttachmentService {
     }
 
     public synchronized int cleanupOrphans() {
+        return cleanupOrphans(null);
+    }
+
+    public synchronized int cleanupOrphans(UUID ownerId) {
         Instant cutoff = clock.instant().minus(policy.orphanTtl());
         int deleted = 0;
         var iterator = attachments.entrySet().iterator();
         while (iterator.hasNext()) {
             Attachment attachment = iterator.next().getValue();
-            if (attachment.status() != AttachmentStatus.ATTACHED && !attachment.createdAt().isAfter(cutoff)) {
+            boolean ownerMatches = ownerId == null || attachment.ownerId().equals(ownerId);
+            if (ownerMatches && attachment.status() != AttachmentStatus.ATTACHED && !attachment.createdAt().isAfter(cutoff)) {
                 objectStore.delete(attachment.objectKey());
                 iterator.remove();
                 deleted++;
