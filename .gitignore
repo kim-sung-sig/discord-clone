@@ -16,7 +16,13 @@ qa/artifacts/
 !.env.example
 
 *.log
+/*.png
 
 .bkit/
 .serena/
+.codex/config.toml
+.idea/
+.playwright-mcp/
+output/
+security-contract-outside-artifacts/
 **/bin/

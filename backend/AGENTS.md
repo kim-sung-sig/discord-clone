@@ -27,6 +27,17 @@ These rules apply to all work under `backend/`.
 
 ## Security
 - Authenticate mutating APIs and enforce authorization in the application/domain boundary.
+- Authenticate read APIs that expose guild topology, channel visibility, presence, voice, gateway, role, audit, or maintenance state. Require membership or a stronger permission before returning resource details.
+- Derive acting user identity from bearer tokens. Do not trust `memberId`, `ownerId`, or `userId` from request data except in audited admin/operator flows.
+- Channel-scoped APIs must check channel visibility or a stronger channel permission before reading, mutating, or delivering events.
 - Internal adapters must require an internal token or profile gate and must not rely on normal user bearer tokens.
 - Never log raw access tokens, refresh tokens, passwords, or internal publisher tokens.
+- Store reusable token state as hashes where possible and compare internal/webhook shared secrets with constant-time comparison.
 - Use explicit error responses for client recovery, but avoid leaking sensitive implementation details.
+
+## Runtime And Scale
+- Keep hot reads, event replay, and searches bounded by cursor, limit, retention, or per-resource indexes.
+- Keep moderation, audit, alert, report, and webhook audit logs bounded per resource or per service.
+- Do not add default-on tests that require local PostgreSQL, Redis, Kafka, or LiveKit. Gate them with an explicit environment variable or provide the dependency in the test harness.
+- Treat `X-Forwarded-For` and similar proxy headers as trusted only after validating the immediate peer is a trusted proxy.
+- Production profiles must reject known development secrets and resource defaults.
