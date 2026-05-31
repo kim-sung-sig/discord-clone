@@ -47,6 +47,7 @@ class ProductionSecretConfiguration {
             "spring.datasource.password",
             List.of("dev_password")
         );
+        requireTrustedProxyPolicy(environment, failures);
         if (activeProfiles.contains("media-livekit")) {
             requireNonDefault(environment, failures, "discord.media.livekit.api-key", List.of("test", "local", "lk-test-key"));
             requireSecret(
@@ -69,6 +70,22 @@ class ProductionSecretConfiguration {
 
         if (!failures.isEmpty()) {
             throw new IllegalStateException("production secret/config validation failed: " + String.join(", ", failures));
+        }
+    }
+
+    private static void requireTrustedProxyPolicy(Environment environment, List<String> failures) {
+        String value = environment.getProperty(TrustedProxyPolicy.PROPERTY_NAME);
+        if (value == null || value.isBlank()) {
+            failures.add(TrustedProxyPolicy.PROPERTY_NAME + " is required");
+            return;
+        }
+        List<String> invalidRules = TrustedProxyPolicy.invalidRules(value);
+        if (!invalidRules.isEmpty()) {
+            failures.add(TrustedProxyPolicy.PROPERTY_NAME + " contains invalid rule");
+            return;
+        }
+        if (!TrustedProxyPolicy.from(value).isConfigured()) {
+            failures.add(TrustedProxyPolicy.PROPERTY_NAME + " is required");
         }
     }
 

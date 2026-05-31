@@ -27,14 +27,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
 class AuthControllerTest {
     private static final String REFRESH_COOKIE = "dc_refresh";
-    private static final AtomicInteger SIGNUP_IP_COUNTER = new AtomicInteger(10);
-    private static final AtomicInteger LOGIN_IP_COUNTER = new AtomicInteger(10);
+    private static final AtomicInteger SIGNUP_IP_COUNTER = new AtomicInteger(100);
+    private static final AtomicInteger LOGIN_IP_COUNTER = new AtomicInteger(100);
 
     @Autowired
     private MockMvc mockMvc;
@@ -101,7 +102,7 @@ class AuthControllerTest {
             .andExpect(status().isCreated());
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100.10")
+                .with(remoteAddr("198.51.100.10"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -247,7 +248,7 @@ class AuthControllerTest {
 
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
-                    .header("X-Forwarded-For", "198.51.100." + (20 + i))
+                    .with(remoteAddr("198.51.100." + (20 + i)))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -259,7 +260,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100.22")
+                .with(remoteAddr("198.51.100.22"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -299,7 +300,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.message").value("account already exists"));
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100.30")
+                .with(remoteAddr("198.51.100.30"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -334,7 +335,7 @@ class AuthControllerTest {
             .andExpect(status().isCreated());
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100.40")
+                .with(remoteAddr("198.51.100.40"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -424,7 +425,7 @@ class AuthControllerTest {
     void locksUnknownEmailAfterRepeatedInvalidLoginAttempts() throws Exception {
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
-                    .header("X-Forwarded-For", "198.51.100." + (50 + i))
+                    .with(remoteAddr("198.51.100." + (50 + i)))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
@@ -436,7 +437,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100.52")
+                .with(remoteAddr("198.51.100.52"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -506,12 +507,12 @@ class AuthControllerTest {
 
     private static MockHttpServletRequestBuilder signupRequest() {
         return post("/api/auth/signup")
-            .header("X-Forwarded-For", "203.0.113." + SIGNUP_IP_COUNTER.getAndIncrement());
+            .with(remoteAddr("203.0.113." + SIGNUP_IP_COUNTER.getAndIncrement()));
     }
 
     private MvcResult login(String email, String password, String userAgent) throws Exception {
         return mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "198.51.100." + LOGIN_IP_COUNTER.getAndIncrement())
+                .with(remoteAddr("198.51.100." + LOGIN_IP_COUNTER.getAndIncrement()))
                 .header("User-Agent", userAgent)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -534,5 +535,12 @@ class AuthControllerTest {
         return assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
             .isNotNull()
             .startsWith(REFRESH_COOKIE + "=");
+    }
+
+    private static RequestPostProcessor remoteAddr(String remoteAddr) {
+        return request -> {
+            request.setRemoteAddr(remoteAddr);
+            return request;
+        };
     }
 }

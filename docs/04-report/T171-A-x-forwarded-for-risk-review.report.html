@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T171-A X-Forwarded-For 위험성 검토 보고서</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --danger-soft: #fee2e2;
+      --danger-text: #991b1b;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --danger-soft: #3f1518;
+      --danger-text: #fca5a5;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 980px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+
+    code {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      padding: 2px 8px;
+    }
+
+    .badge.good { background: var(--success-soft); color: var(--success-text); }
+    .badge.warn { background: var(--warning-soft); color: var(--warning-text); }
+    .badge.danger { background: var(--danger-soft); color: var(--danger-text); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .decision {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+      border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+      font-weight: 700;
+    }
+
+    .risk {
+      background: var(--danger-soft);
+      color: var(--danger-text);
+      border: 1px solid color-mix(in srgb, var(--danger-text) 22%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.94rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>T171-A X-Forwarded-For 위험성 검토 보고서</h1>
+        <p>운영 proxy trust boundary, rate-limit subject, 보안 대시보드 노출 정책 결정 및 적용 기록</p>
+      </header>
+
+      <section class="summary-box report-section" id="summary">
+        <span class="point-tag">핵심 요약</span>
+        <p><strong>권장 결정은 명시적 trusted proxy allowlist만 신뢰하고, 그 밖의 <code>X-Forwarded-For</code>는 완전히 무시하는 것이다.</strong></p>
+        <ul>
+          <li><strong>적용 상태:</strong> 2026-05-31 안전 기본안으로 진행 요청을 받아 Spring API rate-limit 경로도 명시적 allowlist 정책으로 정렬했다.</li>
+          <li><strong>결정 결과:</strong> 운영 환경은 trusted proxy CIDR을 명시해야 하며, allowlist 밖의 <code>X-Forwarded-For</code>/<code>X-Real-IP</code>는 무시한다.</li>
+          <li><strong>노출 정책:</strong> 보안 UI/보고서/일반 로그에는 raw IP/header를 계속 비노출로 유지한다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="scope">
+        <h2>I. 검토 범위</h2>
+        <div class="metric-grid">
+          <div class="item"><span class="label">대상 헤더</span><code>X-Forwarded-For</code>, <code>X-Real-IP</code>, direct remote address</div>
+          <div class="item"><span class="label">보호 대상</span>CSP report limiter subject, backend API rate-limit subject, 보안 대시보드 diagnostics</div>
+          <div class="item"><span class="label">제외 범위</span>실제 proxy CIDR 값, 운영 로그 원문, raw IP/header 샘플</div>
+          <div class="item"><span class="label">근거 문서</span>T104, T128, T170, T171-A 계획 및 현재 코드 경계</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="current-state">
+        <h2>II. 현재 구현 관찰</h2>
+        <table>
+          <thead>
+            <tr><th>영역</th><th>현재 관찰</th><th>결정에 미치는 영향</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Nuxt CSP limiter</td>
+              <td><code>NUXT_CSP_RATE_LIMIT_TRUSTED_PROXY_CIDRS</code>가 비어 있으면 forwarded header를 무시한다. exact IP와 IPv4 CIDR allowlist를 지원한다.</td>
+              <td><span class="badge good">양호</span> 운영 CIDR을 명시하면 spoofing 방어와 원본 client grouping을 함께 달성할 수 있다.</td>
+            </tr>
+            <tr>
+              <td>Nuxt diagnostics</td>
+              <td>대시보드는 source, trusted proxy match, rule count, header presence, subject hash prefix만 보여준다.</td>
+              <td><span class="badge good">유지 권장</span> raw IP/header 노출 없이 운영 설정 오류를 진단할 수 있다.</td>
+            </tr>
+            <tr>
+              <td>Spring API rate limit</td>
+              <td><code>DISCORD_TRUSTED_PROXY_CIDRS</code>로 명시한 peer만 trusted proxy로 간주하고, 그 밖의 forwarded header는 무시한다.</td>
+              <td><span class="badge good">적용됨</span> Nuxt CSP 경로와 동일한 명시 allowlist 모델로 정렬됐다.</td>
+            </tr>
+            <tr>
+              <td>문서/운영 상태</td>
+              <td>T171-A ADR은 accepted/implemented 상태이며 production startup guard와 회귀 테스트가 추가됐다.</td>
+              <td><span class="badge good">완료</span> 이후 변경은 같은 정책을 기준으로 검토한다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="risks">
+        <h2>III. 위험 분석</h2>
+        <div class="risk">
+          <strong>R1. spoofed forwarded header로 rate-limit subject가 분산될 수 있음</strong><br>
+          trusted proxy 밖의 요청에서 forwarded header를 신뢰하면 공격자가 요청마다 client IP처럼 보이는 값을 바꿔 동일 주체 제한을 회피할 수 있다.
+        </div>
+        <div class="risk">
+          <strong>R2. 사설망 proxy 자동 신뢰는 운영망 경계와 다를 수 있음</strong><br>
+          backend API limiter가 사설망 주소를 자동 신뢰하면, 배포 토폴로지에 따라 애플리케이션 앞단이 아닌 내부 호출자도 forwarded header 영향권에 들어갈 수 있다.
+        </div>
+        <div class="risk">
+          <strong>R3. raw IP/header 노출은 감사 편의보다 개인정보/운영정보 노출 비용이 큼</strong><br>
+          대시보드나 보고서에 원문 IP/header를 표시하면 보안 운영자가 빠르게 확인할 수 있지만, 저장/노출/공유 범위가 넓어져 추가 통제가 필요하다.
+        </div>
+        <div class="risk">
+          <strong>R4. proxy 설정 오류가 silent fallback이면 운영자가 늦게 발견함</strong><br>
+          잘못된 CIDR, 빠진 proxy peer, IPv6 CIDR 미지원 같은 설정 이슈가 배포 단계에서 잡히지 않으면 production에서 limiter grouping이 예상과 다르게 동작할 수 있다.
+        </div>
+      </section>
+
+      <section class="report-section" id="options">
+        <h2>IV. 결정 옵션</h2>
+        <table>
+          <thead>
+            <tr><th>옵션</th><th>내용</th><th>장점</th><th>단점</th><th>권장</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A. 명시 allowlist</td>
+              <td>운영 proxy IP/CIDR만 설정으로 신뢰하고, 그 밖의 forwarded header는 무시한다.</td>
+              <td>spoofing 방어가 명확하고 감사 가능하다. Nuxt CSP 경로의 기존 모델과 맞다.</td>
+              <td>운영 토폴로지 변경 시 설정 업데이트가 필요하다.</td>
+              <td><span class="badge good">권장</span></td>
+            </tr>
+            <tr>
+              <td>B. 사설망 자동 신뢰 유지</td>
+              <td>loopback/site-local/unique-local peer를 proxy로 간주한다.</td>
+              <td>로컬/내부 개발 환경에서 설정 부담이 낮다.</td>
+              <td>운영망에서 신뢰 경계가 넓어질 수 있고 배포별 차이가 숨겨진다.</td>
+              <td><span class="badge warn">개발 전용</span></td>
+            </tr>
+            <tr>
+              <td>C. forwarded header 전면 비활성</td>
+              <td>모든 환경에서 direct remote address만 사용한다.</td>
+              <td>spoofing 위험은 가장 낮다.</td>
+              <td>load balancer 뒤에서는 모든 사용자가 동일 proxy subject로 묶일 수 있다.</td>
+              <td><span class="badge warn">임시 안전 모드</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="recommended-decision">
+        <h2>V. 권장 결정안</h2>
+        <div class="decision">
+          T171-A 기본 결정안: production에서는 explicit trusted proxy allowlist를 필수로 삼고, allowlist 밖의 <code>X-Forwarded-For</code>/<code>X-Real-IP</code>는 완전히 무시한다. 보안 UI와 보고서에는 raw IP/header를 계속 비노출로 유지한다. production proxy 설정 오류는 배포 차단 조건으로 올린다.
+        </div>
+        <table>
+          <thead>
+            <tr><th>결정 항목</th><th>권장값</th><th>승인 후 구현 후보</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>신뢰 proxy 목록</td>
+              <td>운영 환경별 explicit CIDR allowlist</td>
+              <td>backend API rate-limit도 동일한 allowlist 모델로 정렬</td>
+            </tr>
+            <tr>
+              <td>비신뢰 forwarded header</td>
+              <td>완전 무시</td>
+              <td>Spring 필터 회귀 테스트 추가</td>
+            </tr>
+            <tr>
+              <td>UI/문서 노출</td>
+              <td>raw IP/header 비노출, source/boolean/hash prefix만 허용</td>
+              <td>보안 대시보드/보고서 노출 계약 테스트 유지</td>
+            </tr>
+            <tr>
+              <td>배포 차단</td>
+              <td>production proxy config contract 추가</td>
+              <td>QA harness 또는 config contract에 proxy guard 추가</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="approval-gates">
+        <h2>VI. 결정 결과</h2>
+        <ol>
+          <li>production trusted proxy CIDR allowlist는 필수 정책이다.</li>
+          <li>allowlist 밖에서 들어온 <code>X-Forwarded-For</code>와 <code>X-Real-IP</code>는 무시한다.</li>
+          <li>보안 UI/보고서/로그에서 raw IP와 raw forwarded header는 비노출로 유지한다.</li>
+          <li>production proxy 설정 누락 또는 잘못된 CIDR은 startup guard로 차단한다.</li>
+        </ol>
+      </section>
+
+      <section class="report-section" id="verification">
+        <h2>VII. 산출물 검증</h2>
+        <p>이번 작업은 결정 문서 작성이며 코드 구현이 아니다. 실행 검증은 문서 존재, placeholder 제거, Git 상태 확인으로 한정한다. 구현 승인 후에는 TDD로 다음 회귀 테스트부터 작성해야 한다.</p>
+        <ul>
+          <li>Nuxt CSP subject: untrusted spoofing ignored, trusted proxy extraction, invalid header fallback.</li>
+          <li>Spring API limiter: untrusted forwarded header ignored, allowlisted proxy extraction, production config guard.</li>
+          <li>Dashboard privacy: raw IP/header/full subject hash 비노출 유지.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

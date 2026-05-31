@@ -49,11 +49,13 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     private final MeterRegistry meterRegistry;
     private final RateLimitStore rateLimitStore;
     private final Environment environment;
+    private final TrustedProxyPolicy trustedProxyPolicy;
 
     public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore, Environment environment) {
         this.meterRegistry = meterRegistry;
         this.rateLimitStore = rateLimitStore;
         this.environment = environment;
+        this.trustedProxyPolicy = TrustedProxyPolicy.from(environment);
     }
 
     @Override
@@ -121,7 +123,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     }
 
     private static boolean isDirectLoopbackRequest(HttpServletRequest request) {
-        return firstForwardedFor(request.getHeader("X-Forwarded-For")) == null
+        return !hasText(request.getHeader("X-Forwarded-For"))
             && isLoopback(request.getRemoteAddr());
     }
 
@@ -193,7 +195,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         return NUMERIC_PATH_SEGMENT.matcher(withoutUuids).replaceAll("/{number}");
     }
 
-    private static String rateLimitSubjectFor(HttpServletRequest request, RateLimitPolicy policy) {
+    private String rateLimitSubjectFor(HttpServletRequest request, RateLimitPolicy policy) {
         if ("auth-login".equals(policy.id())) {
             return ipSubject(request);
         }
@@ -204,39 +206,23 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         return ipSubject(request);
     }
 
-    private static String ipSubject(HttpServletRequest request) {
+    private String ipSubject(HttpServletRequest request) {
         return "ip:" + sha256(clientIpFor(request));
     }
 
-    private static String clientIpFor(HttpServletRequest request) {
+    private String clientIpFor(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
-        if (isTrustedProxy(remoteAddr)) {
-            String forwardedFor = firstForwardedFor(request.getHeader("X-Forwarded-For"));
-            if (forwardedFor != null) {
-                return forwardedFor;
+        if (trustedProxyPolicy.isTrustedProxy(remoteAddr)) {
+            Optional<String> forwardedIp = trustedProxyPolicy.forwardedClientIp(
+                request.getHeader("X-Forwarded-For"),
+                request.getHeader("X-Real-IP")
+            );
+            if (forwardedIp.isPresent()) {
+                return forwardedIp.get();
             }
         }
-        return remoteAddr == null ? "" : remoteAddr;
-    }
-
-    private static String firstForwardedFor(String forwardedFor) {
-        if (forwardedFor == null || forwardedFor.isBlank()) {
-            return null;
-        }
-        String clientIp = forwardedFor.split(",", 2)[0].trim();
-        return clientIp.isBlank() ? null : clientIp;
-    }
-
-    private static boolean isTrustedProxy(String remoteAddr) {
-        if (remoteAddr == null || remoteAddr.isBlank()) {
-            return false;
-        }
-        try {
-            InetAddress address = InetAddress.getByName(remoteAddr);
-            return address.isLoopbackAddress() || address.isSiteLocalAddress() || isUniqueLocalIpv6(address);
-        } catch (UnknownHostException exception) {
-            return false;
-        }
+        return TrustedProxyPolicy.normalizeIpAddress(remoteAddr)
+            .orElse(remoteAddr == null ? "" : remoteAddr.trim());
     }
 
     private static boolean isLoopback(String remoteAddr) {
@@ -250,9 +236,8 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         }
     }
 
-    private static boolean isUniqueLocalIpv6(InetAddress address) {
-        byte[] bytes = address.getAddress();
-        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static String sha256(String value) {

@@ -58,7 +58,7 @@ $forum = Request POST "/api/guilds/$guildId/channels" @{ name='forum'; type='GUI
 $textId = $text.body.id; $voiceId = $voice.body.id; $forumId = $forum.body.id
 Assert $textId 'text channel missing'
 Request PUT "/api/guilds/$guildId/members/$memberId" $null $ownerToken | Out-Null
-Request GET "/api/guilds/$guildId/channels/visible?memberId=$ownerId" | Out-Null
+Request GET "/api/guilds/$guildId/channels/visible?memberId=$ownerId" $null $ownerToken | Out-Null
 
 $msg = Request POST "/api/channels/$textId/messages" @{ content='runtime smoke message <@00000000-0000-0000-0000-000000000099>' } $ownerToken
 $msgId = $msg.body.id

@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'real-backend-e2e.ps1'
+$apiSmokePath = Join-Path $PSScriptRoot 'api-smoke.ps1'
 
 function Assert($condition, $message) {
   if (-not $condition) {
@@ -9,8 +10,10 @@ function Assert($condition, $message) {
 }
 
 Assert (Test-Path $scriptPath) 'qa/real-backend-e2e.ps1 is missing'
+Assert (Test-Path $apiSmokePath) 'qa/api-smoke.ps1 is missing'
 
 $content = Get-Content -Path $scriptPath -Raw
+$apiSmokeContent = Get-Content -Path $apiSmokePath -Raw
 $tokens = $null
 $parseErrors = $null
 [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref] $tokens, [ref] $parseErrors) | Out-Null
@@ -60,5 +63,8 @@ $requiredSnippets = @(
 foreach ($snippet in $requiredSnippets) {
   Assert ($content.Contains($snippet)) "qa/real-backend-e2e.ps1 is missing required snippet: $snippet"
 }
+
+Assert ($apiSmokeContent.Contains('Request GET "/api/guilds/$guildId/channels/visible?memberId=$ownerId" $null $ownerToken')) `
+  'qa/api-smoke.ps1 must authenticate the visible channels request'
 
 Write-Output 'REAL_BACKEND_E2E_CONTRACT_PASS'

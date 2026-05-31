@@ -82,7 +82,7 @@ class ProductionSecretValidationTest {
     }
 
     @Test
-    void productionProfileStartsWhenRequiredSecretsAreExplicit() {
+    void productionProfileFailsWhenTrustedProxyCidrsAreMissing() {
         contextRunner
             .withPropertyValues(
                 "spring.profiles.active=production,postgres,redis",
@@ -92,6 +92,40 @@ class ProductionSecretValidationTest {
                 "spring.datasource.username=discord_prod",
                 "spring.datasource.password=prod-db-password-prod-db-password",
                 "spring.data.redis.host=redis"
+            )
+            .run(context -> assertThat(context.getStartupFailure())
+                .hasMessageContaining("discord.trusted-proxy.cidrs is required"));
+    }
+
+    @Test
+    void productionProfileFailsWhenTrustedProxyCidrsAreInvalid() {
+        contextRunner
+            .withPropertyValues(
+                "spring.profiles.active=production,postgres,redis",
+                "discord.auth.access-token-secret=prod-auth-secret-prod-auth-secret",
+                "discord.gateway.internal-publisher-token=prod-gateway-token-prod-gateway-token",
+                "spring.datasource.url=jdbc:postgresql://postgres:5432/discord",
+                "spring.datasource.username=discord_prod",
+                "spring.datasource.password=prod-db-password-prod-db-password",
+                "spring.data.redis.host=redis",
+                "discord.trusted-proxy.cidrs=not-a-cidr"
+            )
+            .run(context -> assertThat(context.getStartupFailure())
+                .hasMessageContaining("discord.trusted-proxy.cidrs contains invalid rule"));
+    }
+
+    @Test
+    void productionProfileStartsWhenRequiredSecretsAreExplicit() {
+        contextRunner
+            .withPropertyValues(
+                "spring.profiles.active=production,postgres,redis",
+                "discord.auth.access-token-secret=prod-auth-secret-prod-auth-secret",
+                "discord.gateway.internal-publisher-token=prod-gateway-token-prod-gateway-token",
+                "spring.datasource.url=jdbc:postgresql://postgres:5432/discord",
+                "spring.datasource.username=discord_prod",
+                "spring.datasource.password=prod-db-password-prod-db-password",
+                "spring.data.redis.host=redis",
+                "discord.trusted-proxy.cidrs=10.0.0.0/24"
             )
             .run(context -> assertThat(context.getStartupFailure()).isNull());
     }
@@ -106,7 +140,8 @@ class ProductionSecretValidationTest {
                 "spring.datasource.url=jdbc:postgresql://postgres:5432/discord",
                 "spring.datasource.username=discord_prod",
                 "spring.datasource.password=prod-db-password-prod-db-password",
-                "spring.data.redis.host=redis"
+                "spring.data.redis.host=redis",
+                "discord.trusted-proxy.cidrs=10.0.0.0/24"
             )
             .run(context -> assertThat(context.getStartupFailure())
                 .hasMessageContaining("discord.media.livekit.api-key")
@@ -127,7 +162,8 @@ class ProductionSecretValidationTest {
                 "spring.data.redis.host=redis",
                 "discord.media.livekit.api-key=lk-prod-key",
                 "discord.media.livekit.api-secret=livekit-production-secret-value-32",
-                "discord.media.livekit.url=wss://livekit.example.com"
+                "discord.media.livekit.url=wss://livekit.example.com",
+                "discord.trusted-proxy.cidrs=10.0.0.0/24"
             )
             .run(context -> assertThat(context.getStartupFailure()).isNull());
     }
