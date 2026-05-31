@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import DashboardGuardHealthPanel from '../components/security/DashboardGuardHealthPanel.vue'
+import OperatorTokenAuditPanel from '../components/security/OperatorTokenAuditPanel.vue'
+import OperatorTokenForm from '../components/security/OperatorTokenForm.vue'
+import SecuritySummaryStrip from '../components/security/SecuritySummaryStrip.vue'
 import type { CspTelemetryDashboard } from '../server/utils/csp-telemetry-dashboard'
 import type { SecurityDashboardGuardHealth } from '../server/utils/security-dashboard-access'
+import type { SecurityDashboardOperatorTokenAuditEntry } from '../server/utils/security-dashboard-operator-token-store'
 import { useAuthStore } from '../stores/auth'
 
 const dashboard = ref<CspTelemetryDashboard | null>(null)
@@ -9,6 +14,9 @@ const guardHealth = ref<SecurityDashboardGuardHealth | null>(null)
 const loading = ref(true)
 const error = ref('')
 const guardHealthError = ref('')
+const operatorTokenAuditEntries = ref<SecurityDashboardOperatorTokenAuditEntry[]>([])
+const operatorTokenAuditLoading = ref(false)
+const operatorTokenAuditError = ref('')
 const operatorTokenInput = ref('')
 const operatorTokenSaved = ref(false)
 const operatorTokenExpiresAt = ref('')
@@ -20,78 +28,12 @@ const auth = useAuthStore()
 const operatorTokenStorageKey = 'dc_security_dashboard_operator_token'
 const operatorTokenExpiryStorageKey = 'dc_security_dashboard_operator_token_expires_at'
 
-const topDirectiveCount = computed(() => dashboard.value?.summary.topDirectives.length ?? 0)
-const telemetryStorageHealth = computed(() => dashboard.value?.health?.storage)
-const telemetryWriteFailures = computed(() => telemetryStorageHealth.value?.writeFailures ?? 0)
 const rateLimitSubjectDiagnostics = computed(() => dashboard.value?.rateLimit?.subjectDiagnostics)
 const rateLimitSubjectDistribution = computed(() => dashboard.value?.rateLimit?.subjectDistribution)
 const rateLimitTopSubjects = computed(() => rateLimitSubjectDistribution.value?.topSubjects ?? [])
 const rateLimitLifecycle = computed(() => dashboard.value?.rateLimit?.lifecycle)
 const rateLimitRedisLifecycle = computed(() => rateLimitLifecycle.value?.redis)
 const trendMaxTotal = computed(() => Math.max(1, ...(dashboard.value?.trend?.buckets.map((bucket) => bucket.total) ?? [0])))
-type GuardHealthMethod = keyof SecurityDashboardGuardHealth['methods']
-
-const guardHealthMethodLabels: Record<GuardHealthMethod, string> = {
-  backend: 'Backend',
-  jwt: 'JWT',
-  operatorToken: 'Operator token',
-  adminUserIds: 'Admin user IDs',
-  adminRoles: 'Admin roles',
-  adminScopes: 'Admin scopes'
-}
-
-const guardHealthMethods = computed(() => {
-  const methods = guardHealth.value?.methods
-  if (!methods) {
-    return []
-  }
-  return Object.entries(guardHealthMethodLabels).map(([key, label]) => ({
-    key,
-    label,
-    enabled: methods[key as GuardHealthMethod]
-  }))
-})
-
-const guardHealthStatusLabel = computed(() => {
-  switch (guardHealth.value?.status) {
-    case 'ready':
-      return 'Ready'
-    case 'local-dev-open':
-      return 'Local dev open'
-    case 'fail-closed':
-      return 'Fail closed'
-    default:
-      return 'Unknown'
-  }
-})
-
-const guardHealthStatusClass = computed(() =>
-  guardHealth.value ? `guard-status-${guardHealth.value.status}` : 'guard-status-unknown'
-)
-
-const backendAuthProbeLabel = computed(() => {
-  const check = guardHealth.value?.backendCheck
-  if (!check?.configured) {
-    return 'Not configured'
-  }
-  return check.reachable ? 'Reachable' : 'Unreachable'
-})
-
-const telemetryStorageLabel = computed(() => {
-  const health = telemetryStorageHealth.value
-  if (!health) {
-    return 'Unknown'
-  }
-  const backend = health.backend === 'postgres' ? 'Postgres' : health.backend === 'memory' ? 'Memory' : 'Unknown'
-  if (health.ok) {
-    return `${backend} ready`
-  }
-  return `${backend} degraded`
-})
-
-const telemetryStorageClass = computed(() =>
-  telemetryStorageHealth.value?.ok === false ? 'storage-health-degraded' : 'storage-health-ready'
-)
 
 const subjectDiagnosticsTrustLabel = computed(() => {
   const diagnostics = rateLimitSubjectDiagnostics.value
@@ -140,6 +82,7 @@ const loadDashboard = async () => {
   loading.value = true
   error.value = ''
   guardHealthError.value = ''
+  operatorTokenAuditError.value = ''
   try {
     const response = await fetch('/api/security/csp-telemetry?limit=25', {
       headers: dashboardRequestHeaders()
@@ -150,6 +93,7 @@ const loadDashboard = async () => {
     dashboard.value = await response.json() as CspTelemetryDashboard
     loading.value = false
     await loadGuardHealth()
+    await loadOperatorTokenAudit()
   } catch {
     error.value = 'Unable to load browser security telemetry.'
     loading.value = false
@@ -173,6 +117,32 @@ const loadGuardHealth = async () => {
     guardHealth.value = isSecurityDashboardGuardHealth(payload) ? payload : null
   } catch {
     guardHealthError.value = 'Dashboard guard health is unavailable.'
+  }
+}
+
+const loadOperatorTokenAudit = async () => {
+  operatorTokenAuditEntries.value = []
+  operatorTokenAuditError.value = ''
+  const hasDashboardCredential = Boolean(auth.accessToken)
+    || Boolean(window.sessionStorage.getItem(operatorTokenStorageKey)?.trim())
+  if (!hasDashboardCredential) {
+    return
+  }
+  operatorTokenAuditLoading.value = true
+  try {
+    const response = await fetch('/api/security/operator-token/audit?limit=25', {
+      headers: dashboardRequestHeaders()
+    })
+    if (!response.ok) {
+      operatorTokenAuditError.value = 'Operator token audit is unavailable.'
+      return
+    }
+    const payload = await response.json()
+    operatorTokenAuditEntries.value = isOperatorTokenAuditPayload(payload) ? payload.entries : []
+  } catch {
+    operatorTokenAuditError.value = 'Operator token audit is unavailable.'
+  } finally {
+    operatorTokenAuditLoading.value = false
   }
 }
 
@@ -279,6 +249,30 @@ const dashboardRequestHeaders = (): Record<string, string> => {
 
 const trendBarHeight = (total: number): string => `${Math.max(8, Math.round((total / trendMaxTotal.value) * 100))}%`
 
+const isOperatorTokenAuditPayload = (
+  value: unknown
+): value is { entries: SecurityDashboardOperatorTokenAuditEntry[] } => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const candidate = value as { entries?: unknown }
+  return Array.isArray(candidate.entries)
+    && candidate.entries.every((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return false
+      }
+      const auditEntry = entry as Partial<SecurityDashboardOperatorTokenAuditEntry>
+      return (
+        (auditEntry.action === 'issued' || auditEntry.action === 'revoked')
+        && typeof auditEntry.tokenId === 'string'
+        && /^[a-f0-9]{12}$/.test(auditEntry.tokenId)
+        && typeof auditEntry.actor === 'string'
+        && typeof auditEntry.at === 'string'
+        && (auditEntry.reason === undefined || typeof auditEntry.reason === 'string')
+      )
+    })
+}
+
 const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashboardGuardHealth => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false
@@ -324,28 +318,13 @@ const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashbo
       <h1>Browser security</h1>
     </header>
 
-    <form
-      class="security-operator-token"
-      data-testid="operator-token-form"
-      aria-label="Operator token"
-      @submit.prevent="saveOperatorTokenAndRetry"
-    >
-      <label for="operator-token-input">Operator token</label>
-      <div>
-        <input
-          id="operator-token-input"
-          v-model="operatorTokenInput"
-          data-testid="operator-token-input"
-          type="password"
-          autocomplete="off"
-        >
-        <button type="submit">Issue</button>
-        <button v-if="operatorTokenSaved" type="button" @click="clearOperatorToken">Clear</button>
-      </div>
-      <small v-if="operatorTokenExpiresAt" data-testid="operator-token-expiry">
-        Expires {{ operatorTokenExpiresAt }}
-      </small>
-    </form>
+    <OperatorTokenForm
+      v-model:token-input="operatorTokenInput"
+      :saved="operatorTokenSaved"
+      :expires-at="operatorTokenExpiresAt"
+      @issue="saveOperatorTokenAndRetry"
+      @clear="clearOperatorToken"
+    />
 
     <p v-if="loading" class="security-dashboard-state" data-testid="csp-loading-state">Loading telemetry</p>
     <p v-else-if="error" class="security-dashboard-state security-dashboard-error" data-testid="csp-error-state">
@@ -411,103 +390,19 @@ const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashbo
         </form>
       </section>
 
-      <section class="security-summary-strip" aria-label="CSP telemetry summary">
-        <article class="security-summary-card">
-          <span>Total CSP reports</span>
-          <strong data-testid="csp-total">{{ dashboard.summary.total }}</strong>
-        </article>
-        <article class="security-summary-card">
-          <span>Rate-limited reports</span>
-          <strong data-testid="csp-rate-limit-limited">{{ dashboard.rateLimit?.limitedTotal ?? 0 }}</strong>
-        </article>
-        <article class="security-summary-card">
-          <span>Directive groups</span>
-          <strong data-testid="csp-directive-count">{{ topDirectiveCount }}</strong>
-        </article>
-        <article class="security-summary-card">
-          <span>Discarded by retention</span>
-          <strong data-testid="csp-retention-discarded">{{ dashboard.retention?.discardedTotal ?? 0 }}</strong>
-          <dl class="retention-breakdown" aria-label="CSP retention discard breakdown">
-            <div>
-              <dt>Age</dt>
-              <dd data-testid="csp-retention-discarded-by-age">{{ dashboard.retention?.discardedByAge ?? 0 }}</dd>
-            </div>
-            <div>
-              <dt>Max entries</dt>
-              <dd data-testid="csp-retention-discarded-by-max-entries">
-                {{ dashboard.retention?.discardedByMaxEntries ?? 0 }}
-              </dd>
-            </div>
-          </dl>
-        </article>
-        <article class="security-summary-card">
-          <span>Telemetry storage</span>
-          <strong
-            :class="telemetryStorageClass"
-            data-testid="csp-telemetry-storage-health"
-          >
-            {{ telemetryStorageLabel }}
-          </strong>
-        </article>
-        <article class="security-summary-card">
-          <span>Write failures</span>
-          <strong data-testid="csp-telemetry-write-failures">{{ telemetryWriteFailures }}</strong>
-        </article>
-      </section>
+      <SecuritySummaryStrip :dashboard="dashboard" />
 
       <section class="security-dashboard-grid">
-        <article
-          v-if="guardHealth || guardHealthError"
-          class="security-dashboard-panel guard-health-panel"
-          data-testid="dashboard-guard-health"
-        >
-          <header>
-            <p>Access guard</p>
-            <h2>Dashboard guard health</h2>
-          </header>
-          <p
-            v-if="guardHealthError"
-            class="security-dashboard-state security-dashboard-error"
-            data-testid="dashboard-guard-health-error"
-          >
-            {{ guardHealthError }}
-          </p>
-          <template v-else-if="guardHealth">
-            <div class="guard-health-summary">
-              <strong :class="guardHealthStatusClass">{{ guardHealthStatusLabel }}</strong>
-              <span>{{ guardHealth.configured ? 'Configured' : 'Not configured' }}</span>
-              <span>{{ guardHealth.requireConfiguredGuard ? 'Guard required' : 'Guard optional' }}</span>
-            </div>
-            <ul class="guard-method-list" aria-label="Dashboard guard methods">
-              <li
-                v-for="method in guardHealthMethods"
-                :key="method.key"
-                :class="method.enabled ? 'guard-method-enabled' : 'guard-method-disabled'"
-              >
-                <span>{{ method.label }}</span>
-                <strong>{{ method.enabled ? 'On' : 'Off' }}</strong>
-              </li>
-            </ul>
-            <div
-              v-if="guardHealth.backendCheck?.configured"
-              class="backend-auth-probe"
-              data-testid="dashboard-backend-auth-probe"
-            >
-              <span>Backend auth probe</span>
-              <strong>{{ backendAuthProbeLabel }}</strong>
-              <small
-                v-if="guardHealth.backendCheck.statusCode"
-                data-testid="dashboard-backend-auth-probe-status"
-              >
-                HTTP {{ guardHealth.backendCheck.statusCode }}
-              </small>
-              <small>{{ guardHealth.backendCheck.checkedAt }}</small>
-            </div>
-            <ul v-if="guardHealth.warnings.length > 0" class="guard-warning-list">
-              <li v-for="warning in guardHealth.warnings" :key="warning">{{ warning }}</li>
-            </ul>
-          </template>
-        </article>
+        <DashboardGuardHealthPanel
+          :guard-health="guardHealth"
+          :error="guardHealthError"
+        />
+
+        <OperatorTokenAuditPanel
+          :entries="operatorTokenAuditEntries"
+          :loading="operatorTokenAuditLoading"
+          :error="operatorTokenAuditError"
+        />
 
         <article
           v-if="rateLimitSubjectDiagnostics"
@@ -770,8 +665,8 @@ const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashbo
               <p>{{ event.reason ?? 'No operator reason recorded' }}</p>
               <small>
                 {{ event.actor }}
-                <template v-if="event.assignedTo"> Â· assigned to {{ event.assignedTo }}</template>
-                <template v-if="event.snoozeUntil"> Â· snoozed until {{ event.snoozeUntil }}</template>
+                <template v-if="event.assignedTo"> &middot; assigned to {{ event.assignedTo }}</template>
+                <template v-if="event.snoozeUntil"> &middot; snoozed until {{ event.snoozeUntil }}</template>
               </small>
             </article>
           </div>

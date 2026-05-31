@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{보고서_제목}}</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3, h4 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+    h4 {
+      font-size: 16px;
+      margin: 16px 0 8px;
+      display: flex;
+      align-items: center;
+    }
+    h4::before {
+      content: "•";
+      color: var(--primary);
+      font-weight: 800;
+      display: inline-block;
+      width: 1em;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+
+    .point-tag {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      background: var(--success-soft);
+      color: var(--success-text);
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .before-after, .ba-box {
+      background: var(--bg);
+      border-left: 4px solid var(--line);
+      padding: 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+
+    .highlight {
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .decision {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+      border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.94rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>{{보고서_제목}}</h1>
+        <p>{{보고서_부제}}</p>
+      </header>
+
+      <section class="summary-box report-section" id="summary">
+        <span class="point-tag">핵심 요약</span>
+        <p><strong>{{한_문장_요약}}</strong></p>
+        <ul>
+          <li><strong>성과:</strong> {{성과_요약}}</li>
+          <li><strong>검증:</strong> {{검증_요약}}</li>
+          <li><strong>리스크:</strong> {{리스크_요약}}</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="scope">
+        <h2>I. 작업 범위</h2>
+        <div class="metric-grid">
+          <div class="item"><span class="label">목표</span>{{목표}}</div>
+          <div class="item"><span class="label">완료 기준</span>{{완료_기준}}</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="completed">
+        <h2>II. 완료 내용</h2>
+        <h3>1. 주요 변경</h3>
+        <div class="before-after">
+          <strong>[Before & After]</strong><br>
+          - <strong>기존:</strong> {{기존_상태}}<br>
+          - <strong>현재:</strong> <span class="highlight">{{개선_결과}}</span>
+        </div>
+        <h3>2. 변경 파일</h3>
+        <table>
+          <thead>
+            <tr><th>파일</th><th>변경 요약</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>{{파일_경로}}</td><td>{{변경_요약}}</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="review">
+        <h2>III. 리뷰 및 점수</h2>
+        <table>
+          <thead>
+            <tr><th>항목</th><th>점수</th><th>근거</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>보안</td><td>{{보안_점수}}</td><td>{{보안_근거}}</td></tr>
+            <tr><td>사용성</td><td>{{사용성_점수}}</td><td>{{사용성_근거}}</td></tr>
+            <tr><td>유지보수성</td><td>{{유지보수성_점수}}</td><td>{{유지보수성_근거}}</td></tr>
+            <tr><td>기능성</td><td>{{기능성_점수}}</td><td>{{기능성_근거}}</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="verification">
+        <h2>IV. 검증 결과</h2>
+        <div class="ba-box">
+          <strong>실행한 검증</strong><br>
+          {{검증_명령과_결과}}
+        </div>
+      </section>
+
+      <section class="report-section" id="decision">
+        <h2>V. 결정 필요 사항</h2>
+        <div class="decision">{{사용자_결정이_필요한_사항}}</div>
+      </section>
+
+      <section class="report-section" id="risk">
+        <h2>VI. 잔여 리스크</h2>
+        <ul>
+          <li>{{잔여_리스크_1}}</li>
+          <li>{{잔여_리스크_2}}</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

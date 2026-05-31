@@ -1,5 +1,7 @@
 import { createHmac } from 'node:crypto'
+import { createApp, toWebHandler } from 'h3'
 import { describe, expect, it } from 'vitest'
+import { createSecurityDashboardOperatorTokenAuditHandler } from '../../server/routes/api/security/operator-token/audit.get'
 import {
   authorizeSecurityDashboardAccess,
   buildSecurityDashboardGuardHealth,
@@ -9,6 +11,7 @@ import {
 } from '../../server/utils/security-dashboard-access'
 import {
   createDefaultSecurityDashboardOperatorTokenStore,
+  hashSecurityDashboardOperatorTokenForTests,
   InMemorySecurityDashboardOperatorTokenStore,
   PostgresSecurityDashboardOperatorTokenStore,
   issueSecurityDashboardOperatorToken
@@ -161,6 +164,106 @@ describe('security dashboard access guard', () => {
       allowed: false,
       reason: 'operator token is invalid'
     })
+  })
+
+  it('serves operator token audit entries through a guarded route without raw token values', async () => {
+    const store = new InMemorySecurityDashboardOperatorTokenStore()
+    const revoked = await issueSecurityDashboardOperatorToken({
+      store,
+      actor: 'operator-token-bootstrap',
+      now: () => new Date('2026-05-21T00:00:00.000Z')
+    })
+    await store.revoke({
+      token: revoked.token,
+      actor: 'security-admin',
+      reason: 'operator cleared session',
+      now: new Date('2026-05-21T00:06:00.000Z')
+    })
+    const active = await issueSecurityDashboardOperatorToken({
+      store,
+      actor: 'operator-token-bootstrap',
+      now: () => new Date('2999-05-21T00:07:00.000Z')
+    })
+
+    const app = createApp()
+    app.use('/api/security/operator-token/audit', createSecurityDashboardOperatorTokenAuditHandler({
+      operatorTokenStore: store
+    }))
+    const response = await toWebHandler(app)(new Request('http://localhost/api/security/operator-token/audit?limit=3', {
+      headers: {
+        'x-operator-token': active.token
+      }
+    }))
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.entries).toEqual([
+      {
+        action: 'issued',
+        actor: 'operator-token-bootstrap',
+        at: '2999-05-21T00:07:00.000Z',
+        tokenId: hashSecurityDashboardOperatorTokenForTests(active.token).slice(0, 12)
+      },
+      {
+        action: 'revoked',
+        actor: 'security-admin',
+        at: '2026-05-21T00:06:00.000Z',
+        reason: 'operator cleared session',
+        tokenId: hashSecurityDashboardOperatorTokenForTests(revoked.token).slice(0, 12)
+      },
+      {
+        action: 'issued',
+        actor: 'operator-token-bootstrap',
+        at: '2026-05-21T00:00:00.000Z',
+        tokenId: hashSecurityDashboardOperatorTokenForTests(revoked.token).slice(0, 12)
+      }
+    ])
+    for (const entry of payload.entries) {
+      expect(entry.tokenId).toMatch(/^[a-f0-9]{12}$/)
+      expect(entry.tokenId).not.toHaveLength(64)
+    }
+    expect(JSON.stringify(payload)).not.toContain(active.token)
+    expect(JSON.stringify(payload)).not.toContain(revoked.token)
+    expect(JSON.stringify(payload)).not.toContain(hashSecurityDashboardOperatorTokenForTests(active.token))
+    expect(JSON.stringify(payload)).not.toContain(hashSecurityDashboardOperatorTokenForTests(revoked.token))
+
+    const forbidden = await toWebHandler(app)(new Request('http://localhost/api/security/operator-token/audit'))
+    expect(forbidden.status).toBe(403)
+  })
+
+  it('allows a signed admin JWT to read operator token audit without an operator token header', async () => {
+    const store = new InMemorySecurityDashboardOperatorTokenStore()
+    const issued = await issueSecurityDashboardOperatorToken({
+      store,
+      actor: 'operator-token-bootstrap',
+      now: () => new Date('2026-05-21T00:00:00.000Z')
+    })
+    const jwtSecret = 'local-jwt-secret-with-enough-length'
+    const adminJwt = signJwt({ sub: 'admin-user', iat: 1779148800, exp: 32503680000 }, jwtSecret)
+    const app = createApp()
+    app.use('/api/security/operator-token/audit', createSecurityDashboardOperatorTokenAuditHandler({
+      operatorTokenStore: store,
+      accessConfig: {
+        jwtSecret,
+        adminUserIds: ['admin-user']
+      }
+    }))
+
+    const response = await toWebHandler(app)(new Request('http://localhost/api/security/operator-token/audit?limit=1', {
+      headers: {
+        Authorization: `Bearer ${adminJwt}`
+      }
+    }))
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.entries).toEqual([
+      expect.objectContaining({
+        action: 'issued',
+        tokenId: hashSecurityDashboardOperatorTokenForTests(issued.token).slice(0, 12)
+      })
+    ])
+    expect(JSON.stringify(payload)).not.toContain(issued.token)
   })
 
   it('selects a durable Postgres operator token store when a database URL is configured', async () => {

@@ -12,7 +12,7 @@ const jsonResponse = (body: unknown, status = 200) =>
   })
 
 const flushDashboard = async () => {
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < 6; index += 1) {
     await Promise.resolve()
     await nextTick()
   }
@@ -639,6 +639,61 @@ describe('browser security dashboard', () => {
     expect(calls[0]?.headers).toEqual({
       Authorization: 'Bearer backend-access-token',
       'x-operator-token': 'ops-token'
+    })
+  })
+
+  it('renders operator token audit entries with token hash prefixes but not raw tokens', async () => {
+    const calls: Array<{ input: string, init?: RequestInit }> = []
+    window.sessionStorage.setItem('dc_security_dashboard_operator_token', 'sdo_saved-dashboard-token')
+    vi.stubGlobal('fetch', async (input, init) => {
+      calls.push({ input: String(input), init })
+      if (String(input).includes('/api/security/operator-token/audit')) {
+        return jsonResponse({
+          entries: [
+            {
+              action: 'revoked',
+              tokenId: 'abc123def456',
+              actor: 'security-admin',
+              at: '2026-05-21T00:06:00.000Z',
+              reason: 'operator cleared session'
+            },
+            {
+              action: 'issued',
+              tokenId: 'fedcba654321',
+              actor: 'operator-token-bootstrap',
+              at: '2026-05-21T00:00:00.000Z'
+            }
+          ]
+        })
+      }
+      return jsonResponse({
+        summary: {
+          total: 0,
+          byEffectiveDirective: {},
+          topDirectives: []
+        },
+        recent: []
+      })
+    })
+
+    const wrapper = await mountSuspended(SecurityPage, {
+      global: { plugins: [pinia] }
+    })
+    await flushDashboard()
+
+    const panel = wrapper.get('[data-testid="operator-token-audit"]')
+    expect(panel.text()).toContain('Operator token audit')
+    expect(panel.text()).toContain('Revoked')
+    expect(panel.text()).toContain('abc123def456')
+    expect(panel.text()).toContain('security-admin')
+    expect(panel.text()).toContain('operator cleared session')
+    expect(panel.text()).toContain('Issued')
+    expect(panel.text()).toContain('fedcba654321')
+    expect(wrapper.text()).not.toContain('sdo_saved-dashboard-token')
+
+    const auditCall = calls.find((call) => call.input.includes('/api/security/operator-token/audit'))
+    expect(auditCall?.init?.headers).toEqual({
+      'x-operator-token': 'sdo_saved-dashboard-token'
     })
   })
 
