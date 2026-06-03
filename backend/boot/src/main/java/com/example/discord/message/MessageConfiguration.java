@@ -1,8 +1,12 @@
 package com.example.discord.message;
 
+import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Clock;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -57,6 +61,32 @@ class MessageConfiguration {
         ChannelMessagePagePort pages
     ) {
         return new DefaultChannelMessageReader(readGuard, pages);
+    }
+
+    @Bean
+    MessagePublicationRelay messagePublicationRelay(
+        MessagePublicationOutboxQueue outbox,
+        MessagePublishedDispatcher dispatcher
+    ) {
+        return new DefaultMessagePublicationRelay(outbox, dispatcher, Clock.systemUTC());
+    }
+
+    @Bean
+    MessagePublishedDispatcher messagePublishedDispatcher(
+        InMemoryGatewayService gatewayService,
+        MessageLookupPort messages
+    ) {
+        return event -> {
+            if (event.target() instanceof ChannelMessageTarget channel) {
+                Message message = messages.requireMessage(channel, event.messageId());
+                gatewayService.publish(
+                    "MESSAGE_CREATE",
+                    channel.guildId(),
+                    channel.channelId(),
+                    gatewayPayload(message)
+                );
+            }
+        };
     }
 
     @Bean
@@ -161,5 +191,30 @@ class MessageConfiguration {
             return channel;
         }
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message target");
+    }
+
+    private static Map<String, Object> gatewayPayload(Message message) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("id", message.id().toString());
+        payload.put("guildId", message.guildId().toString());
+        payload.put("channelId", message.channelId().toString());
+        payload.put("authorId", message.authorId().toString());
+        payload.put("content", message.content().value());
+        payload.put("mentions", message.mentions().stream().map(MessageConfiguration::mentionToken).toList());
+        payload.put("pinned", message.pinned());
+        payload.put("deleted", message.deleted());
+        payload.put("edited", message.edited());
+        payload.put("createdAt", message.createdAt().toString());
+        payload.put("updatedAt", message.updatedAt().toString());
+        return payload;
+    }
+
+    private static String mentionToken(MessageMentionTarget mention) {
+        return switch (mention) {
+            case UserMentionTarget user -> user.userId().toString();
+            case RoleMentionTarget role -> role.roleId().toString();
+            case ChannelMentionTarget channel -> channel.channelId().toString();
+            case SpecialMentionTarget special -> special.kind().name().toLowerCase(Locale.ROOT);
+        };
     }
 }

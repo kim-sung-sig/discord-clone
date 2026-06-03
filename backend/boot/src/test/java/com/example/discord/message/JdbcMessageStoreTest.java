@@ -3,6 +3,7 @@ package com.example.discord.message;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,9 @@ class JdbcMessageStoreTest {
 
     @Autowired
     private MessagePublicationOutbox outbox;
+
+    @Autowired
+    private MessagePublicationOutboxQueue outboxQueue;
 
     @Autowired
     private DataSource dataSource;
@@ -81,6 +85,7 @@ class JdbcMessageStoreTest {
         assertThat(search).isSameAs(messages);
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
+        assertThat(outboxQueue).isSameAs(messages);
     }
 
     @Test
@@ -104,6 +109,41 @@ class JdbcMessageStoreTest {
             .contains(message);
         assertThat(rowCount("message_publication_outbox")).isEqualTo(1);
         assertThat(rowCount("message_publication_outbox_mentions")).isEqualTo(1);
+    }
+
+    @Test
+    void claimsMarksAndReleasesOutboxPublications() throws Exception {
+        Message message = message("relay me", List.of());
+        MessagePublished event = new MessagePublished(
+            UUID.randomUUID(),
+            message.id(),
+            message.author(),
+            message.target(),
+            message.mentions(),
+            "correlation-relay",
+            NOW
+        );
+        publications.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
+
+        List<ClaimedMessagePublication> claimed = outboxQueue.claimPendingPublications(
+            10,
+            NOW,
+            Duration.ofSeconds(30)
+        );
+
+        assertThat(claimed).singleElement().satisfies(publication -> {
+            assertThat(publication.event()).isEqualTo(event);
+            assertThat(publication.claimToken()).isNotNull();
+        });
+        outboxQueue.releaseFailed(event.eventId(), claimed.getFirst().claimToken(), "temporary failure", NOW);
+        assertThat(outboxAttempts(event.eventId())).isEqualTo(1);
+
+        ClaimedMessagePublication retried = outboxQueue.claimPendingPublications(10, NOW.plusSeconds(31), Duration.ofSeconds(30))
+            .getFirst();
+        outboxQueue.markPublished(event.eventId(), retried.claimToken(), NOW.plusSeconds(32));
+
+        assertThat(unpublishedOutboxCount()).isZero();
+        assertThat(publishedOutboxCount()).isEqualTo(1);
     }
 
     @Test
@@ -192,6 +232,47 @@ class JdbcMessageStoreTest {
              var resultSet = statement.executeQuery("SELECT COUNT(*) AS row_count FROM " + tableName)) {
             resultSet.next();
             return resultSet.getInt("row_count");
+        }
+    }
+
+    private int unpublishedOutboxCount() throws Exception {
+        return scalar("""
+            SELECT COUNT(*) AS value
+            FROM message_publication_outbox
+            WHERE published_at IS NULL
+              AND dead_lettered_at IS NULL
+            """);
+    }
+
+    private int publishedOutboxCount() throws Exception {
+        return scalar("""
+            SELECT COUNT(*) AS value
+            FROM message_publication_outbox
+            WHERE published_at IS NOT NULL
+            """);
+    }
+
+    private int outboxAttempts(UUID eventId) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT attempts
+                 FROM message_publication_outbox
+                 WHERE event_id = ?
+                 """)) {
+            statement.setObject(1, eventId);
+            try (var resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getInt("attempts");
+            }
+        }
+    }
+
+    private int scalar(String sql) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.createStatement();
+             var resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getInt("value");
         }
     }
 

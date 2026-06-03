@@ -2,6 +2,7 @@ package com.example.discord.message;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -19,7 +20,14 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 public class InMemoryMessageService
-    implements MessageStore, MessagePublicationStore, ChannelMessagePagePort, ChannelMessageSearchPort, MessageLookupPort {
+    implements
+    MessageStore,
+    MessagePublicationStore,
+    MessagePublicationOutbox,
+    MessagePublicationOutboxQueue,
+    ChannelMessagePagePort,
+    ChannelMessageSearchPort,
+    MessageLookupPort {
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
         .thenComparing(order -> order.messageId().toString())
@@ -29,6 +37,8 @@ public class InMemoryMessageService
     private final Map<UUID, Message> messages = new LinkedHashMap<>();
     private final Map<ChannelKey, NavigableSet<MessageOrder>> messagesByChannel = new LinkedHashMap<>();
     private final Map<IdempotencyScope, UUID> messageIdsByIdempotency = new LinkedHashMap<>();
+    private final Map<UUID, MessagePublished> pendingPublications = new LinkedHashMap<>();
+    private final Map<UUID, UUID> publicationClaimTokens = new LinkedHashMap<>();
 
     public InMemoryMessageService() {
         this(Clock.systemUTC());
@@ -76,7 +86,55 @@ public class InMemoryMessageService
         MessagePublished event
     ) {
         Objects.requireNonNull(event, "event must not be null");
-        return save(message, idempotencyKey);
+        Message saved = save(message, idempotencyKey);
+        pendingPublications.put(event.eventId(), event);
+        return saved;
+    }
+
+    @Override
+    public synchronized void append(MessagePublished event) {
+        Objects.requireNonNull(event, "event must not be null");
+        pendingPublications.put(event.eventId(), event);
+    }
+
+    @Override
+    public synchronized List<ClaimedMessagePublication> claimPendingPublications(
+        int limit,
+        Instant claimedAt,
+        Duration lease
+    ) {
+        Objects.requireNonNull(claimedAt, "claimedAt must not be null");
+        Objects.requireNonNull(lease, "lease must not be null");
+        return pendingPublications.values().stream()
+            .limit(pageSize(limit))
+            .map(event -> {
+                UUID claimToken = UUID.randomUUID();
+                publicationClaimTokens.put(event.eventId(), claimToken);
+                return new ClaimedMessagePublication(event, claimToken);
+            })
+            .toList();
+    }
+
+    @Override
+    public synchronized void markPublished(UUID eventId, UUID claimToken, Instant publishedAt) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(claimToken, "claimToken must not be null");
+        Objects.requireNonNull(publishedAt, "publishedAt must not be null");
+        if (!claimToken.equals(publicationClaimTokens.get(eventId))) {
+            return;
+        }
+        pendingPublications.remove(eventId);
+        publicationClaimTokens.remove(eventId);
+    }
+
+    @Override
+    public synchronized void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(claimToken, "claimToken must not be null");
+        Objects.requireNonNull(failedAt, "failedAt must not be null");
+        if (claimToken.equals(publicationClaimTokens.get(eventId))) {
+            publicationClaimTokens.remove(eventId);
+        }
     }
 
     @Override

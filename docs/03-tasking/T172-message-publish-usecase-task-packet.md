@@ -75,6 +75,8 @@ Expected tests:
 - publish use case가 메시지 저장과 outbox 이벤트 저장을 `MessagePublicationStore.savePublished(...)` 하나의 포트 호출로 위임
 - idempotency key를 `message_idempotency_keys`에 TTL과 함께 저장하고 만료 key는 재시도 판정에서 제외
 - `message_publication_outbox`와 mention target outbox row 저장
+- outbox relay는 unpublished row를 bounded batch로 claim하고, 성공분만 `published_at`을 갱신
+- relay 실패 시 claim을 해제하고 attempts/last_error/dead-letter 상태를 갱신
 - message module 전체 테스트
 - backend boot 테스트
 - root Gradle 테스트
@@ -105,6 +107,7 @@ RED:
 - `DefaultChannelMessageReaderTest`: reader/read guard/page port 없음으로 컴파일 실패
 - `JdbcMessageStoreTest`: postgres profile JDBC adapter/store/read/search/lookup/outbox 경계 없음
 - `DefaultPublishMessageUseCaseTest`: 기존 publish use case가 `MessageStore.save(...)`와 `MessagePublicationOutbox.append(...)`를 별도 호출하던 구조와 충돌
+- `DefaultMessagePublicationRelayTest`: relay/dispatcher/mark-published 경계 없음
 
 GREEN:
 
@@ -126,6 +129,11 @@ GREEN:
 - legacy `PersistentMessageService`, `MessageSnapshotStore`, `JdbcMessageSnapshotStore`, `PostgresMessageServiceTest` 제거
 - `MessagePublicationStore`를 추가하고 `DefaultPublishMessageUseCase`가 idempotent publish 저장과 `MessagePublished` outbox 저장을 `savePublished(...)` 한 번으로 위임하도록 전환
 - `JdbcMessageStore.savePublished(...)`는 동일 JDBC connection/transaction 안에서 message, mentions, edits, idempotency key, outbox, outbox mentions를 저장
+- `MessagePublicationRelay`, `MessagePublicationOutboxQueue`, `MessagePublishedDispatcher`, `ClaimedMessagePublication` 추가
+- relay는 claim lease 기반 bounded batch만 처리하고, dispatcher 성공 후 claim token으로 `published_at`을 갱신
+- 실패한 dispatch는 published 처리하지 않고 claim을 해제하며 failure metadata를 남긴다
+- `V10__message_outbox_claims.sql`로 outbox claim token, claim lease, attempts, last_error, dead_lettered_at 추가
+- `MessagePublicationRelayWorker`가 fixed-delay scheduled relay를 실행한다
 
 ## 보안/확장성 확인
 
@@ -141,4 +149,6 @@ GREEN:
 - default/local profile은 아직 `InMemoryMessageService`를 포트 구현으로 사용한다. 이것은 local runtime용 잔여 구현이며, 운영/DB profile의 기준 구현은 `JdbcMessageStore`다.
 - `JdbcMessageStoreTest`는 `DISCORD_RUN_POSTGRES_TESTS=true`가 필요하다. 기본 로컬 검증에서는 컴파일만 확인되고 실제 PostgreSQL round-trip은 CI 또는 로컬 Postgres 제공 환경에서 실행해야 한다.
 - postgres profile의 publish path는 `MessagePublicationStore.savePublished(...)`를 통해 message/idempotency/outbox 저장을 하나의 adapter transaction 경계로 묶는다.
-- outbox dispatcher/relay, published marker 갱신, 재처리 스케줄러는 아직 없다. 현재 범위는 outbox row의 원자 저장까지다.
+- outbox relay는 `discord.message.outbox-relay-batch-size`로 bounded batch를 사용하고, claim lease로 다중 worker 중복 처리를 줄인다.
+- outbox dispatcher는 `MessagePublished`를 message lookup으로 보강한 뒤 gateway `MESSAGE_CREATE` 이벤트로 발행한다.
+- dead-letter 상태 컬럼은 추가했지만 operator 재처리 API, dead-letter 조회 API, 보상 트랜잭션/SAGA 오케스트레이션은 아직 없다.
