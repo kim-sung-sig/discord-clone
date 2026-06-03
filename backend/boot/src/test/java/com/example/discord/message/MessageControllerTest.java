@@ -86,7 +86,7 @@ class MessageControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content").value("after <@00000000-0000-0000-0000-000000000099>"))
             .andExpect(jsonPath("$.edited").value(true))
-            .andExpect(jsonPath("$.mentions", hasItem("00000000-0000-0000-0000-000000000099")));
+            .andExpect(jsonPath("$.mentions").isEmpty());
 
         mockMvc.perform(delete("/api/channels/{channelId}/messages/{messageId}", channelId, messageId)
                 .header("Authorization", author.bearer()))
@@ -97,7 +97,7 @@ class MessageControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.messages[0].id").value(messageId))
             .andExpect(jsonPath("$.messages[0].deleted").value(true))
-            .andExpect(jsonPath("$.messages[0].content").value(""));
+            .andExpect(jsonPath("$.messages[0].content").value("[deleted]"));
     }
 
     @Test

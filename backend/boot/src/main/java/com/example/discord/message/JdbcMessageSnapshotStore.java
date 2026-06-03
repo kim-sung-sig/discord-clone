@@ -36,10 +36,12 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
                 UUID messageId = resultSet.getObject("id", UUID.class);
                 messages.add(new Message(
                     messageId,
-                    resultSet.getObject("guild_id", UUID.class),
-                    resultSet.getObject("channel_id", UUID.class),
-                    resultSet.getObject("author_id", UUID.class),
-                    resultSet.getString("content"),
+                    new UserMessageAuthor(resultSet.getObject("author_id", UUID.class)),
+                    new ChannelMessageTarget(
+                        resultSet.getObject("guild_id", UUID.class),
+                        resultSet.getObject("channel_id", UUID.class)
+                    ),
+                    new MessageContent(resultSet.getString("content")),
                     loadMentions(connection, messageId),
                     resultSet.getBoolean("pinned"),
                     resultSet.getBoolean("deleted"),
@@ -97,7 +99,7 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
                 updated_at = ?
             WHERE id = ?
             """)) {
-            statement.setString(1, message.content());
+            statement.setString(1, message.content().value());
             statement.setBoolean(2, message.pinned());
             statement.setBoolean(3, message.deleted());
             statement.setBoolean(4, message.edited());
@@ -117,7 +119,7 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
         statement.setObject(3, message.channelId());
         statement.setObject(4, message.authorId());
         statement.setLong(5, sequence);
-        statement.setString(6, message.content());
+        statement.setString(6, message.content().value());
         statement.setBoolean(7, message.pinned());
         statement.setBoolean(8, message.deleted());
         statement.setBoolean(9, message.edited());
@@ -147,7 +149,7 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
         }
     }
 
-    private static List<String> loadMentions(Connection connection, UUID messageId) throws SQLException {
+    private static List<MessageMentionTarget> loadMentions(Connection connection, UUID messageId) throws SQLException {
         try (var statement = connection.prepareStatement("""
             SELECT mention
             FROM message_mention_tokens
@@ -156,9 +158,9 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
             """)) {
             statement.setObject(1, messageId);
             try (ResultSet resultSet = statement.executeQuery()) {
-                List<String> mentions = new ArrayList<>();
+                List<MessageMentionTarget> mentions = new ArrayList<>();
                 while (resultSet.next()) {
-                    mentions.add(resultSet.getString("mention"));
+                    mentionFromToken(resultSet.getString("mention")).ifPresent(mentions::add);
                 }
                 return mentions;
             }
@@ -177,7 +179,7 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
                 List<MessageEdit> edits = new ArrayList<>();
                 while (resultSet.next()) {
                     edits.add(new MessageEdit(
-                        resultSet.getString("content"),
+                        new MessageContent(resultSet.getString("content")),
                         resultSet.getTimestamp("edited_at").toInstant()
                     ));
                 }
@@ -189,13 +191,13 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
     private static void replaceMentions(Connection connection, Message message) throws SQLException {
         deleteByMessageId(connection, "DELETE FROM message_mention_tokens WHERE message_id = ?", message.id());
         int position = 0;
-        for (String mention : message.mentions()) {
+        for (MessageMentionTarget mention : message.mentions()) {
             try (var statement = connection.prepareStatement("""
                 INSERT INTO message_mention_tokens(message_id, mention, position)
                 VALUES (?, ?, ?)
                 """)) {
                 statement.setObject(1, message.id());
-                statement.setString(2, mention);
+                statement.setString(2, mentionToken(mention));
                 statement.setInt(3, position++);
                 statement.executeUpdate();
             }
@@ -211,11 +213,28 @@ class JdbcMessageSnapshotStore implements MessageSnapshotStore {
                 """)) {
                 statement.setObject(1, UUID.randomUUID());
                 statement.setObject(2, message.id());
-                statement.setString(3, edit.content());
+                statement.setString(3, edit.content().value());
                 statement.setTimestamp(4, Timestamp.from(edit.editedAt()));
                 statement.executeUpdate();
             }
         }
+    }
+
+    private static java.util.Optional<MessageMentionTarget> mentionFromToken(String token) {
+        try {
+            return java.util.Optional.of(new UserMentionTarget(UUID.fromString(token)));
+        } catch (IllegalArgumentException exception) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private static String mentionToken(MessageMentionTarget mention) {
+        return switch (mention) {
+            case UserMentionTarget user -> user.userId().toString();
+            case RoleMentionTarget role -> role.roleId().toString();
+            case ChannelMentionTarget channel -> channel.channelId().toString();
+            case SpecialMentionTarget special -> special.kind().name().toLowerCase(java.util.Locale.ROOT);
+        };
     }
 
     private static void deleteByMessageId(Connection connection, String sql, UUID messageId) throws SQLException {

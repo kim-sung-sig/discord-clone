@@ -1,5 +1,6 @@
 package com.example.discord.message;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,11 @@ class IdempotencyKeyTest {
         assertThatThrownBy(() -> new IdempotencyKey("   "))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("idempotency key must not be blank");
+    }
+
+    @Test
+    void normalizesSurroundingWhitespace() {
+        assertThat(new IdempotencyKey("  send-1  ").value()).isEqualTo("send-1");
     }
 
     @Test

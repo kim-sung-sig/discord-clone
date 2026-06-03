@@ -8,7 +8,6 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,11 +17,8 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 public class InMemoryMessageService {
-    private static final Pattern USER_ID_MENTION = Pattern.compile("<@([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})>");
-    private static final Pattern USERNAME_MENTION = Pattern.compile("(?<![A-Za-z0-9_.<])@([A-Za-z0-9][A-Za-z0-9-]{0,31})");
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
         .thenComparing(order -> order.messageId().toString())
@@ -46,15 +42,14 @@ public class InMemoryMessageService {
 
     public synchronized Message create(CreateMessageCommand command) {
         requireCommand(command);
-        String content = requireContent(command.content());
+        MessageContent content = requireContent(command.content());
         Instant now = clock.instant();
         Message message = new Message(
             UUID.randomUUID(),
-            command.guildId(),
-            command.channelId(),
-            command.authorId(),
+            new UserMessageAuthor(command.authorId()),
+            new ChannelMessageTarget(command.guildId(), command.channelId()),
             content,
-            mentions(content),
+            List.of(),
             false,
             false,
             List.of(),
@@ -88,7 +83,7 @@ public class InMemoryMessageService {
 
     public synchronized Message edit(EditMessageCommand command) {
         requireCommand(command);
-        String content = requireContent(command.content());
+        MessageContent content = requireContent(command.content());
         Message current = requireMessage(command.guildId(), command.channelId(), command.messageId());
         if (current.deleted()) {
             throw new IllegalStateException("deleted message cannot be edited");
@@ -97,11 +92,10 @@ public class InMemoryMessageService {
         history.add(new MessageEdit(current.content(), clock.instant()));
         Message updated = new Message(
             current.id(),
-            current.guildId(),
-            current.channelId(),
-            current.authorId(),
+            current.author(),
+            current.target(),
             content,
-            mentions(content),
+            List.of(),
             current.pinned(),
             false,
             history,
@@ -116,10 +110,9 @@ public class InMemoryMessageService {
         Message current = requireMessage(guildId, channelId, messageId);
         Message deleted = new Message(
             current.id(),
-            current.guildId(),
-            current.channelId(),
-            current.authorId(),
-            "",
+            current.author(),
+            current.target(),
+            new MessageContent("[deleted]"),
             List.of(),
             current.pinned(),
             true,
@@ -166,9 +159,8 @@ public class InMemoryMessageService {
         Message current = requireMessage(guildId, channelId, messageId);
         Message updated = new Message(
             current.id(),
-            current.guildId(),
-            current.channelId(),
-            current.authorId(),
+            current.author(),
+            current.target(),
             current.content(),
             current.mentions(),
             pinned,
@@ -254,7 +246,7 @@ public class InMemoryMessageService {
     private static boolean matchesSearch(Message message, String normalized) {
         return message != null
             && !message.deleted()
-            && message.content().toLowerCase(Locale.ROOT).contains(normalized);
+            && message.content().value().toLowerCase(Locale.ROOT).contains(normalized);
     }
 
     private Message requireMessage(UUID guildId, UUID channelId, UUID messageId) {
@@ -284,11 +276,12 @@ public class InMemoryMessageService {
         Objects.requireNonNull(channelId, "channelId must not be null");
     }
 
-    private static String requireContent(String content) {
-        if (content == null || content.isBlank()) {
-            throw new IllegalArgumentException("message content is required");
+    private static MessageContent requireContent(String content) {
+        try {
+            return new MessageContent(content);
+        } catch (NullPointerException | IllegalArgumentException exception) {
+            throw new IllegalArgumentException("message content is required", exception);
         }
-        return content;
     }
 
     private static int pageSize(int limit) {
@@ -296,20 +289,6 @@ public class InMemoryMessageService {
             return 50;
         }
         return Math.min(limit, 100);
-    }
-
-    private static List<String> mentions(String content) {
-        LinkedHashSet<String> mentions = new LinkedHashSet<>();
-        var userIdMatcher = USER_ID_MENTION.matcher(content);
-        while (userIdMatcher.find()) {
-            mentions.add(UUID.fromString(userIdMatcher.group(1)).toString());
-        }
-
-        var usernameMatcher = USERNAME_MENTION.matcher(content);
-        while (usernameMatcher.find()) {
-            mentions.add(usernameMatcher.group(1).toLowerCase(Locale.ROOT));
-        }
-        return List.copyOf(mentions);
     }
 
     private record Cursor(Instant createdAt, String id) {

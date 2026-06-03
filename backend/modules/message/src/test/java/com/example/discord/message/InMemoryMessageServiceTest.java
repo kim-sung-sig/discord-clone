@@ -51,7 +51,7 @@ class InMemoryMessageServiceTest {
     }
 
     @Test
-    void extractsUuidMentionsFromDiscordStyleTokens() {
+    void doesNotExtractMentionsFromContent() {
         InMemoryMessageService service = service();
 
         Message message = service.create(new CreateMessageCommand(
@@ -61,7 +61,7 @@ class InMemoryMessageServiceTest {
             "hello <@" + MENTION_ID + "> and @alice-dev and <@not-a-uuid>"
         ));
 
-        assertThat(message.mentions()).containsExactly(MENTION_ID.toString(), "alice-dev");
+        assertThat(message.mentions()).isEmpty();
     }
 
     @Test
@@ -71,10 +71,10 @@ class InMemoryMessageServiceTest {
 
         Message edited = service.edit(new EditMessageCommand(GUILD_ID, CHANNEL_ID, original.id(), "after"));
 
-        assertThat(edited.content()).isEqualTo("after");
+        assertThat(edited.content()).isEqualTo(new MessageContent("after"));
         assertThat(edited.edited()).isTrue();
         assertThat(edited.editHistory()).hasSize(1);
-        assertThat(edited.editHistory().getFirst().content()).isEqualTo("before");
+        assertThat(edited.editHistory().getFirst().content()).isEqualTo(new MessageContent("before"));
     }
 
     @Test
@@ -85,7 +85,7 @@ class InMemoryMessageServiceTest {
         Message deleted = service.delete(GUILD_ID, CHANNEL_ID, original.id());
 
         assertThat(deleted.deleted()).isTrue();
-        assertThat(deleted.content()).isEmpty();
+        assertThat(deleted.content()).isEqualTo(new MessageContent("[deleted]"));
         assertThat(service.messages(GUILD_ID, CHANNEL_ID, null, 10).messages())
             .singleElement()
             .extracting(Message::deleted)
@@ -100,7 +100,7 @@ class InMemoryMessageServiceTest {
 
         Message deleted = service.delete(GUILD_ID, CHANNEL_ID, edited.id());
 
-        assertThat(deleted.content()).isEmpty();
+        assertThat(deleted.content()).isEqualTo(new MessageContent("[deleted]"));
         assertThat(deleted.editHistory()).isEmpty();
     }
 

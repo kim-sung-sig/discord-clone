@@ -52,7 +52,7 @@ class PostgresMessageServiceTest {
     }
 
     @Test
-    void persistsMessagesAndReloadsEditsPinsAndMentions() {
+    void persistsMessagesAndReloadsEditsAndPins() {
         InMemoryMessageService service = new PersistentMessageService(snapshots);
         Message created = service.create(new CreateMessageCommand(guildId, channelId, ownerId, "hello @alice"));
         service.edit(new EditMessageCommand(guildId, channelId, created.id(), "hello <@" + ownerId + ">"));
@@ -61,8 +61,8 @@ class PostgresMessageServiceTest {
         InMemoryMessageService reloaded = new PersistentMessageService(snapshots);
         Message message = reloaded.message(guildId, channelId, created.id());
 
-        assertThat(message.content()).isEqualTo("hello <@" + ownerId + ">");
-        assertThat(message.mentions()).containsExactly(ownerId.toString());
+        assertThat(message.content()).isEqualTo(new MessageContent("hello <@" + ownerId + ">"));
+        assertThat(message.mentions()).isEmpty();
         assertThat(message.pinned()).isTrue();
         assertThat(message.edited()).isTrue();
         assertThat(message.editHistory()).hasSize(1);

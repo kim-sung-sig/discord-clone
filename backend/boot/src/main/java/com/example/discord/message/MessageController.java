@@ -218,8 +218,8 @@ class MessageController {
                 message.guildId(),
                 message.channelId(),
                 message.authorId(),
-                message.content(),
-                message.mentions(),
+                message.content().value(),
+                message.mentions().stream().map(MessageResponse::mentionToken).toList(),
                 message.pinned(),
                 message.deleted(),
                 message.edited(),
@@ -228,11 +228,20 @@ class MessageController {
                 message.updatedAt()
             );
         }
+
+        private static String mentionToken(MessageMentionTarget mention) {
+            return switch (mention) {
+                case UserMentionTarget user -> user.userId().toString();
+                case RoleMentionTarget role -> role.roleId().toString();
+                case ChannelMentionTarget channel -> channel.channelId().toString();
+                case SpecialMentionTarget special -> special.kind().name().toLowerCase(java.util.Locale.ROOT);
+            };
+        }
     }
 
     record MessageEditResponse(String content, Instant editedAt) {
         static MessageEditResponse from(MessageEdit edit) {
-            return new MessageEditResponse(edit.content(), edit.editedAt());
+            return new MessageEditResponse(edit.content().value(), edit.editedAt());
         }
     }
 
