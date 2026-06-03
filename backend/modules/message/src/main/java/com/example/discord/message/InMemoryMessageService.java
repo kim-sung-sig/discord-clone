@@ -18,7 +18,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
-public class InMemoryMessageService implements MessageStore {
+public class InMemoryMessageService
+    implements MessageStore, ChannelMessagePagePort, ChannelMessageSearchPort, MessageLookupPort {
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
         .thenComparing(order -> order.messageId().toString())
@@ -115,6 +116,12 @@ public class InMemoryMessageService implements MessageStore {
         return new MessagePage(visiblePage, nextCursor);
     }
 
+    @Override
+    public synchronized MessagePage read(ChannelMessageTarget target, String beforeCursor, int limit) {
+        Objects.requireNonNull(target, "target must not be null");
+        return messages(target.guildId(), target.channelId(), beforeCursor, limit);
+    }
+
     public synchronized Message edit(EditMessageCommand command) {
         requireCommand(command);
         MessageContent content = requireContent(command.content());
@@ -175,6 +182,12 @@ public class InMemoryMessageService implements MessageStore {
         return searchChannel(guildId, channelId, normalized, pageSize(limit));
     }
 
+    @Override
+    public synchronized List<Message> search(ChannelMessageTarget target, String query, int limit) {
+        Objects.requireNonNull(target, "target must not be null");
+        return search(target.guildId(), target.channelId(), query, limit);
+    }
+
     public synchronized List<Message> search(UUID guildId, Set<UUID> allowedChannelIds, String query, int limit) {
         Objects.requireNonNull(guildId, "guildId must not be null");
         Set<UUID> channels = allowedChannelIds == null ? Set.of() : Set.copyOf(allowedChannelIds);
@@ -187,6 +200,12 @@ public class InMemoryMessageService implements MessageStore {
 
     public synchronized Message message(UUID guildId, UUID channelId, UUID messageId) {
         return requireMessage(guildId, channelId, messageId);
+    }
+
+    @Override
+    public synchronized Message requireMessage(ChannelMessageTarget target, UUID messageId) {
+        Objects.requireNonNull(target, "target must not be null");
+        return message(target.guildId(), target.channelId(), messageId);
     }
 
     private Message pinned(UUID guildId, UUID channelId, UUID messageId, boolean pinned) {

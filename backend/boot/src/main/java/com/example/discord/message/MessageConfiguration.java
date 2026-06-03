@@ -18,12 +18,6 @@ class MessageConfiguration {
     }
 
     @Bean
-    @Profile("postgres")
-    InMemoryMessageService persistentMessageService(MessageSnapshotStore snapshots) {
-        return new PersistentMessageService(snapshots);
-    }
-
-    @Bean
     PublishMessageUseCase publishMessageUseCase(
         MessageStore messages,
         MessagePublishGuard publishGuard,
@@ -61,12 +55,9 @@ class MessageConfiguration {
     @Bean
     ChannelMessageReader channelMessageReader(
         ChannelMessageReadGuard readGuard,
-        InMemoryMessageService messageService
+        ChannelMessagePagePort pages
     ) {
-        return new DefaultChannelMessageReader(
-            readGuard,
-            (target, beforeCursor, limit) -> messageService.messages(target.guildId(), target.channelId(), beforeCursor, limit)
-        );
+        return new DefaultChannelMessageReader(readGuard, pages);
     }
 
     @Bean
@@ -153,6 +144,7 @@ class MessageConfiguration {
     }
 
     @Bean
+    @Profile("!postgres")
     MessagePublicationOutbox messagePublicationOutbox() {
         return event -> {
         };

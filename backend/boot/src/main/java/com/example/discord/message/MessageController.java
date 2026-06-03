@@ -30,33 +30,33 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/channels/{channelId}/messages")
 class MessageController {
-    private final InMemoryMessageService messageService;
     private final PublishMessageUseCase publishMessage;
     private final EditMessageUseCase editMessage;
     private final DeleteMessageUseCase deleteMessage;
     private final PinMessageUseCase pinMessage;
     private final ChannelMessageReader channelMessageReader;
+    private final ChannelMessageSearchPort messageSearch;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     MessageController(
-        InMemoryMessageService messageService,
         PublishMessageUseCase publishMessage,
         EditMessageUseCase editMessage,
         DeleteMessageUseCase deleteMessage,
         PinMessageUseCase pinMessage,
         ChannelMessageReader channelMessageReader,
+        ChannelMessageSearchPort messageSearch,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
-        this.messageService = messageService;
         this.publishMessage = publishMessage;
         this.editMessage = editMessage;
         this.deleteMessage = deleteMessage;
         this.pinMessage = pinMessage;
         this.channelMessageReader = channelMessageReader;
+        this.messageSearch = messageSearch;
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -174,7 +174,7 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = requireView(channelId, requesterId);
-        return messageService.search(guildId, channelId, q, limit).stream()
+        return messageSearch.search(new ChannelMessageTarget(guildId, channelId), q, limit).stream()
             .map(MessageResponse::from)
             .toList();
     }

@@ -2,7 +2,8 @@ package com.example.discord.storage;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
-import com.example.discord.message.InMemoryMessageService;
+import com.example.discord.message.ChannelMessageTarget;
+import com.example.discord.message.MessageLookupPort;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -27,18 +28,18 @@ import org.springframework.web.server.ResponseStatusException;
 class AttachmentController {
     private final InMemoryAttachmentService attachmentService;
     private final InMemoryGuildService guildService;
-    private final InMemoryMessageService messageService;
+    private final MessageLookupPort messageLookup;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     AttachmentController(
         InMemoryAttachmentService attachmentService,
         InMemoryGuildService guildService,
-        InMemoryMessageService messageService,
+        MessageLookupPort messageLookup,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.attachmentService = attachmentService;
         this.guildService = guildService;
-        this.messageService = messageService;
+        this.messageLookup = messageLookup;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -85,7 +86,7 @@ class AttachmentController {
         if (!guildService.canSendMessages(guildId, channelId, requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "send messages permission required");
         }
-        messageService.message(guildId, channelId, messageId);
+        messageLookup.requireMessage(new ChannelMessageTarget(guildId, channelId), messageId);
         return AttachmentResponse.from(attachmentService.attachToMessage(
             attachmentId,
             requesterId,
