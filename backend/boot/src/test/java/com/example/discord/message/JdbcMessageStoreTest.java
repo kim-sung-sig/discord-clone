@@ -43,6 +43,9 @@ class JdbcMessageStoreTest {
     private MessagePublicationOutboxQueue outboxQueue;
 
     @Autowired
+    private MessagePublicationDeadLetterQueue deadLetters;
+
+    @Autowired
     private DataSource dataSource;
 
     private UUID ownerId;
@@ -86,6 +89,7 @@ class JdbcMessageStoreTest {
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
         assertThat(outboxQueue).isSameAs(messages);
+        assertThat(deadLetters).isSameAs(messages);
     }
 
     @Test
@@ -144,6 +148,50 @@ class JdbcMessageStoreTest {
 
         assertThat(unpublishedOutboxCount()).isZero();
         assertThat(publishedOutboxCount()).isEqualTo(1);
+    }
+
+    @Test
+    void listsAndRequeuesDeadLetterPublications() throws Exception {
+        Message message = message("dead letter replay", List.of(new SpecialMentionTarget(SpecialMentionKind.HERE)));
+        MessagePublished event = new MessagePublished(
+            UUID.randomUUID(),
+            message.id(),
+            message.author(),
+            message.target(),
+            message.mentions(),
+            "correlation-dead-letter",
+            NOW
+        );
+        publications.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
+
+        for (int attempt = 1; attempt <= 10; attempt++) {
+            ClaimedMessagePublication claimed = outboxQueue.claimPendingPublications(
+                    1,
+                    NOW.plusSeconds(attempt * 31L),
+                    Duration.ofSeconds(30)
+                )
+                .getFirst();
+            outboxQueue.releaseFailed(
+                event.eventId(),
+                claimed.claimToken(),
+                "gateway down " + attempt,
+                NOW.plusSeconds(attempt * 31L)
+            );
+        }
+
+        assertThat(deadLetters.listDeadLetters(10))
+            .singleElement()
+            .satisfies(deadLetter -> {
+                assertThat(deadLetter.event()).isEqualTo(event);
+                assertThat(deadLetter.attempts()).isEqualTo(10);
+                assertThat(deadLetter.lastError()).isEqualTo("gateway down 10");
+            });
+
+        assertThat(deadLetters.requeueDeadLetter(event.eventId(), NOW.plusSeconds(600))).isTrue();
+        assertThat(deadLetters.listDeadLetters(10)).isEmpty();
+        assertThat(outboxQueue.claimPendingPublications(1, NOW.plusSeconds(601), Duration.ofSeconds(30)))
+            .singleElement()
+            .satisfies(publication -> assertThat(publication.event()).isEqualTo(event));
     }
 
     @Test

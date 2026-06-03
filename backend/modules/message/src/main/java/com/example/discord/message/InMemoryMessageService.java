@@ -25,6 +25,7 @@ public class InMemoryMessageService
     MessagePublicationStore,
     MessagePublicationOutbox,
     MessagePublicationOutboxQueue,
+    MessagePublicationDeadLetterQueue,
     ChannelMessagePagePort,
     ChannelMessageSearchPort,
     MessageLookupPort {
@@ -39,6 +40,9 @@ public class InMemoryMessageService
     private final Map<IdempotencyScope, UUID> messageIdsByIdempotency = new LinkedHashMap<>();
     private final Map<UUID, MessagePublished> pendingPublications = new LinkedHashMap<>();
     private final Map<UUID, UUID> publicationClaimTokens = new LinkedHashMap<>();
+    private final Map<UUID, Integer> publicationAttempts = new LinkedHashMap<>();
+    private final Map<UUID, String> publicationLastErrors = new LinkedHashMap<>();
+    private final Map<UUID, DeadLetteredMessagePublication> deadLetterPublications = new LinkedHashMap<>();
 
     public InMemoryMessageService() {
         this(Clock.systemUTC());
@@ -106,6 +110,7 @@ public class InMemoryMessageService
         Objects.requireNonNull(claimedAt, "claimedAt must not be null");
         Objects.requireNonNull(lease, "lease must not be null");
         return pendingPublications.values().stream()
+            .filter(event -> !publicationClaimTokens.containsKey(event.eventId()))
             .limit(pageSize(limit))
             .map(event -> {
                 UUID claimToken = UUID.randomUUID();
@@ -134,7 +139,41 @@ public class InMemoryMessageService
         Objects.requireNonNull(failedAt, "failedAt must not be null");
         if (claimToken.equals(publicationClaimTokens.get(eventId))) {
             publicationClaimTokens.remove(eventId);
+            int attempts = publicationAttempts.merge(eventId, 1, Integer::sum);
+            String lastError = errorMessage == null ? "" : errorMessage;
+            publicationLastErrors.put(eventId, lastError);
+            if (attempts >= 10) {
+                MessagePublished event = pendingPublications.remove(eventId);
+                if (event != null) {
+                    deadLetterPublications.put(
+                        eventId,
+                        new DeadLetteredMessagePublication(event, attempts, lastError, failedAt)
+                    );
+                }
+            }
         }
+    }
+
+    @Override
+    public synchronized List<DeadLetteredMessagePublication> listDeadLetters(int limit) {
+        return deadLetterPublications.values().stream()
+            .limit(pageSize(limit))
+            .toList();
+    }
+
+    @Override
+    public synchronized boolean requeueDeadLetter(UUID eventId, Instant requestedAt) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(requestedAt, "requestedAt must not be null");
+        DeadLetteredMessagePublication deadLetter = deadLetterPublications.remove(eventId);
+        if (deadLetter == null) {
+            return false;
+        }
+        publicationAttempts.remove(eventId);
+        publicationLastErrors.remove(eventId);
+        publicationClaimTokens.remove(eventId);
+        pendingPublications.put(eventId, deadLetter.event());
+        return true;
     }
 
     @Override

@@ -29,7 +29,8 @@ class JdbcMessageStore implements
     ChannelMessageSearchPort,
     MessageLookupPort,
     MessagePublicationOutbox,
-    MessagePublicationOutboxQueue {
+    MessagePublicationOutboxQueue,
+    MessagePublicationDeadLetterQueue {
     private static final Duration IDEMPOTENCY_RETENTION = Duration.ofDays(7);
     private static final int MAX_PUBLICATION_ATTEMPTS = 10;
 
@@ -354,6 +355,70 @@ class JdbcMessageStore implements
             statement.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to release failed message publication outbox event", exception);
+        }
+    }
+
+    @Override
+    public List<DeadLetteredMessagePublication> listDeadLetters(int limit) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT event_id,
+                        message_id,
+                        author_type,
+                        author_id,
+                        target_type,
+                        guild_id,
+                        channel_id,
+                        correlation_id,
+                        occurred_at,
+                        attempts,
+                        last_error,
+                        dead_lettered_at
+                 FROM message_publication_outbox
+                 WHERE published_at IS NULL
+                   AND dead_lettered_at IS NOT NULL
+                 ORDER BY dead_lettered_at, event_id
+                 LIMIT ?
+                 """)) {
+            statement.setInt(1, pageSize(limit));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<DeadLetteredMessagePublication> deadLetters = new ArrayList<>();
+                while (resultSet.next()) {
+                    deadLetters.add(new DeadLetteredMessagePublication(
+                        outboxEventFrom(connection, resultSet),
+                        resultSet.getInt("attempts"),
+                        resultSet.getString("last_error"),
+                        resultSet.getTimestamp("dead_lettered_at").toInstant()
+                    ));
+                }
+                return List.copyOf(deadLetters);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to list message publication dead letters", exception);
+        }
+    }
+
+    @Override
+    public boolean requeueDeadLetter(UUID eventId, Instant requestedAt) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(requestedAt, "requestedAt must not be null");
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 UPDATE message_publication_outbox
+                 SET dead_lettered_at = NULL,
+                     attempts = 0,
+                     last_error = NULL,
+                     claim_token = NULL,
+                     claimed_at = NULL,
+                     claim_expires_at = NULL
+                 WHERE event_id = ?
+                   AND published_at IS NULL
+                   AND dead_lettered_at IS NOT NULL
+                 """)) {
+            statement.setObject(1, eventId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to requeue message publication dead letter", exception);
         }
     }
 

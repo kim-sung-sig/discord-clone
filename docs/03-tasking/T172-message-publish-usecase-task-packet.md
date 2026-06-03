@@ -77,6 +77,8 @@ Expected tests:
 - `message_publication_outbox`와 mention target outbox row 저장
 - outbox relay는 unpublished row를 bounded batch로 claim하고, 성공분만 `published_at`을 갱신
 - relay 실패 시 claim을 해제하고 attempts/last_error/dead-letter 상태를 갱신
+- internal operator header 없이는 dead-letter 조회/replay API 접근 거절
+- internal operator header가 있으면 dead-letter publication을 조회하고 replay 요청으로 relay 대상에 다시 올림
 - message module 전체 테스트
 - backend boot 테스트
 - root Gradle 테스트
@@ -134,6 +136,10 @@ GREEN:
 - 실패한 dispatch는 published 처리하지 않고 claim을 해제하며 failure metadata를 남긴다
 - `V10__message_outbox_claims.sql`로 outbox claim token, claim lease, attempts, last_error, dead_lettered_at 추가
 - `MessagePublicationRelayWorker`가 fixed-delay scheduled relay를 실행한다
+- `MessagePublicationDeadLetterQueue`, `DeadLetteredMessagePublication` 추가
+- `MessageOutboxController`가 `X-Internal-Message-Outbox-Operator` 헤더와 `discord.message.outbox-operator-token`으로 보호되는 dead-letter 조회/replay API를 제공
+- replay 요청은 dead-letter 상태를 해제하고 attempts/error/claim 상태를 초기화해 relay가 다시 claim할 수 있게 함
+- `JdbcMessageStore`가 dead-letter 조회/requeue 포트를 제공하고, local/default 포트 구현도 동일 계약을 제공
 
 ## 보안/확장성 확인
 
@@ -151,4 +157,5 @@ GREEN:
 - postgres profile의 publish path는 `MessagePublicationStore.savePublished(...)`를 통해 message/idempotency/outbox 저장을 하나의 adapter transaction 경계로 묶는다.
 - outbox relay는 `discord.message.outbox-relay-batch-size`로 bounded batch를 사용하고, claim lease로 다중 worker 중복 처리를 줄인다.
 - outbox dispatcher는 `MessagePublished`를 message lookup으로 보강한 뒤 gateway `MESSAGE_CREATE` 이벤트로 발행한다.
-- dead-letter 상태 컬럼은 추가했지만 operator 재처리 API, dead-letter 조회 API, 보상 트랜잭션/SAGA 오케스트레이션은 아직 없다.
+- dead-letter 조회/replay API는 내부 operator header로 보호한다. replay는 즉시 dispatch하지 않고 dead-letter 상태를 해제해 scheduled relay가 다시 claim하도록 만든다.
+- 보상 트랜잭션/SAGA 오케스트레이션은 아직 없다.
