@@ -24,6 +24,9 @@ class JdbcMessageStoreTest {
     private MessageStore messages;
 
     @Autowired
+    private MessagePublicationStore publications;
+
+    @Autowired
     private ChannelMessagePagePort pages;
 
     @Autowired
@@ -73,10 +76,34 @@ class JdbcMessageStoreTest {
     @Test
     void postgresProfileUsesJdbcMessagePorts() {
         assertThat(messages).isInstanceOf(JdbcMessageStore.class);
+        assertThat(publications).isSameAs(messages);
         assertThat(pages).isSameAs(messages);
         assertThat(search).isSameAs(messages);
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
+    }
+
+    @Test
+    void savePublishedPersistsMessageIdempotencyKeyAndOutboxInOnePortCall() throws Exception {
+        Message message = message("published once", List.of(new SpecialMentionTarget(SpecialMentionKind.EVERYONE)));
+        IdempotencyKey idempotencyKey = new IdempotencyKey("send-" + UUID.randomUUID());
+        MessagePublished event = new MessagePublished(
+            UUID.randomUUID(),
+            message.id(),
+            message.author(),
+            message.target(),
+            message.mentions(),
+            "correlation-save-published",
+            NOW
+        );
+
+        publications.savePublished(message, idempotencyKey, event);
+
+        assertThat(messages.findById(message.id())).contains(message);
+        assertThat(messages.findByIdempotencyKey(message.author(), message.target(), idempotencyKey))
+            .contains(message);
+        assertThat(rowCount("message_publication_outbox")).isEqualTo(1);
+        assertThat(rowCount("message_publication_outbox_mentions")).isEqualTo(1);
     }
 
     @Test

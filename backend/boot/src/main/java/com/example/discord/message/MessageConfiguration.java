@@ -19,12 +19,11 @@ class MessageConfiguration {
 
     @Bean
     PublishMessageUseCase publishMessageUseCase(
-        MessageStore messages,
+        MessagePublicationStore publications,
         MessagePublishGuard publishGuard,
-        MessageContentPolicy contentPolicy,
-        MessagePublicationOutbox outbox
+        MessageContentPolicy contentPolicy
     ) {
-        return new DefaultPublishMessageUseCase(publishGuard, contentPolicy, messages, outbox, Clock.systemUTC());
+        return new DefaultPublishMessageUseCase(publishGuard, contentPolicy, publications, Clock.systemUTC());
     }
 
     @Bean

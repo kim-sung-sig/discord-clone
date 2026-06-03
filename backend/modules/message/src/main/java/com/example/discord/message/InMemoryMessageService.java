@@ -19,7 +19,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 public class InMemoryMessageService
-    implements MessageStore, ChannelMessagePagePort, ChannelMessageSearchPort, MessageLookupPort {
+    implements MessageStore, MessagePublicationStore, ChannelMessagePagePort, ChannelMessageSearchPort, MessageLookupPort {
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
         .thenComparing(order -> order.messageId().toString())
@@ -67,6 +67,16 @@ public class InMemoryMessageService
         save(message);
         messageIdsByIdempotency.put(new IdempotencyScope(message.author(), message.target(), idempotencyKey), message.id());
         return message;
+    }
+
+    @Override
+    public synchronized Message savePublished(
+        Message message,
+        IdempotencyKey idempotencyKey,
+        MessagePublished event
+    ) {
+        Objects.requireNonNull(event, "event must not be null");
+        return save(message, idempotencyKey);
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Repository;
 @DependsOn("postgresFlyway")
 class JdbcMessageStore implements
     MessageStore,
+    MessagePublicationStore,
     ChannelMessagePagePort,
     ChannelMessageSearchPort,
     MessageLookupPort,
@@ -127,6 +128,40 @@ class JdbcMessageStore implements
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to save message with idempotency key", exception);
+        }
+    }
+
+    @Override
+    public Message savePublished(
+        Message message,
+        IdempotencyKey idempotencyKey,
+        MessagePublished event
+    ) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey must not be null");
+        Objects.requireNonNull(event, "event must not be null");
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                cleanupExpiredIdempotencyKeys(connection);
+                upsertMessage(connection, message);
+                replaceMentions(connection, message);
+                replaceEdits(connection, message);
+                insertIdempotencyKey(connection, message, idempotencyKey);
+                MessageScope scope = MessageScope.from(event.author(), event.target())
+                    .orElseThrow(() -> new IllegalArgumentException("unsupported message publication scope"));
+                insertOutboxEvent(connection, event, scope);
+                insertOutboxMentions(connection, event);
+                connection.commit();
+                return message;
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to save published message", exception);
         }
     }
 

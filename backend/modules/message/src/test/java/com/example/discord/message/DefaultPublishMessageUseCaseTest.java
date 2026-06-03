@@ -25,8 +25,6 @@ class DefaultPublishMessageUseCaseTest {
             (author, target, content, mentions) -> {
             },
             new EmptyMessageStore(),
-            event -> {
-            },
             FIXED_CLOCK
         );
 
@@ -37,7 +35,6 @@ class DefaultPublishMessageUseCaseTest {
     @Test
     void storesMessageWithAuthorTargetContentAndMentions() {
         RecordingMessageStore messages = new RecordingMessageStore();
-        List<MessagePublished> events = new ArrayList<>();
         PublishMessageRequest request = request();
         PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
             (author, target) -> {
@@ -45,7 +42,6 @@ class DefaultPublishMessageUseCaseTest {
             (author, target, content, mentions) -> {
             },
             messages,
-            events::add,
             FIXED_CLOCK
         );
 
@@ -62,9 +58,9 @@ class DefaultPublishMessageUseCaseTest {
 
     @Test
     void deduplicatesMentionsBeforePolicyStoreAndEvent() {
-        RecordingMessageStore messages = new RecordingMessageStore();
-        RecordingContentPolicy contentPolicy = new RecordingContentPolicy();
         List<MessagePublished> events = new ArrayList<>();
+        RecordingMessageStore messages = new RecordingMessageStore(events);
+        RecordingContentPolicy contentPolicy = new RecordingContentPolicy();
         UserMentionTarget mention = new UserMentionTarget(UUID.randomUUID());
         PublishMessageRequest request = new PublishMessageRequest(
             new UserMessageAuthor(UUID.randomUUID()),
@@ -79,7 +75,6 @@ class DefaultPublishMessageUseCaseTest {
             },
             contentPolicy,
             messages,
-            events::add,
             FIXED_CLOCK
         );
 
@@ -104,7 +99,6 @@ class DefaultPublishMessageUseCaseTest {
         PublishMessageRequest request = request();
         Message existing = messageFor(request);
         ExistingMessageStore messages = new ExistingMessageStore(existing);
-        List<MessagePublished> events = new ArrayList<>();
         PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
             (author, target) -> {
                 throw new AssertionError("guard should not run for idempotent retry");
@@ -113,27 +107,24 @@ class DefaultPublishMessageUseCaseTest {
                 throw new AssertionError("content policy should not run for idempotent retry");
             },
             messages,
-            events::add,
             FIXED_CLOCK
         );
 
         PublishMessageResult result = useCase.publish(request);
 
         assertThat(result.message()).isSameAs(existing);
-        assertThat(events).isEmpty();
     }
 
     @Test
     void publishesSameContentAgainWhenClientSuppliesDifferentIdempotencyKey() {
-        RecordingMessageStore messages = new RecordingMessageStore();
         List<MessagePublished> events = new ArrayList<>();
+        RecordingMessageStore messages = new RecordingMessageStore(events);
         PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
             (author, target) -> {
             },
             (author, target, content, mentions) -> {
             },
             messages,
-            events::add,
             FIXED_CLOCK
         );
         MessageAuthor author = new UserMessageAuthor(UUID.randomUUID());
@@ -182,8 +173,6 @@ class DefaultPublishMessageUseCaseTest {
             (author, target, content, mentions) -> {
             },
             new ExistingMessageStore(existing),
-            event -> {
-            },
             FIXED_CLOCK
         );
 
@@ -218,12 +207,7 @@ class DefaultPublishMessageUseCaseTest {
         );
     }
 
-    private static final class EmptyMessageStore implements MessageStore {
-        @Override
-        public Optional<Message> findById(UUID messageId) {
-            throw new UnsupportedOperationException("not needed for this test");
-        }
-
+    private static final class EmptyMessageStore implements MessagePublicationStore {
         @Override
         public Optional<Message> findByIdempotencyKey(
             MessageAuthor author,
@@ -234,22 +218,25 @@ class DefaultPublishMessageUseCaseTest {
         }
 
         @Override
-        public Message save(Message message) {
-            throw new UnsupportedOperationException("not needed for this test");
-        }
-
-        @Override
-        public Message save(Message message, IdempotencyKey idempotencyKey) {
+        public Message savePublished(
+            Message message,
+            IdempotencyKey idempotencyKey,
+            MessagePublished event
+        ) {
             throw new UnsupportedOperationException("not needed for this test");
         }
     }
 
-    private static final class RecordingMessageStore implements MessageStore {
+    private static final class RecordingMessageStore implements MessagePublicationStore {
+        private final List<MessagePublished> events;
         private Message savedMessage;
 
-        @Override
-        public Optional<Message> findById(UUID messageId) {
-            throw new UnsupportedOperationException("not needed for this test");
+        private RecordingMessageStore() {
+            this(new ArrayList<>());
+        }
+
+        private RecordingMessageStore(List<MessagePublished> events) {
+            this.events = events;
         }
 
         @Override
@@ -262,14 +249,14 @@ class DefaultPublishMessageUseCaseTest {
         }
 
         @Override
-        public Message save(Message message) {
+        public Message savePublished(
+            Message message,
+            IdempotencyKey idempotencyKey,
+            MessagePublished event
+        ) {
             this.savedMessage = message;
+            this.events.add(event);
             return message;
-        }
-
-        @Override
-        public Message save(Message message, IdempotencyKey idempotencyKey) {
-            return save(message);
         }
     }
 
@@ -287,16 +274,11 @@ class DefaultPublishMessageUseCaseTest {
         }
     }
 
-    private static final class ExistingMessageStore implements MessageStore {
+    private static final class ExistingMessageStore implements MessagePublicationStore {
         private final Message existing;
 
         private ExistingMessageStore(Message existing) {
             this.existing = existing;
-        }
-
-        @Override
-        public Optional<Message> findById(UUID messageId) {
-            throw new UnsupportedOperationException("not needed for this test");
         }
 
         @Override
@@ -309,12 +291,11 @@ class DefaultPublishMessageUseCaseTest {
         }
 
         @Override
-        public Message save(Message message) {
-            throw new AssertionError("save should not run for idempotent retry");
-        }
-
-        @Override
-        public Message save(Message message, IdempotencyKey idempotencyKey) {
+        public Message savePublished(
+            Message message,
+            IdempotencyKey idempotencyKey,
+            MessagePublished event
+        ) {
             throw new AssertionError("save should not run for idempotent retry");
         }
     }
