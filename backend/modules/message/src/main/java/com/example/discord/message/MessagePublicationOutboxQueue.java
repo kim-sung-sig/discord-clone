@@ -10,5 +10,5 @@ public interface MessagePublicationOutboxQueue {
 
     void markPublished(UUID eventId, UUID claimToken, Instant publishedAt);
 
-    void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt);
+    void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt, Duration retryDelay);
 }

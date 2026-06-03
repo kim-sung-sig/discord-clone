@@ -42,6 +42,7 @@ public class InMemoryMessageService
     private final Map<UUID, UUID> publicationClaimTokens = new LinkedHashMap<>();
     private final Map<UUID, Integer> publicationAttempts = new LinkedHashMap<>();
     private final Map<UUID, String> publicationLastErrors = new LinkedHashMap<>();
+    private final Map<UUID, Instant> publicationRetryAfter = new LinkedHashMap<>();
     private final Map<UUID, DeadLetteredMessagePublication> deadLetterPublications = new LinkedHashMap<>();
 
     public InMemoryMessageService() {
@@ -111,6 +112,7 @@ public class InMemoryMessageService
         Objects.requireNonNull(lease, "lease must not be null");
         return pendingPublications.values().stream()
             .filter(event -> !publicationClaimTokens.containsKey(event.eventId()))
+            .filter(event -> eligibleForRetry(event, claimedAt))
             .limit(pageSize(limit))
             .map(event -> {
                 UUID claimToken = UUID.randomUUID();
@@ -130,13 +132,21 @@ public class InMemoryMessageService
         }
         pendingPublications.remove(eventId);
         publicationClaimTokens.remove(eventId);
+        publicationRetryAfter.remove(eventId);
     }
 
     @Override
-    public synchronized void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt) {
+    public synchronized void releaseFailed(
+        UUID eventId,
+        UUID claimToken,
+        String errorMessage,
+        Instant failedAt,
+        Duration retryDelay
+    ) {
         Objects.requireNonNull(eventId, "eventId must not be null");
         Objects.requireNonNull(claimToken, "claimToken must not be null");
         Objects.requireNonNull(failedAt, "failedAt must not be null");
+        Objects.requireNonNull(retryDelay, "retryDelay must not be null");
         if (claimToken.equals(publicationClaimTokens.get(eventId))) {
             publicationClaimTokens.remove(eventId);
             int attempts = publicationAttempts.merge(eventId, 1, Integer::sum);
@@ -144,12 +154,15 @@ public class InMemoryMessageService
             publicationLastErrors.put(eventId, lastError);
             if (attempts >= 10) {
                 MessagePublished event = pendingPublications.remove(eventId);
+                publicationRetryAfter.remove(eventId);
                 if (event != null) {
                     deadLetterPublications.put(
                         eventId,
                         new DeadLetteredMessagePublication(event, attempts, lastError, failedAt)
                     );
                 }
+            } else {
+                publicationRetryAfter.put(eventId, failedAt.plus(retryDelay));
             }
         }
     }
@@ -172,8 +185,14 @@ public class InMemoryMessageService
         publicationAttempts.remove(eventId);
         publicationLastErrors.remove(eventId);
         publicationClaimTokens.remove(eventId);
+        publicationRetryAfter.remove(eventId);
         pendingPublications.put(eventId, deadLetter.event());
         return true;
+    }
+
+    private boolean eligibleForRetry(MessagePublished event, Instant claimedAt) {
+        Instant retryAfter = publicationRetryAfter.get(event.eventId());
+        return retryAfter == null || !retryAfter.isAfter(claimedAt);
     }
 
     @Override

@@ -139,8 +139,15 @@ class JdbcMessageStoreTest {
             assertThat(publication.event()).isEqualTo(event);
             assertThat(publication.claimToken()).isNotNull();
         });
-        outboxQueue.releaseFailed(event.eventId(), claimed.getFirst().claimToken(), "temporary failure", NOW);
+        outboxQueue.releaseFailed(
+            event.eventId(),
+            claimed.getFirst().claimToken(),
+            "temporary failure",
+            NOW,
+            Duration.ofSeconds(30)
+        );
         assertThat(outboxAttempts(event.eventId())).isEqualTo(1);
+        assertThat(outboxQueue.claimPendingPublications(10, NOW.plusSeconds(29), Duration.ofSeconds(30))).isEmpty();
 
         ClaimedMessagePublication retried = outboxQueue.claimPendingPublications(10, NOW.plusSeconds(31), Duration.ofSeconds(30))
             .getFirst();
@@ -175,7 +182,8 @@ class JdbcMessageStoreTest {
                 event.eventId(),
                 claimed.claimToken(),
                 "gateway down " + attempt,
-                NOW.plusSeconds(attempt * 31L)
+                NOW.plusSeconds(attempt * 31L),
+                Duration.ofSeconds(30)
             );
         }
 

@@ -51,6 +51,7 @@ class DefaultMessagePublicationRelayTest {
         assertThat(outbox.marked).isEmpty();
         assertThat(outbox.released).containsExactly(event.eventId());
         assertThat(outbox.releaseErrors).containsExactly("gateway unavailable");
+        assertThat(outbox.releaseRetryDelays).containsExactly(Duration.ofSeconds(5));
     }
 
     private static MessagePublished event() {
@@ -75,6 +76,7 @@ class DefaultMessagePublicationRelayTest {
         private final List<Instant> publishedAt = new ArrayList<>();
         private final List<UUID> released = new ArrayList<>();
         private final List<String> releaseErrors = new ArrayList<>();
+        private final List<Duration> releaseRetryDelays = new ArrayList<>();
 
         private RecordingOutbox(List<MessagePublished> events) {
             this.events = events;
@@ -102,9 +104,16 @@ class DefaultMessagePublicationRelayTest {
         }
 
         @Override
-        public void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt) {
+        public void releaseFailed(
+            UUID eventId,
+            UUID claimToken,
+            String errorMessage,
+            Instant failedAt,
+            Duration retryDelay
+        ) {
             released.add(eventId);
             releaseErrors.add(errorMessage);
+            releaseRetryDelays.add(retryDelay);
         }
     }
 }

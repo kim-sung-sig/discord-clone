@@ -77,6 +77,7 @@ Expected tests:
 - `message_publication_outbox`와 mention target outbox row 저장
 - outbox relay는 unpublished row를 bounded batch로 claim하고, 성공분만 `published_at`을 갱신
 - relay 실패 시 claim을 해제하고 attempts/last_error/dead-letter 상태를 갱신
+- relay 실패 후 retry backoff 전에는 같은 publication을 다시 claim하지 않음
 - internal operator header 없이는 dead-letter 조회/replay API 접근 거절
 - internal operator header가 있으면 dead-letter publication을 조회하고 replay 요청으로 relay 대상에 다시 올림
 - message module 전체 테스트
@@ -136,6 +137,9 @@ GREEN:
 - 실패한 dispatch는 published 처리하지 않고 claim을 해제하며 failure metadata를 남긴다
 - `V10__message_outbox_claims.sql`로 outbox claim token, claim lease, attempts, last_error, dead_lettered_at 추가
 - `MessagePublicationRelayWorker`가 fixed-delay scheduled relay를 실행한다
+- relay 실패는 `discord.message.outbox-relay-retry-delay-ms` 기본 5000ms backoff를 적용해 같은 publication의 즉시 재시도 폭주를 막는다
+- `JdbcMessageStore.releaseFailed(...)`는 실패 시 `claim_expires_at = failedAt + retryDelay`를 저장하고, dead-letter 확정 시에는 claim/retry 상태를 비운다
+- local/default 포트 구현도 실패 publication을 retry delay 이후에만 다시 claim한다
 - `MessagePublicationDeadLetterQueue`, `DeadLetteredMessagePublication` 추가
 - `MessageOutboxController`가 `X-Internal-Message-Outbox-Operator` 헤더와 `discord.message.outbox-operator-token`으로 보호되는 dead-letter 조회/replay API를 제공
 - replay 요청은 dead-letter 상태를 해제하고 attempts/error/claim 상태를 초기화해 relay가 다시 claim할 수 있게 함
@@ -156,6 +160,8 @@ GREEN:
 - `JdbcMessageStoreTest`는 `DISCORD_RUN_POSTGRES_TESTS=true`가 필요하다. 기본 로컬 검증에서는 컴파일만 확인되고 실제 PostgreSQL round-trip은 CI 또는 로컬 Postgres 제공 환경에서 실행해야 한다.
 - postgres profile의 publish path는 `MessagePublicationStore.savePublished(...)`를 통해 message/idempotency/outbox 저장을 하나의 adapter transaction 경계로 묶는다.
 - outbox relay는 `discord.message.outbox-relay-batch-size`로 bounded batch를 사용하고, claim lease로 다중 worker 중복 처리를 줄인다.
+- outbox relay 실패는 retry backoff를 적용한다. 이 값은 `discord.message.outbox-relay-retry-delay-ms`로 조정하며, 기본 5000ms다.
 - outbox dispatcher는 `MessagePublished`를 message lookup으로 보강한 뒤 gateway `MESSAGE_CREATE` 이벤트로 발행한다.
 - dead-letter 조회/replay API는 내부 operator header로 보호한다. replay는 즉시 dispatch하지 않고 dead-letter 상태를 해제해 scheduled relay가 다시 claim하도록 만든다.
-- 보상 트랜잭션/SAGA 오케스트레이션은 아직 없다.
+- 메시지 발행 자체의 SAGA/보상 트랜잭션은 T172 초기 설계에서 과설계로 판단되어 이 슬라이스에는 넣지 않는다. 현재 메시지 발행 안정성은 transactional outbox, claim lease, retry backoff, dead-letter, operator replay로 닫는다.
+- SAGA 후보는 attachment upload + message attach, invite accept, premium entitlement 같은 다중 리소스 상태 변경 흐름에서 별도 task로 다룬다.

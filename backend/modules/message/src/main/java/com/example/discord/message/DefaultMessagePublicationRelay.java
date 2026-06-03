@@ -11,13 +11,14 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
     private final MessagePublishedDispatcher dispatcher;
     private final Clock clock;
     private final Duration claimLease;
+    private final Duration retryDelay;
 
     public DefaultMessagePublicationRelay(
         MessagePublicationOutboxQueue outbox,
         MessagePublishedDispatcher dispatcher,
         Clock clock
     ) {
-        this(outbox, dispatcher, clock, Duration.ofSeconds(30));
+        this(outbox, dispatcher, clock, Duration.ofSeconds(30), Duration.ofSeconds(5));
     }
 
     public DefaultMessagePublicationRelay(
@@ -26,10 +27,24 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
         Clock clock,
         Duration claimLease
     ) {
+        this(outbox, dispatcher, clock, claimLease, Duration.ofSeconds(5));
+    }
+
+    public DefaultMessagePublicationRelay(
+        MessagePublicationOutboxQueue outbox,
+        MessagePublishedDispatcher dispatcher,
+        Clock clock,
+        Duration claimLease,
+        Duration retryDelay
+    ) {
         this.outbox = Objects.requireNonNull(outbox, "outbox must not be null");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.claimLease = Objects.requireNonNull(claimLease, "claimLease must not be null");
+        this.retryDelay = Objects.requireNonNull(retryDelay, "retryDelay must not be null");
+        if (retryDelay.isZero() || retryDelay.isNegative()) {
+            throw new IllegalArgumentException("retryDelay must be positive");
+        }
     }
 
     @Override
@@ -45,7 +60,13 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
                 dispatcher.dispatch(event);
                 outbox.markPublished(event.eventId(), publication.claimToken(), clock.instant());
             } catch (RuntimeException exception) {
-                outbox.releaseFailed(event.eventId(), publication.claimToken(), exception.getMessage(), clock.instant());
+                outbox.releaseFailed(
+                    event.eventId(),
+                    publication.claimToken(),
+                    exception.getMessage(),
+                    clock.instant(),
+                    retryDelay
+                );
                 throw exception;
             }
             delivered++;

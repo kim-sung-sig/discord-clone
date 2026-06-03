@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Field;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Set;
@@ -152,6 +154,51 @@ class InMemoryMessageServiceTest {
         assertThat(service.search(GUILD_ID, Set.of(CHANNEL_ID), "moderation", 10))
             .extracting(Message::id)
             .containsExactly(visible.id());
+    }
+
+    @Test
+    void failedPublicationIsNotClaimedAgainBeforeRetryDelay() {
+        InMemoryMessageService service = service();
+        Message message = new Message(
+            UUID.randomUUID(),
+            new UserMessageAuthor(AUTHOR_ID),
+            new ChannelMessageTarget(GUILD_ID, CHANNEL_ID),
+            new MessageContent("backoff me"),
+            List.of(),
+            false,
+            false,
+            List.of(),
+            Instant.parse("2026-05-13T00:00:00Z"),
+            Instant.parse("2026-05-13T00:00:00Z")
+        );
+        MessagePublished event = new MessagePublished(
+            UUID.randomUUID(),
+            message.id(),
+            message.author(),
+            message.target(),
+            message.mentions(),
+            "correlation-backoff",
+            message.createdAt()
+        );
+        service.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
+        Instant firstAttempt = Instant.parse("2026-05-13T00:00:10Z");
+        ClaimedMessagePublication claimed = service
+            .claimPendingPublications(1, firstAttempt, Duration.ofSeconds(30))
+            .getFirst();
+
+        service.releaseFailed(
+            event.eventId(),
+            claimed.claimToken(),
+            "gateway unavailable",
+            firstAttempt,
+            Duration.ofSeconds(30)
+        );
+
+        assertThat(service.claimPendingPublications(1, firstAttempt.plusSeconds(29), Duration.ofSeconds(30))).isEmpty();
+        assertThat(service.claimPendingPublications(1, firstAttempt.plusSeconds(30), Duration.ofSeconds(30)))
+            .singleElement()
+            .extracting(ClaimedMessagePublication::event)
+            .isEqualTo(event);
     }
 
     private static InMemoryMessageService service() {

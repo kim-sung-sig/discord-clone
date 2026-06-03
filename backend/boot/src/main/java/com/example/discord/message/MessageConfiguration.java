@@ -4,9 +4,11 @@ import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -66,9 +68,16 @@ class MessageConfiguration {
     @Bean
     MessagePublicationRelay messagePublicationRelay(
         MessagePublicationOutboxQueue outbox,
-        MessagePublishedDispatcher dispatcher
+        MessagePublishedDispatcher dispatcher,
+        @Value("${discord.message.outbox-relay-retry-delay-ms:5000}") long retryDelayMs
     ) {
-        return new DefaultMessagePublicationRelay(outbox, dispatcher, Clock.systemUTC());
+        return new DefaultMessagePublicationRelay(
+            outbox,
+            dispatcher,
+            Clock.systemUTC(),
+            Duration.ofSeconds(30),
+            Duration.ofMillis(retryDelayMs)
+        );
     }
 
     @Bean

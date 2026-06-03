@@ -90,7 +90,8 @@ class MessageOutboxControllerTest {
                 event.eventId(),
                 claimed.claimToken(),
                 "gateway down " + attempt,
-                NOW.plusSeconds(attempt * 31L)
+                NOW.plusSeconds(attempt * 31L),
+                Duration.ofSeconds(30)
             );
         }
         return event;

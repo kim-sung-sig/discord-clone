@@ -327,10 +327,17 @@ class JdbcMessageStore implements
     }
 
     @Override
-    public void releaseFailed(UUID eventId, UUID claimToken, String errorMessage, Instant failedAt) {
+    public void releaseFailed(
+        UUID eventId,
+        UUID claimToken,
+        String errorMessage,
+        Instant failedAt,
+        Duration retryDelay
+    ) {
         Objects.requireNonNull(eventId, "eventId must not be null");
         Objects.requireNonNull(claimToken, "claimToken must not be null");
         Objects.requireNonNull(failedAt, "failedAt must not be null");
+        Objects.requireNonNull(retryDelay, "retryDelay must not be null");
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement("""
                  UPDATE message_publication_outbox
@@ -342,7 +349,10 @@ class JdbcMessageStore implements
                      END,
                      claim_token = NULL,
                      claimed_at = NULL,
-                     claim_expires_at = NULL
+                     claim_expires_at = CASE
+                         WHEN attempts + 1 >= ? THEN NULL
+                         ELSE ?
+                     END
                  WHERE event_id = ?
                    AND claim_token = ?
                    AND published_at IS NULL
@@ -350,8 +360,10 @@ class JdbcMessageStore implements
             statement.setString(1, errorMessage == null ? "" : errorMessage);
             statement.setInt(2, MAX_PUBLICATION_ATTEMPTS);
             statement.setTimestamp(3, Timestamp.from(failedAt));
-            statement.setObject(4, eventId);
-            statement.setObject(5, claimToken);
+            statement.setInt(4, MAX_PUBLICATION_ATTEMPTS);
+            statement.setTimestamp(5, Timestamp.from(failedAt.plus(retryDelay)));
+            statement.setObject(6, eventId);
+            statement.setObject(7, claimToken);
             statement.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to release failed message publication outbox event", exception);
