@@ -522,6 +522,8 @@ describe('Discord app shell', () => {
       content: 'Authenticated hello @cto-bot'
     })
     expect(JSON.parse(String(messagePost!.init?.body)).clientEventId).toMatch(/^web-shell:/)
+    expect(JSON.parse(String(messagePost!.init?.body)).idempotencyKey)
+      .toBe(JSON.parse(String(messagePost!.init?.body)).clientEventId)
     await vi.waitFor(() => {
       expect((wrapper.get('[data-testid="message-input"]').element as HTMLInputElement).value).toBe('')
     })

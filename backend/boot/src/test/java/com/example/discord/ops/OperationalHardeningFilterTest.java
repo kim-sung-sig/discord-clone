@@ -324,9 +324,10 @@ class OperationalHardeningFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "content": "spam attempt"
+                          "content": "spam attempt",
+                          "idempotencyKey": "spam-%s"
                         }
-                        """))
+                        """.formatted(i)))
                 .andExpect(status().isUnauthorized());
         }
 
@@ -335,7 +336,8 @@ class OperationalHardeningFilterTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "spam attempt"
+                      "content": "spam attempt",
+                      "idempotencyKey": "spam-final"
                     }
                     """))
             .andExpect(status().isTooManyRequests())

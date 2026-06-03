@@ -80,7 +80,8 @@ class ModerationControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "this has a spoiler"
+                      "content": "this has a spoiler",
+                      "idempotencyKey": "send-spoiler"
                     }
                     """))
             .andExpect(status().isForbidden());
@@ -106,7 +107,8 @@ class ModerationControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "malware link"
+                      "content": "malware link",
+                      "idempotencyKey": "send-malware"
                     }
                     """))
             .andExpect(status().isForbidden());
@@ -282,9 +284,10 @@ class ModerationControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "%s"
+                      "content": "%s",
+                      "idempotencyKey": "send-%s"
                     }
-                    """.formatted(content)))
+                    """.formatted(content, UUID.randomUUID())))
             .andExpect(status().isCreated())
             .andReturn();
 

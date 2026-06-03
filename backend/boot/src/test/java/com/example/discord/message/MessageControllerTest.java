@@ -1,6 +1,6 @@
 package com.example.discord.message;
 
-import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -38,10 +38,67 @@ class MessageControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "cannot send"
+                      "content": "cannot send",
+                      "idempotencyKey": "send-denied"
                     }
                     """))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsCreateWithoutIdempotencyKey() throws Exception {
+        AuthSession owner = signup("message_idempotency_owner");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+
+        mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "missing idempotency key"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reusesMessageForSameIdempotencyKeyRetry() throws Exception {
+        AuthSession owner = signup("message_idempotent_owner");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+        String key = "send-" + UUID.randomUUID();
+
+        String firstId = createMessage(channelId, "hello retry", key, owner);
+        String secondId = createMessage(channelId, "hello retry", key, owner);
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.messages", hasSize(1)))
+            .andExpect(jsonPath("$.messages[0].id").value(firstId));
+        org.assertj.core.api.Assertions.assertThat(secondId).isEqualTo(firstId);
+    }
+
+    @Test
+    void rejectsSameIdempotencyKeyWithDifferentContent() throws Exception {
+        AuthSession owner = signup("msg_idem_conflict_owner");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+        String key = "send-" + UUID.randomUUID();
+
+        createMessage(channelId, "first content", key, owner);
+
+        mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "second content",
+                      "idempotencyKey": "%s"
+                    }
+                    """.formatted(key)))
+            .andExpect(status().isConflict());
     }
 
     @Test
@@ -249,14 +306,19 @@ class MessageControllerTest {
     }
 
     private String createMessage(String channelId, String content, AuthSession requester) throws Exception {
+        return createMessage(channelId, content, "send-" + UUID.randomUUID(), requester);
+    }
+
+    private String createMessage(String channelId, String content, String idempotencyKey, AuthSession requester) throws Exception {
         MvcResult messageResult = mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
                 .header("Authorization", requester.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "%s"
+                      "content": "%s",
+                      "idempotencyKey": "%s"
                     }
-                    """.formatted(content)))
+                    """.formatted(content, idempotencyKey)))
             .andExpect(status().isCreated())
             .andReturn();
 

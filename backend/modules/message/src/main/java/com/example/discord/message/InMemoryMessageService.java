@@ -18,7 +18,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
-public class InMemoryMessageService {
+public class InMemoryMessageService implements MessageStore {
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
         .thenComparing(order -> order.messageId().toString())
@@ -27,6 +27,7 @@ public class InMemoryMessageService {
     private final Clock clock;
     private final Map<UUID, Message> messages = new LinkedHashMap<>();
     private final Map<ChannelKey, NavigableSet<MessageOrder>> messagesByChannel = new LinkedHashMap<>();
+    private final Map<IdempotencyScope, UUID> messageIdsByIdempotency = new LinkedHashMap<>();
 
     public InMemoryMessageService() {
         this(Clock.systemUTC());
@@ -38,6 +39,27 @@ public class InMemoryMessageService {
 
     protected synchronized void putMessage(Message message) {
         upsertMessage(message);
+    }
+
+    @Override
+    public synchronized java.util.Optional<Message> findByIdempotencyKey(
+        MessageAuthor author,
+        MessageTarget target,
+        IdempotencyKey idempotencyKey
+    ) {
+        Objects.requireNonNull(author, "author must not be null");
+        Objects.requireNonNull(target, "target must not be null");
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey must not be null");
+        UUID messageId = messageIdsByIdempotency.get(new IdempotencyScope(author, target, idempotencyKey));
+        return java.util.Optional.ofNullable(messageId).map(messages::get);
+    }
+
+    @Override
+    public synchronized Message save(Message message, IdempotencyKey idempotencyKey) {
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey must not be null");
+        upsertMessage(message);
+        messageIdsByIdempotency.put(new IdempotencyScope(message.author(), message.target(), idempotencyKey), message.id());
+        return message;
     }
 
     public synchronized Message create(CreateMessageCommand command) {
@@ -332,5 +354,8 @@ public class InMemoryMessageService {
     }
 
     private record ChannelSearchCursor(MessageOrder order, Iterator<MessageOrder> iterator) {
+    }
+
+    private record IdempotencyScope(MessageAuthor author, MessageTarget target, IdempotencyKey idempotencyKey) {
     }
 }

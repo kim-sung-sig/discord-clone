@@ -1508,7 +1508,7 @@ export const useShellStore = defineStore('shell', {
         try {
           const message = await client.post<BackendMessageResponse>(
             discordApiPaths.channel.messages(channelId),
-            { content: body, clientEventId },
+            { content: body, idempotencyKey: clientEventId, clientEventId },
             { bearerToken, requestId }
           )
           const shellMessage = this.confirmBackendMessage(message, clientEventId, requestId)

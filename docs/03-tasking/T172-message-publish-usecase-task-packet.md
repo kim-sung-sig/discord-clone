@@ -27,6 +27,7 @@ Affected endpoints:
 
 - 기존 message controller 응답 변환부
 - 기존 message create/edit/delete/pin endpoint의 응답 content/mentions shape
+- `POST /api/channels/{channelId}/messages`: `idempotencyKey`를 필수 요청 필드로 받고 `PublishMessageUseCase`로 위임한다.
 
 Affected domain services:
 
@@ -59,6 +60,8 @@ Expected tests:
 - message module 전체 테스트
 - backend boot 테스트
 - root Gradle 테스트
+- frontend message composer payload 테스트
+- npm workspace 테스트
 
 Expected docs/wiki updates:
 
@@ -86,6 +89,9 @@ GREEN:
 - `DefaultPublishMessageUseCase` 성공 저장/outbox append 구현
 - mention 중복 제거를 policy/store/event에 동일 적용
 - idempotent retry payload 충돌을 `MessagePublishRejectedException`으로 거절
+- `MessageController` create 경로를 `PublishMessageUseCase`로 전환
+- create endpoint에서 `idempotencyKey` 누락은 400, 같은 key 재시도는 기존 message 반환, 같은 key + 다른 content는 409로 검증
+- 웹 클라이언트는 발송 시도마다 만든 `clientEventId`를 `idempotencyKey`로 같이 전송
 
 ## 보안/확장성 확인
 
@@ -93,3 +99,4 @@ GREEN:
 - mention의 진실은 content 파싱 결과가 아니라 요청으로 들어온 structured mention target이라는 결정에 맞춰 기존 서버-side mention extraction 기대를 제거했다.
 - `ChannelMessageQuery`는 requester와 target을 명시하고 limit을 양수로 제한한다.
 - `IdempotencyKey`는 content hash가 아니라 클라이언트 발송 시도 ID로 유지한다.
+- 화면/클라이언트는 발송 시도마다 `clientEventId`를 만들고, 같은 값을 `idempotencyKey`로 서버에 전송한다. 재시도 시 같은 client event/idempotency key를 재사용할 수 있다.

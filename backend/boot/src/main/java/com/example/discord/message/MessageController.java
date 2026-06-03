@@ -3,10 +3,10 @@ package com.example.discord.message;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.AutoModDecision;
 import com.example.discord.moderation.InMemoryModerationService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,17 +31,20 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/channels/{channelId}/messages")
 class MessageController {
     private final InMemoryMessageService messageService;
+    private final PublishMessageUseCase publishMessage;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     MessageController(
         InMemoryMessageService messageService,
+        PublishMessageUseCase publishMessage,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.messageService = messageService;
+        this.publishMessage = publishMessage;
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -55,15 +58,15 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = guildIdFor(channelId);
-        if (!guildService.canSendMessages(guildId, channelId, requesterId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "send messages permission required");
-        }
-        requireRequest(request);
-        AutoModDecision decision = moderationService.evaluateMessage(guildId, channelId, requesterId, request.content());
-        if (decision.blocked()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, decision.reason());
-        }
-        Message message = messageService.create(new CreateMessageCommand(guildId, channelId, requesterId, request.content()));
+        requireCreateRequest(request);
+        Message message = publishMessage.publish(new PublishMessageRequest(
+            new UserMessageAuthor(requesterId),
+            new ChannelMessageTarget(guildId, channelId),
+            new MessageContent(request.content()),
+            mentionTargetsFrom(request.mentions()),
+            new IdempotencyKey(request.idempotencyKey()),
+            UUID.randomUUID().toString()
+        )).message();
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
     }
 
@@ -186,7 +189,45 @@ class MessageController {
         }
     }
 
-    record MessageContentRequest(String content) {
+    private static void requireCreateRequest(MessageContentRequest request) {
+        requireRequest(request);
+        if (request.content() == null || request.idempotencyKey() == null) {
+            throw new IllegalArgumentException("content and idempotencyKey are required");
+        }
+    }
+
+    private static List<MessageMentionTarget> mentionTargetsFrom(List<MessageMentionRequest> mentions) {
+        if (mentions == null) {
+            return List.of();
+        }
+        return mentions.stream().map(MessageController::mentionTargetFrom).toList();
+    }
+
+    private static MessageMentionTarget mentionTargetFrom(MessageMentionRequest mention) {
+        if (mention == null || mention.type() == null) {
+            throw new IllegalArgumentException("mention type is required");
+        }
+        return switch (mention.type().trim().toUpperCase(Locale.ROOT)) {
+            case "USER" -> new UserMentionTarget(requiredMentionId(mention));
+            case "ROLE" -> new RoleMentionTarget(requiredMentionId(mention));
+            case "CHANNEL" -> new ChannelMentionTarget(requiredMentionId(mention));
+            case "EVERYONE" -> new SpecialMentionTarget(SpecialMentionKind.EVERYONE);
+            case "HERE" -> new SpecialMentionTarget(SpecialMentionKind.HERE);
+            default -> throw new IllegalArgumentException("unsupported mention type");
+        };
+    }
+
+    private static UUID requiredMentionId(MessageMentionRequest mention) {
+        if (mention.id() == null) {
+            throw new IllegalArgumentException("mention id is required");
+        }
+        return mention.id();
+    }
+
+    record MessageContentRequest(String content, String idempotencyKey, List<MessageMentionRequest> mentions) {
+    }
+
+    record MessageMentionRequest(String type, UUID id) {
     }
 
     record MessagePageResponse(List<MessageResponse> messages, String nextCursor) {
@@ -264,5 +305,10 @@ class MessageControllerAdvice {
     @ExceptionHandler(MessageNotFoundException.class)
     ResponseEntity<MessageController.ErrorResponse> missingMessage(MessageNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new MessageController.ErrorResponse(exception.getMessage()));
+    }
+
+    @ExceptionHandler(MessagePublishRejectedException.class)
+    ResponseEntity<MessageController.ErrorResponse> rejectedPublish(MessagePublishRejectedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new MessageController.ErrorResponse(exception.getMessage()));
     }
 }
