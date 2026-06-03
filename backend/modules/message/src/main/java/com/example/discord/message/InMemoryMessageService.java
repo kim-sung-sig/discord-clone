@@ -42,6 +42,12 @@ public class InMemoryMessageService implements MessageStore {
     }
 
     @Override
+    public synchronized java.util.Optional<Message> findById(UUID messageId) {
+        Objects.requireNonNull(messageId, "messageId must not be null");
+        return java.util.Optional.ofNullable(messages.get(messageId));
+    }
+
+    @Override
     public synchronized java.util.Optional<Message> findByIdempotencyKey(
         MessageAuthor author,
         MessageTarget target,
@@ -57,8 +63,14 @@ public class InMemoryMessageService implements MessageStore {
     @Override
     public synchronized Message save(Message message, IdempotencyKey idempotencyKey) {
         Objects.requireNonNull(idempotencyKey, "idempotencyKey must not be null");
-        upsertMessage(message);
+        save(message);
         messageIdsByIdempotency.put(new IdempotencyScope(message.author(), message.target(), idempotencyKey), message.id());
+        return message;
+    }
+
+    @Override
+    public synchronized Message save(Message message) {
+        upsertMessage(message);
         return message;
     }
 

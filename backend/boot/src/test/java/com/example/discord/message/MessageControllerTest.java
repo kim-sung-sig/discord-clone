@@ -152,9 +152,7 @@ class MessageControllerTest {
         mockMvc.perform(get("/api/channels/{channelId}/messages", channelId)
                 .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.messages[0].id").value(messageId))
-            .andExpect(jsonPath("$.messages[0].deleted").value(true))
-            .andExpect(jsonPath("$.messages[0].content").value("[deleted]"));
+            .andExpect(jsonPath("$.messages").isEmpty());
     }
 
     @Test

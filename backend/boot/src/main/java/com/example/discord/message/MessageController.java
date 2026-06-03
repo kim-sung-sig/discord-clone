@@ -32,6 +32,10 @@ import org.springframework.web.server.ResponseStatusException;
 class MessageController {
     private final InMemoryMessageService messageService;
     private final PublishMessageUseCase publishMessage;
+    private final EditMessageUseCase editMessage;
+    private final DeleteMessageUseCase deleteMessage;
+    private final PinMessageUseCase pinMessage;
+    private final ChannelMessageReader channelMessageReader;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
@@ -39,12 +43,20 @@ class MessageController {
     MessageController(
         InMemoryMessageService messageService,
         PublishMessageUseCase publishMessage,
+        EditMessageUseCase editMessage,
+        DeleteMessageUseCase deleteMessage,
+        PinMessageUseCase pinMessage,
+        ChannelMessageReader channelMessageReader,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.messageService = messageService;
         this.publishMessage = publishMessage;
+        this.editMessage = editMessage;
+        this.deleteMessage = deleteMessage;
+        this.pinMessage = pinMessage;
+        this.channelMessageReader = channelMessageReader;
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -78,8 +90,13 @@ class MessageController {
         @RequestParam(defaultValue = "50") int limit
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = requireView(channelId, requesterId);
-        MessagePage page = messageService.messages(guildId, channelId, before, limit);
+        UUID guildId = guildIdFor(channelId);
+        MessagePage page = channelMessageReader.read(new ChannelMessageQuery(
+            new UserMessageAuthor(requesterId),
+            new ChannelMessageTarget(guildId, channelId),
+            before,
+            limit
+        ));
         return MessagePageResponse.from(page);
     }
 
@@ -91,16 +108,14 @@ class MessageController {
         @RequestBody MessageContentRequest request
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = guildIdFor(channelId);
-        if (!guildService.canSendMessages(guildId, channelId, requesterId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "send messages permission required");
-        }
-        Message message = messageService.message(guildId, channelId, messageId);
-        if (!message.authorId().equals(requesterId) || message.deleted()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "message author required");
-        }
         requireRequest(request);
-        return MessageResponse.from(messageService.edit(new EditMessageCommand(guildId, channelId, messageId, request.content())));
+        Message message = editMessage.edit(new EditMessageRequest(
+            messageId,
+            new UserMessageAuthor(requesterId),
+            new MessageContent(request.content()),
+            mentionTargetsFrom(request.mentions())
+        )).message();
+        return MessageResponse.from(message);
     }
 
     @DeleteMapping("/{messageId}")
@@ -110,16 +125,11 @@ class MessageController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = guildIdFor(channelId);
-        Message message = messageService.message(guildId, channelId, messageId);
-        boolean author = message.authorId().equals(requesterId)
-            && !message.deleted()
-            && guildService.canViewChannel(guildId, channelId, requesterId);
-        if (!author && !guildService.canManageMessages(guildId, channelId, requesterId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage messages permission required");
-        }
-        messageService.delete(guildId, channelId, messageId);
-        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_DELETED, requesterId, messageId, "message deleted");
+        Message message = deleteMessage.delete(new DeleteMessageRequest(
+            messageId,
+            new UserMessageAuthor(requesterId)
+        )).message();
+        moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_DELETED, requesterId, messageId, "message deleted");
         return ResponseEntity.noContent().build();
     }
 
@@ -130,9 +140,12 @@ class MessageController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = requireManageMessages(channelId, requesterId);
-        Message message = messageService.pin(guildId, channelId, messageId);
-        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_PINNED, requesterId, messageId, "message pinned");
+        Message message = pinMessage.pin(new PinMessageRequest(
+            messageId,
+            new UserMessageAuthor(requesterId),
+            true
+        )).message();
+        moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_PINNED, requesterId, messageId, "message pinned");
         return MessageResponse.from(message);
     }
 
@@ -143,9 +156,12 @@ class MessageController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = requireManageMessages(channelId, requesterId);
-        Message message = messageService.unpin(guildId, channelId, messageId);
-        moderationService.appendAudit(guildId, AuditLogAction.MESSAGE_UNPINNED, requesterId, messageId, "message unpinned");
+        Message message = pinMessage.pin(new PinMessageRequest(
+            messageId,
+            new UserMessageAuthor(requesterId),
+            false
+        )).message();
+        moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_UNPINNED, requesterId, messageId, "message unpinned");
         return MessageResponse.from(message);
     }
 
@@ -167,14 +183,6 @@ class MessageController {
         UUID guildId = guildIdFor(channelId);
         if (!guildService.canViewChannel(guildId, channelId, requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
-        }
-        return guildId;
-    }
-
-    private UUID requireManageMessages(UUID channelId, UUID requesterId) {
-        UUID guildId = guildIdFor(channelId);
-        if (!guildService.canManageMessages(guildId, channelId, requesterId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage messages permission required");
         }
         return guildId;
     }
@@ -310,5 +318,10 @@ class MessageControllerAdvice {
     @ExceptionHandler(MessagePublishRejectedException.class)
     ResponseEntity<MessageController.ErrorResponse> rejectedPublish(MessagePublishRejectedException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new MessageController.ErrorResponse(exception.getMessage()));
+    }
+
+    @ExceptionHandler(MessageMutationRejectedException.class)
+    ResponseEntity<MessageController.ErrorResponse> rejectedMutation(MessageMutationRejectedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageController.ErrorResponse(exception.getMessage()));
     }
 }

@@ -28,6 +28,10 @@ Affected endpoints:
 - 기존 message controller 응답 변환부
 - 기존 message create/edit/delete/pin endpoint의 응답 content/mentions shape
 - `POST /api/channels/{channelId}/messages`: `idempotencyKey`를 필수 요청 필드로 받고 `PublishMessageUseCase`로 위임한다.
+- `GET /api/channels/{channelId}/messages`: `ChannelMessageReader`로 위임하고 기본 조회에서는 삭제 메시지를 숨긴다.
+- `PATCH /api/channels/{channelId}/messages/{messageId}`: `EditMessageUseCase`로 위임한다.
+- `DELETE /api/channels/{channelId}/messages/{messageId}`: `DeleteMessageUseCase`로 위임한다.
+- `PUT/DELETE /api/channels/{channelId}/messages/{messageId}/pin`: `PinMessageUseCase`로 위임한다.
 
 Affected domain services:
 
@@ -38,7 +42,11 @@ Affected domain services:
 - `MessageStore`
 - `MessagePublicationOutbox`
 - `MessagePublishGuard`
+- `MessageMutationGuard`
 - `MessageContentPolicy`
+- `ChannelMessageReader`
+- `ChannelMessageReadGuard`
+- `ChannelMessagePagePort`
 
 Persistence/runtime profiles:
 
@@ -57,6 +65,10 @@ Expected tests:
 - 중복 mention 제거
 - idempotent retry 기존 메시지 반환
 - 같은 idempotency key + 다른 payload 거절
+- 같은 content라도 다른 idempotency key면 새 message 저장
+- edit/delete/pin use case guard 거절과 성공 mutation
+- channel message reader read guard 거절
+- channel message reader 기본 조회에서 deleted message 제외
 - message module 전체 테스트
 - backend boot 테스트
 - root Gradle 테스트
@@ -81,6 +93,10 @@ RED:
 - `DefaultPublishMessageUseCaseTest`: 성공 발행 경로가 `UnsupportedOperationException`으로 실패
 - `DefaultPublishMessageUseCaseTest`: policy에 중복 mention 원본이 전달되어 실패
 - `DefaultPublishMessageUseCaseTest`: 같은 idempotency key + 다른 content가 거절되지 않아 실패
+- `DefaultEditMessageUseCaseTest`: 수정 유스케이스/guard/store 갱신 경계 없음으로 컴파일 실패
+- `DefaultDeleteMessageUseCaseTest`: 삭제 유스케이스/guard/store 갱신 경계 없음으로 컴파일 실패
+- `DefaultPinMessageUseCaseTest`: 고정 유스케이스/guard/store 갱신 경계 없음으로 컴파일 실패
+- `DefaultChannelMessageReaderTest`: reader/read guard/page port 없음으로 컴파일 실패
 
 GREEN:
 
@@ -92,6 +108,10 @@ GREEN:
 - `MessageController` create 경로를 `PublishMessageUseCase`로 전환
 - create endpoint에서 `idempotencyKey` 누락은 400, 같은 key 재시도는 기존 message 반환, 같은 key + 다른 content는 409로 검증
 - 웹 클라이언트는 발송 시도마다 만든 `clientEventId`를 `idempotencyKey`로 같이 전송
+- 같은 content라도 서로 다른 클라이언트 발송 시도 key면 새 메시지를 저장하고 이벤트를 각각 발행하도록 검증
+- edit/delete/pin 경로를 `MessageMutationGuard` + `MessageStore` 기반 use case로 구현
+- channel list 경로를 `ChannelMessageReadGuard` + `ChannelMessagePagePort` 기반 reader로 구현
+- boot controller의 list/edit/delete/pin/unpin 경로를 새 use case/reader로 전환
 
 ## 보안/확장성 확인
 
@@ -100,3 +120,7 @@ GREEN:
 - `ChannelMessageQuery`는 requester와 target을 명시하고 limit을 양수로 제한한다.
 - `IdempotencyKey`는 content hash가 아니라 클라이언트 발송 시도 ID로 유지한다.
 - 화면/클라이언트는 발송 시도마다 `clientEventId`를 만들고, 같은 값을 `idempotencyKey`로 서버에 전송한다. 재시도 시 같은 client event/idempotency key를 재사용할 수 있다.
+- 중복 판정 범위는 `MessageAuthor + MessageTarget + IdempotencyKey`다. `content` 동일 여부는 중복 판정 기준이 아니다.
+- 같은 범위의 `IdempotencyKey`가 다른 payload와 함께 다시 들어오면 클라이언트 오용으로 보고 `409 Conflict`로 거절한다.
+- `IdempotencyKey` 보존은 무기한이 아니다. 영속 저장 adapter에서는 `expires_at` 또는 TTL 정책으로 24시간/7일 같은 보존 기간을 두고, 만료 후 같은 content라도 새 발송 시도 key를 정상 저장할 수 있게 한다.
+- 현재 boot wiring은 새 코어 포트에 연결됐지만 runtime 저장 adapter는 아직 기존 `InMemoryMessageService`를 포트 구현으로 사용한다. DB-backed `MessageStore`/`ChannelMessagePagePort`/idempotency TTL adapter는 다음 슬라이스의 잔여 작업이다.

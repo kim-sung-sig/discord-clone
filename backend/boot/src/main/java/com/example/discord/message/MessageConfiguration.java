@@ -34,6 +34,42 @@ class MessageConfiguration {
     }
 
     @Bean
+    EditMessageUseCase editMessageUseCase(
+        MessageMutationGuard mutationGuard,
+        MessageContentPolicy contentPolicy,
+        MessageStore messages
+    ) {
+        return new DefaultEditMessageUseCase(mutationGuard, contentPolicy, messages, Clock.systemUTC());
+    }
+
+    @Bean
+    DeleteMessageUseCase deleteMessageUseCase(
+        MessageMutationGuard mutationGuard,
+        MessageStore messages
+    ) {
+        return new DefaultDeleteMessageUseCase(mutationGuard, messages, Clock.systemUTC());
+    }
+
+    @Bean
+    PinMessageUseCase pinMessageUseCase(
+        MessageMutationGuard mutationGuard,
+        MessageStore messages
+    ) {
+        return new DefaultPinMessageUseCase(mutationGuard, messages, Clock.systemUTC());
+    }
+
+    @Bean
+    ChannelMessageReader channelMessageReader(
+        ChannelMessageReadGuard readGuard,
+        InMemoryMessageService messageService
+    ) {
+        return new DefaultChannelMessageReader(
+            readGuard,
+            (target, beforeCursor, limit) -> messageService.messages(target.guildId(), target.channelId(), beforeCursor, limit)
+        );
+    }
+
+    @Bean
     MessagePublishGuard messagePublishGuard(InMemoryGuildService guildService) {
         return (author, target) -> {
             if (author instanceof UserMessageAuthor user && target instanceof ChannelMessageTarget channel) {
@@ -43,6 +79,59 @@ class MessageConfiguration {
                 return;
             }
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message author or target");
+        };
+    }
+
+    @Bean
+    ChannelMessageReadGuard channelMessageReadGuard(InMemoryGuildService guildService) {
+        return query -> {
+            if (query.requester() instanceof UserMessageAuthor user) {
+                ChannelMessageTarget channel = query.target();
+                if (!guildService.canViewChannel(channel.guildId(), channel.channelId(), user.userId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
+                }
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message reader");
+        };
+    }
+
+    @Bean
+    MessageMutationGuard messageMutationGuard(InMemoryGuildService guildService) {
+        return new MessageMutationGuard() {
+            @Override
+            public void requireCanEdit(MessageAuthor actor, Message message) {
+                UserMessageAuthor user = requireUserActor(actor);
+                ChannelMessageTarget channel = requireChannelTarget(message);
+                if (
+                    !message.authorId().equals(user.userId())
+                        || message.deleted()
+                        || !guildService.canSendMessages(channel.guildId(), channel.channelId(), user.userId())
+                ) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "message author required");
+                }
+            }
+
+            @Override
+            public void requireCanDelete(MessageAuthor actor, Message message) {
+                UserMessageAuthor user = requireUserActor(actor);
+                ChannelMessageTarget channel = requireChannelTarget(message);
+                boolean author = message.authorId().equals(user.userId())
+                    && !message.deleted()
+                    && guildService.canViewChannel(channel.guildId(), channel.channelId(), user.userId());
+                if (!author && !guildService.canManageMessages(channel.guildId(), channel.channelId(), user.userId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage messages permission required");
+                }
+            }
+
+            @Override
+            public void requireCanPin(MessageAuthor actor, Message message) {
+                UserMessageAuthor user = requireUserActor(actor);
+                ChannelMessageTarget channel = requireChannelTarget(message);
+                if (!guildService.canManageMessages(channel.guildId(), channel.channelId(), user.userId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "manage messages permission required");
+                }
+            }
         };
     }
 
@@ -67,5 +156,19 @@ class MessageConfiguration {
     MessagePublicationOutbox messagePublicationOutbox() {
         return event -> {
         };
+    }
+
+    private static UserMessageAuthor requireUserActor(MessageAuthor actor) {
+        if (actor instanceof UserMessageAuthor user) {
+            return user;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message actor");
+    }
+
+    private static ChannelMessageTarget requireChannelTarget(Message message) {
+        if (message.target() instanceof ChannelMessageTarget channel) {
+            return channel;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message target");
     }
 }

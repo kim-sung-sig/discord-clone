@@ -124,6 +124,44 @@ class DefaultPublishMessageUseCaseTest {
     }
 
     @Test
+    void publishesSameContentAgainWhenClientSuppliesDifferentIdempotencyKey() {
+        RecordingMessageStore messages = new RecordingMessageStore();
+        List<MessagePublished> events = new ArrayList<>();
+        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+            (author, target) -> {
+            },
+            (author, target, content, mentions) -> {
+            },
+            messages,
+            events::add,
+            FIXED_CLOCK
+        );
+        MessageAuthor author = new UserMessageAuthor(UUID.randomUUID());
+        MessageTarget target = new ChannelMessageTarget(UUID.randomUUID(), UUID.randomUUID());
+        MessageContent content = new MessageContent("same text");
+
+        PublishMessageResult first = useCase.publish(new PublishMessageRequest(
+            author,
+            target,
+            content,
+            List.of(),
+            new IdempotencyKey("send-attempt-1"),
+            "correlation-1"
+        ));
+        PublishMessageResult second = useCase.publish(new PublishMessageRequest(
+            author,
+            target,
+            content,
+            List.of(),
+            new IdempotencyKey("send-attempt-2"),
+            "correlation-2"
+        ));
+
+        assertThat(second.message().id()).isNotEqualTo(first.message().id());
+        assertThat(events).hasSize(2);
+    }
+
+    @Test
     void rejectsSameIdempotencyKeyWithDifferentContent() {
         PublishMessageRequest request = request();
         Message existing = new Message(
@@ -182,12 +220,22 @@ class DefaultPublishMessageUseCaseTest {
 
     private static final class EmptyMessageStore implements MessageStore {
         @Override
+        public Optional<Message> findById(UUID messageId) {
+            throw new UnsupportedOperationException("not needed for this test");
+        }
+
+        @Override
         public Optional<Message> findByIdempotencyKey(
             MessageAuthor author,
             MessageTarget target,
             IdempotencyKey idempotencyKey
         ) {
             return Optional.empty();
+        }
+
+        @Override
+        public Message save(Message message) {
+            throw new UnsupportedOperationException("not needed for this test");
         }
 
         @Override
@@ -200,6 +248,11 @@ class DefaultPublishMessageUseCaseTest {
         private Message savedMessage;
 
         @Override
+        public Optional<Message> findById(UUID messageId) {
+            throw new UnsupportedOperationException("not needed for this test");
+        }
+
+        @Override
         public Optional<Message> findByIdempotencyKey(
             MessageAuthor author,
             MessageTarget target,
@@ -209,9 +262,14 @@ class DefaultPublishMessageUseCaseTest {
         }
 
         @Override
-        public Message save(Message message, IdempotencyKey idempotencyKey) {
+        public Message save(Message message) {
             this.savedMessage = message;
             return message;
+        }
+
+        @Override
+        public Message save(Message message, IdempotencyKey idempotencyKey) {
+            return save(message);
         }
     }
 
@@ -237,12 +295,22 @@ class DefaultPublishMessageUseCaseTest {
         }
 
         @Override
+        public Optional<Message> findById(UUID messageId) {
+            throw new UnsupportedOperationException("not needed for this test");
+        }
+
+        @Override
         public Optional<Message> findByIdempotencyKey(
             MessageAuthor author,
             MessageTarget target,
             IdempotencyKey idempotencyKey
         ) {
             return Optional.of(existing);
+        }
+
+        @Override
+        public Message save(Message message) {
+            throw new AssertionError("save should not run for idempotent retry");
         }
 
         @Override
