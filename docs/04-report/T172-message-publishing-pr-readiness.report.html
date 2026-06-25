@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T172 메시지 발행 리뉴얼 PR 준비 점검</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --paper: #ffffff;
+      --text: #243244;
+      --muted: #66758a;
+      --heading: #101928;
+      --line: #d9e1ec;
+      --primary: #2563eb;
+      --primary-soft: #eef5ff;
+      --success-soft: #e8f7ee;
+      --success-text: #17663a;
+      --warning-soft: #fff5d8;
+      --warning-text: #8a5a00;
+      --danger-soft: #fdecec;
+      --danger-text: #a12727;
+      --shadow: 0 18px 50px rgba(20, 36, 56, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d7dee8;
+      --muted: #9aa7b8;
+      --heading: #f8fafc;
+      --line: #293548;
+      --primary: #69a6ff;
+      --primary-soft: #10294d;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2d0b;
+      --warning-text: #facc15;
+      --danger-soft: #3a1518;
+      --danger-text: #fca5a5;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 980px);
+      gap: 24px;
+      width: min(1300px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar, .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .document {
+      border-radius: 14px;
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 34px 0 14px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 17px;
+      margin: 22px 0 8px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 18px;
+      border-radius: 12px;
+      margin: 22px 0;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--paper);
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      padding: 2px 8px;
+      margin-left: 8px;
+      background: var(--success-soft);
+      color: var(--success-text);
+    }
+
+    .badge.warning {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+    }
+
+    .badge.danger {
+      background: var(--danger-soft);
+      color: var(--danger-text);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 0.95rem;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+      font-weight: 800;
+    }
+
+    code {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 0.92em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      overflow: auto;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      body { font-size: 15px; }
+      .layout {
+        grid-template-columns: 1fr;
+        width: min(100% - 20px, 520px);
+        gap: 14px;
+        margin: 10px auto 18px;
+      }
+      .sidebar {
+        position: static;
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .toc {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 180px;
+      }
+      .toc a {
+        font-size: 0.86rem;
+        line-height: 1.35;
+      }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document {
+        padding: 18px 14px;
+        border-radius: 10px;
+      }
+      .header {
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+      }
+      h1 { font-size: 22px; }
+      h2 {
+        font-size: 18px;
+        margin: 26px 0 12px;
+        padding: 8px 0 8px 10px;
+      }
+      h3 { font-size: 16px; }
+      .summary-box { padding: 14px; }
+      table {
+        display: block;
+        overflow-x: auto;
+        table-layout: auto;
+        white-space: normal;
+        -webkit-overflow-scrolling: touch;
+      }
+      th, td {
+        min-width: 150px;
+        padding: 9px 10px;
+      }
+      pre {
+        max-width: 100%;
+        font-size: 0.86rem;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .layout {
+        width: calc(100% - 16px);
+        margin-top: 8px;
+      }
+      .toc {
+        grid-template-columns: 1fr;
+        max-height: 150px;
+      }
+      .document { padding: 16px 12px; }
+      table { font-size: 0.88rem; }
+      th, td { min-width: 140px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="toolbar">
+        <input class="search" id="searchInput" type="search" placeholder="검색">
+        <button class="theme-toggle" id="themeToggle" type="button">다크 모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav class="toc" id="toc"></nav>
+    </aside>
+
+    <article class="document" id="document">
+      <header class="header">
+        <h1>T172 메시지 발행 리뉴얼 PR 준비 점검</h1>
+        <p>기준 브랜치: <code>feature/t02-guild-channel-permission</code> / 작성일: 2026-06-25</p>
+      </header>
+
+      <section class="summary-box searchable">
+        <h2 id="decision">최종 판단</h2>
+        <p><strong>판단:</strong> 현재 브랜치는 PR 또는 팀 공유 가능한 상태로 보인다. 다만 브랜치명이 실제 작업과 맞지 않고, PostgreSQL gated 테스트와 T190 full security gate는 조건부 미실행 영역으로 명시해야 한다.</p>
+        <div class="metric-grid">
+          <div class="item"><span class="label">원격 대비</span><code>origin/feature/t02-guild-channel-permission..HEAD</code> 10커밋 ahead</div>
+          <div class="item"><span class="label">작업트리</span>깨끗함</div>
+          <div class="item"><span class="label">주 작업</span>T172 메시지 발행 유스케이스, JDBC persistence port, transactional outbox, relay, dead-letter replay</div>
+          <div class="item"><span class="label">공유 조건</span>PR 제목과 본문에서 브랜치명 불일치와 gated 검증 범위를 명시</div>
+        </div>
+      </section>
+
+      <section class="searchable">
+        <h2 id="branch">브랜치명 처리</h2>
+        <p><code>feature/t02-guild-channel-permission</code>은 실제 변경 범위인 T172 메시지 발행 리뉴얼과 맞지 않는다. 커밋이 이미 원격 추적 브랜치 대비 10개 쌓여 있고, 작업트리가 깨끗하므로 지금 코드나 히스토리를 고칠 필요는 없다.</p>
+        <table>
+          <thead><tr><th>선택지</th><th>판단</th><th>이유</th></tr></thead>
+          <tbody>
+            <tr><td>현재 브랜치로 PR 생성</td><td><span class="badge">권장</span></td><td>추가 git write/remote 작업 없이 공유 가능하다. PR 제목을 <code>T172 message publishing renewal</code>로 두고 본문 첫 줄에 브랜치명 mismatch를 설명한다.</td></tr>
+            <tr><td>로컬 새 브랜치로 이름 정리</td><td><span class="badge warning">선택</span></td><td>리뷰어 혼선을 줄일 수 있지만 원격 push/fetch 승인이 필요하고, 현재 요청 범위에서는 필수는 아니다.</td></tr>
+            <tr><td>커밋 재작성</td><td><span class="badge danger">비권장</span></td><td>destructive 성격의 히스토리 정리가 필요할 수 있고, 현재 검증된 상태를 흔들 실익이 작다.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="searchable">
+        <h2 id="implementation">구현 대조</h2>
+        <p><code>docs/03-tasking/T172-message-publish-usecase-task-packet.md</code>는 최신 구현과 대체로 일치한다. 특히 idempotency key 필수화, mutation/read use case 전환, PostgreSQL adapter, transactional outbox, claim lease, retry backoff, dead-letter replay까지 반영되어 있다.</p>
+        <table>
+          <thead><tr><th>항목</th><th>확인 근거</th><th>판단</th></tr></thead>
+          <tbody>
+            <tr><td>메시지 생성</td><td><code>MessageController</code>가 bearer identity를 받아 <code>PublishMessageUseCase</code>와 <code>IdempotencyKey</code>로 위임한다.</td><td><span class="badge">일치</span></td></tr>
+            <tr><td>조회/수정/삭제/핀</td><td>list는 <code>ChannelMessageReader</code>, mutation은 각 use case와 guard를 통과한다.</td><td><span class="badge">일치</span></td></tr>
+            <tr><td>PostgreSQL persistence</td><td><code>JdbcMessageStore.savePublished(...)</code>가 message, mentions, idempotency key, outbox, outbox mentions를 한 JDBC transaction에 저장한다.</td><td><span class="badge">일치</span></td></tr>
+            <tr><td>Outbox relay</td><td>claim lease, bounded limit, mark published, release failed, retry delay, dead-letter 상태가 구현되어 있다.</td><td><span class="badge">일치</span></td></tr>
+            <tr><td>Bounded reads</td><td>local/JDBC page size는 1 미만이면 50, 최대 100으로 clamp된다.</td><td><span class="badge">일치</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="searchable">
+        <h2 id="wiki">외부 위키 판단</h2>
+        <p><code>Backend Architecture.md</code>는 T172 durable architecture 변경을 충분히 반영하고 있다. 문서에는 message-first vocabulary, client-generated idempotency key, structured mentions, JDBC persistence ports, removal of loadAll snapshot path, transactional outbox, relay worker, retry backoff, dead-letter operator API, SAGA 제외 판단이 들어 있다.</p>
+        <p><code>QA Infra Operations.md</code>도 PostgreSQL gated 테스트와 T190 security gate의 네트워크 승인 caveat를 담고 있다. 이번 점검으로 새 durable rule이나 wiki contradiction을 찾지 못했으므로 외부 위키는 갱신하지 않았다.</p>
+      </section>
+
+      <section class="searchable">
+        <h2 id="verification">검증 상태</h2>
+        <table>
+          <thead><tr><th>명령 또는 조건</th><th>상태</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td><code>./gradlew --version</code></td><td><span class="badge">사용자 제공 PASS</span></td><td>현재 턴에서는 재실행하지 않았다.</td></tr>
+            <tr><td><code>./gradlew :backend:modules:message:test :backend:boot:test</code></td><td><span class="badge">사용자 제공 PASS</span></td><td>T172 핵심 단위/boot 테스트 범위.</td></tr>
+            <tr><td><code>npm run test --workspaces</code></td><td><span class="badge">사용자 제공 PASS</span></td><td>웹 composer payload 포함.</td></tr>
+            <tr><td><code>./gradlew test</code></td><td><span class="badge">사용자 제공 PASS</span></td><td>전체 Gradle 회귀.</td></tr>
+            <tr><td><code>git diff --check origin/feature/t02-guild-channel-permission...HEAD</code></td><td><span class="badge">PASS</span></td><td>공백/패치 형식 문제 없음.</td></tr>
+            <tr><td><code>DISCORD_RUN_POSTGRES_TESTS=true</code></td><td><span class="badge warning">미실행</span></td><td>현재 환경에서 <code>DISCORD_RUN_POSTGRES_TESTS</code>와 <code>POSTGRES_JDBC_URL</code>은 설정되어 있지 않았다. DB 연결 확인과 실행은 별도 승인 필요.</td></tr>
+            <tr><td>T190 full security gate</td><td><span class="badge warning">미주장</span></td><td>npm audit/OSV로 dependency metadata가 전송되므로 네트워크 승인 없이 full coverage로 주장하면 안 된다.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="searchable">
+        <h2 id="pr">PR 설명 초안</h2>
+        <pre><code>## Summary
+- Renew message publishing around MessageAuthor, MessageTarget, MessageContent, MessageMentionTarget, and client-generated IdempotencyKey.
+- Route create/list/edit/delete/pin through message use case/read boundaries.
+- Replace the PostgreSQL message snapshot/loadAll path with JDBC persistence ports and explicit relational message/idempotency/outbox tables.
+- Add transactional message publication outbox, relay claim lease, retry backoff, dead-letter listing, and replay-to-relay-queue operator flow.
+- Include related T171 security hardening already present on this branch: trusted proxy policy, security dashboard MFA/operator audit updates, and T190 gate wiring fixes.
+
+## Branch Note
+This PR is opened from feature/t02-guild-channel-permission, but the real current slice is T172 message publishing renewal. The branch name is historical and should not be used as the PR scope.
+
+## Verification
+- ./gradlew --version
+- ./gradlew :backend:modules:message:test :backend:boot:test
+- npm run test --workspaces
+- ./gradlew test
+- git diff --check origin/feature/t02-guild-channel-permission...HEAD
+
+## Not Claimed
+- PostgreSQL-gated tests require DISCORD_RUN_POSTGRES_TESTS=true plus a reachable POSTGRES_JDBC_URL. They were not run in this final check because the env was not configured and DB execution needs explicit approval.
+- T190 full security gate is not claimed without network-approved npm audit/OSV execution.</code></pre>
+      </section>
+
+      <section class="searchable">
+        <h2 id="risks">잔여 리스크</h2>
+        <table>
+          <thead><tr><th>리스크</th><th>영향</th><th>권장 처리</th></tr></thead>
+          <tbody>
+            <tr><td>브랜치명과 실제 범위 불일치</td><td>리뷰어가 T02 permission 작업으로 오해할 수 있다.</td><td>PR 제목/본문 첫 단락에 T172 scope와 historical branch name을 명시한다.</td></tr>
+            <tr><td>PostgreSQL round-trip 미확인</td><td>JDBC adapter와 migration의 실제 DB 동작은 로컬 최종 점검에서 주장할 수 없다.</td><td>승인 후 <code>DISCORD_RUN_POSTGRES_TESTS=true POSTGRES_JDBC_URL=...</code>로 focused PostgreSQL 테스트를 실행한다.</td></tr>
+            <tr><td>T190 full gate 미실행</td><td>dependency advisory runtime coverage를 PR에서 과장할 위험이 있다.</td><td>네트워크 승인 전에는 contract/policy 범위만 언급한다.</td></tr>
+            <tr><td>같은 브랜치에 T171/T190 성격 변경 포함</td><td>PR review scope가 넓어질 수 있다.</td><td>PR 본문에서 T172 primary scope와 bundled prior security commits를 분리해 설명한다.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="searchable">
+        <h2 id="commit-summary">커밋 요약</h2>
+        <ul>
+          <li><code>997073e</code>: 보안 운영/CI gate 하드닝.</li>
+          <li><code>a6c9c78</code> - <code>7ef5e81</code>: 메시지 core value object와 publish use case/controller wiring.</li>
+          <li><code>094dfbe</code>: mutation/read 경로를 use case와 reader로 전환.</li>
+          <li><code>b01eec3</code>: JDBC message persistence ports와 explicit schema.</li>
+          <li><code>38c58b3</code>: publish 저장과 outbox append를 transactional store boundary로 통합.</li>
+          <li><code>57e6b14</code> - <code>d2e4524</code>: outbox relay, dead-letter replay, retry backoff.</li>
+        </ul>
+      </section>
+    </article>
+  </main>
+
+  <script>
+    const toc = document.querySelector('#toc');
+    const headings = [...document.querySelectorAll('h2[id]')];
+    headings.forEach((heading) => {
+      const link = document.createElement('a');
+      link.href = `#${heading.id}`;
+      link.textContent = heading.textContent;
+      toc.appendChild(link);
+    });
+
+    document.querySelector('#themeToggle').addEventListener('click', () => {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+      document.querySelector('#themeToggle').textContent = dark ? '다크 모드' : '라이트 모드';
+    });
+
+    document.querySelector('#searchInput').addEventListener('input', (event) => {
+      const value = event.target.value.trim().toLowerCase();
+      document.querySelectorAll('.searchable').forEach((section) => {
+        const hit = !value || section.textContent.toLowerCase().includes(value);
+        section.classList.toggle('hidden-by-search', !hit);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          document.querySelectorAll('.toc a').forEach((link) => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+          });
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    headings.forEach((heading) => observer.observe(heading));
+  </script>
+</body>
+</html>
