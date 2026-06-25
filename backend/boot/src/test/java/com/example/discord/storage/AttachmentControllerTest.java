@@ -1,7 +1,7 @@
 package com.example.discord.storage;
 
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -212,9 +212,10 @@ class AttachmentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "%s"
+                      "content": "%s",
+                      "idempotencyKey": "send-%s"
                     }
-                    """.formatted(content)))
+                    """.formatted(content, UUID.randomUUID())))
             .andExpect(status().isCreated())
             .andReturn();
 

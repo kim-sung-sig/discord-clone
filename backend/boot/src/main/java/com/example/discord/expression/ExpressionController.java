@@ -2,7 +2,8 @@ package com.example.discord.expression;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
-import com.example.discord.message.InMemoryMessageService;
+import com.example.discord.message.ChannelMessageTarget;
+import com.example.discord.message.MessageLookupPort;
 import com.example.discord.message.MessageNotFoundException;
 import java.util.List;
 import java.util.UUID;
@@ -27,18 +28,18 @@ import org.springframework.web.server.ResponseStatusException;
 class ExpressionController {
     private final InMemoryExpressionService expressionService;
     private final InMemoryGuildService guildService;
-    private final InMemoryMessageService messageService;
+    private final MessageLookupPort messageLookup;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ExpressionController(
         InMemoryExpressionService expressionService,
         InMemoryGuildService guildService,
-        InMemoryMessageService messageService,
+        MessageLookupPort messageLookup,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.expressionService = expressionService;
         this.guildService = guildService;
-        this.messageService = messageService;
+        this.messageLookup = messageLookup;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -176,7 +177,7 @@ class ExpressionController {
 
     private void requireReactableMessage(UUID channelId, UUID messageId, UUID requesterId) {
         UUID guildId = requireViewChannel(channelId, requesterId);
-        messageService.message(guildId, channelId, messageId);
+        messageLookup.requireMessage(new ChannelMessageTarget(guildId, channelId), messageId);
     }
 
     private static void requireRequest(Object request) {

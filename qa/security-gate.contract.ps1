@@ -49,6 +49,7 @@ Assert ($gateText.Contains('frontend-osv-vulnerabilities.json')) 'security gate 
 Assert ($gateText.Contains('frontend-sbom.npm.raw.json')) 'security gate must write native npm workspace SBOM evidence'
 Assert ($gateText.Contains('frontend-sbom.npm.lockfile.json')) 'security gate must write native npm package-lock SBOM evidence'
 Assert ($gateText.Contains('backend-vulnerabilities.json')) 'security gate must write backend vulnerability evidence'
+Assert ($gateText.Contains('@($frontendOsvFindings) + @($backendFindings)')) 'security gate must combine OSV findings as arrays even when one side has a single finding'
 Assert ($gateText.Contains('frontend-sbom.json')) 'security gate must write frontend SBOM'
 Assert ($gateText.Contains('backend-sbom.json')) 'security gate must write backend SBOM'
 Assert ($gateText.Contains('security-allowlist.json')) 'security gate must evaluate the allowlist'

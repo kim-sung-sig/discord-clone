@@ -15,6 +15,7 @@ export interface SecurityDashboardPrincipal {
   roles: string[]
   scopes: string[]
   admin?: boolean
+  mfa?: SecurityDashboardMfaEvidence
 }
 
 export interface SecurityDashboardAccessResult {
@@ -49,6 +50,24 @@ export interface SecurityDashboardAccessOptions extends SecurityDashboardPrincip
 export interface SecurityDashboardAccessConfig extends SecurityDashboardAccessOptions {
 }
 
+export interface SecurityDashboardMfaEvidence {
+  verified: boolean
+  methods: string[]
+  verifiedAt?: string
+}
+
+export interface SecurityDashboardMfaConfig {
+  requireForOperatorActions: boolean
+  maxAgeMinutes: number
+  allowTestMfaHeader: boolean
+  now?: () => Date
+}
+
+export interface SecurityDashboardMfaEvaluation {
+  satisfied: boolean
+  reason?: string
+}
+
 export type SecurityDashboardGuardHealthStatus = 'ready' | 'local-dev-open' | 'fail-closed'
 
 export interface SecurityDashboardGuardHealth {
@@ -80,6 +99,9 @@ interface JwtVerificationResult {
 }
 
 const BEARER_PREFIX = 'Bearer '
+const DEFAULT_MFA_MAX_AGE_MINUTES = 15
+const TEST_MFA_HEADER_VALUE = 'verified'
+const MFA_METHOD_HINTS = new Set(['mfa', 'otp', 'totp', 'webauthn', 'u2f', 'fido', 'fido2', 'hwk', 'sms', 'push'])
 
 export const createSecurityDashboardAccessConfig = (
   env: NodeJS.ProcessEnv = process.env
@@ -92,6 +114,51 @@ export const createSecurityDashboardAccessConfig = (
   adminScopes: parseList(env.NUXT_SECURITY_DASHBOARD_ADMIN_SCOPES),
   requireConfiguredGuard: env.NODE_ENV === 'production' || env.NUXT_SECURITY_DASHBOARD_REQUIRE_GUARD === 'true'
 })
+
+export const createSecurityDashboardMfaConfig = (
+  env: NodeJS.ProcessEnv = process.env
+): SecurityDashboardMfaConfig => {
+  const production = env.NODE_ENV === 'production'
+  return {
+    requireForOperatorActions: production || env.NUXT_SECURITY_DASHBOARD_REQUIRE_MFA !== 'false',
+    maxAgeMinutes: parsePositiveInteger(
+      env.NUXT_SECURITY_DASHBOARD_MFA_MAX_AGE_MINUTES,
+      DEFAULT_MFA_MAX_AGE_MINUTES,
+      120
+    ),
+    allowTestMfaHeader: !production && env.NUXT_SECURITY_DASHBOARD_ALLOW_TEST_MFA_HEADER === 'true'
+  }
+}
+
+export const evaluateSecurityDashboardMfaRequirement = (
+  principal: SecurityDashboardPrincipal | undefined,
+  config: SecurityDashboardMfaConfig,
+  testMfaHeader?: string
+): SecurityDashboardMfaEvaluation => {
+  if (!config.requireForOperatorActions) {
+    return { satisfied: true }
+  }
+  if (config.allowTestMfaHeader && testMfaHeader?.trim() === TEST_MFA_HEADER_VALUE) {
+    return { satisfied: true }
+  }
+
+  const evidence = principal?.mfa
+  const verifiedAt = evidence?.verifiedAt ? new Date(evidence.verifiedAt).getTime() : Number.NaN
+  const now = (config.now?.() ?? new Date()).getTime()
+  const maxAgeMs = Math.max(1, config.maxAgeMinutes) * 60_000
+  if (
+    evidence?.verified
+    && Number.isFinite(verifiedAt)
+    && verifiedAt <= now
+    && now - verifiedAt <= maxAgeMs
+  ) {
+    return { satisfied: true }
+  }
+  return {
+    satisfied: false,
+    reason: 'fresh MFA evidence is required'
+  }
+}
 
 export const authorizeSecurityDashboardAccess = async (
   input: SecurityDashboardAccessInput,
@@ -384,11 +451,13 @@ const verifyHs256Jwt = (
     return { reason: 'JWT is expired' }
   }
 
+  const mfa = mfaEvidenceFromClaims(payload)
   return {
     principal: {
       userId: stringValue(payload.sub ?? payload.userId ?? payload.id),
       roles: arrayValues(payload.roles ?? payload.role),
-      scopes: scopeValues(payload.scope ?? payload.scopes)
+      scopes: scopeValues(payload.scope ?? payload.scopes),
+      ...(mfa ? { mfa } : {})
     }
   }
 }
@@ -397,12 +466,14 @@ const normalizePrincipal = (value: unknown): SecurityDashboardPrincipal | undefi
   if (!isRecord(value)) {
     return undefined
   }
+  const mfa = mfaEvidenceFromClaims(value)
   if (value.admin === true || value.isAdmin === true) {
     return {
       userId: stringValue(value.id ?? value.userId ?? value.sub ?? recordValue(value.user, 'id')),
       roles: arrayValues(value.roles ?? value.role),
       scopes: scopeValues(value.scope ?? value.scopes),
-      admin: true
+      admin: true,
+      ...(mfa ? { mfa } : {})
     }
   }
   const userId = stringValue(value.id ?? value.userId ?? value.sub ?? recordValue(value.user, 'id'))
@@ -415,7 +486,8 @@ const normalizePrincipal = (value: unknown): SecurityDashboardPrincipal | undefi
   return {
     userId,
     roles,
-    scopes
+    scopes,
+    ...(mfa ? { mfa } : {})
   }
 }
 
@@ -479,6 +551,14 @@ const parseList = (value: string | undefined): string[] =>
     .map((item) => item.trim())
     .filter(Boolean)
 
+const parsePositiveInteger = (value: string | undefined, fallback: number, max: number): number => {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback
+  }
+  return Math.min(parsed, max)
+}
+
 const setOf = (values: string[] | undefined): Set<string> => new Set(values ?? [])
 
 const arrayValues = (value: unknown): string[] => {
@@ -497,6 +577,70 @@ const scopeValues = (value: unknown): string[] => {
   return single ? single.split(/\s+/).filter(Boolean) : []
 }
 
+const mfaEvidenceFromClaims = (value: Record<string, unknown>): SecurityDashboardMfaEvidence | undefined => {
+  const user = recordObject(value.user)
+  const methods = uniqueValues([
+    ...scopeValues(value.amr ?? user?.amr),
+    ...scopeValues(value.mfaMethods ?? value.mfa_methods ?? user?.mfaMethods ?? user?.mfa_methods),
+    ...scopeValues(value.acr ?? user?.acr)
+  ])
+  const verified = booleanValue(
+    value.mfaVerified
+      ?? value.mfa_verified
+      ?? value.mfa
+      ?? user?.mfaVerified
+      ?? user?.mfa_verified
+      ?? user?.mfa
+  ) || methods.some((method) => MFA_METHOD_HINTS.has(method.toLowerCase()) || method.toLowerCase().includes('mfa'))
+  const verifiedAt = timestampClaimToIso(
+    value.authTime
+      ?? value.auth_time
+      ?? value.mfaVerifiedAt
+      ?? value.mfa_verified_at
+      ?? value.iat
+      ?? user?.authTime
+      ?? user?.auth_time
+      ?? user?.mfaVerifiedAt
+      ?? user?.mfa_verified_at
+      ?? user?.iat
+  )
+
+  if (!verified && methods.length === 0 && !verifiedAt) {
+    return undefined
+  }
+  return {
+    verified,
+    methods,
+    ...(verifiedAt ? { verifiedAt } : {})
+  }
+}
+
+const uniqueValues = (values: string[]): string[] => Array.from(new Set(values))
+
+const booleanValue = (value: unknown): boolean =>
+  value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true')
+
+const timestampClaimToIso = (value: unknown): string | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return timestampNumberToIso(value)
+  }
+  const text = stringValue(value)
+  if (!text) {
+    return undefined
+  }
+  if (/^\d+$/.test(text)) {
+    return timestampNumberToIso(Number.parseInt(text, 10))
+  }
+  const parsed = Date.parse(text)
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined
+}
+
+const timestampNumberToIso = (value: number): string | undefined => {
+  const milliseconds = value > 1_000_000_000_000 ? value : value * 1000
+  const date = new Date(milliseconds)
+  return Number.isFinite(date.getTime()) ? date.toISOString() : undefined
+}
+
 const stringValue = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined
 
@@ -505,3 +649,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const recordValue = (value: unknown, key: string): unknown =>
   isRecord(value) ? value[key] : undefined
+
+const recordObject = (value: unknown): Record<string, unknown> | undefined =>
+  isRecord(value) ? value : undefined

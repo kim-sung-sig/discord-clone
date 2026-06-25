@@ -154,11 +154,14 @@ const saveOperatorTokenAndRetry = async () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        ...dashboardRequestHeaders(),
         'x-operator-token': bootstrapToken
       }
     })
     if (!response.ok) {
-      error.value = 'Unable to issue a short-lived operator token.'
+      error.value = await responseIsMfaRequired(response)
+        ? 'Step-up MFA is required before issuing an operator token.'
+        : 'Unable to issue a short-lived operator token.'
       return
     }
     const payload = await response.json()
@@ -245,6 +248,15 @@ const dashboardRequestHeaders = (): Record<string, string> => {
     headers['x-operator-token'] = operatorToken
   }
   return headers
+}
+
+const responseIsMfaRequired = async (response: Response): Promise<boolean> => {
+  try {
+    const payload = await response.json()
+    return Boolean(payload && typeof payload === 'object' && (payload as { message?: unknown }).message === 'mfa_required')
+  } catch {
+    return false
+  }
 }
 
 const trendBarHeight = (total: number): string => `${Math.max(8, Math.round((total / trendMaxTotal.value) * 100))}%`

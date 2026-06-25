@@ -37,6 +37,10 @@ class PersistenceBootstrapTest {
             assertThat(tableExists(statement, "guilds")).isTrue();
             assertThat(tableExists(statement, "channels")).isTrue();
             assertThat(tableExists(statement, "messages")).isTrue();
+            assertThat(tableExists(statement, "message_idempotency_keys")).isTrue();
+            assertThat(tableExists(statement, "message_publication_outbox")).isTrue();
+            assertThat(columnExists(statement, "message_publication_outbox", "claim_token")).isTrue();
+            assertThat(columnExists(statement, "message_publication_outbox", "dead_lettered_at")).isTrue();
             assertThat(tableExists(statement, "invites")).isTrue();
         }
     }
@@ -50,6 +54,21 @@ class PersistenceBootstrapTest {
                   AND table_name = '%s'
             )
             """.formatted(tableName))) {
+            resultSet.next();
+            return resultSet.getBoolean(1);
+        }
+    }
+
+    private static boolean columnExists(Statement statement, String tableName, String columnName) throws Exception {
+        try (ResultSet resultSet = statement.executeQuery("""
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = '%s'
+                  AND column_name = '%s'
+            )
+            """.formatted(tableName, columnName))) {
             resultSet.next();
             return resultSet.getBoolean(1);
         }

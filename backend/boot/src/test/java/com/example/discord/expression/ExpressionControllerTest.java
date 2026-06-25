@@ -172,9 +172,10 @@ class ExpressionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "%s"
+                      "content": "%s",
+                      "idempotencyKey": "send-%s"
                     }
-                    """.formatted(content)))
+                    """.formatted(content, UUID.randomUUID())))
             .andExpect(status().isCreated())
             .andReturn();
 

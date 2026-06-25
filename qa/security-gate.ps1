@@ -234,7 +234,7 @@ try {
   }
   $frontendOsvFindings = Read-VulnerabilityFindings $frontendOsvPath
   $backendFindings = Read-VulnerabilityFindings $backendVulnerabilitiesPath
-  foreach ($finding in @($frontendOsvFindings + $backendFindings)) {
+  foreach ($finding in @($frontendOsvFindings) + @($backendFindings)) {
     if ($finding.severity -in @('high', 'critical', 'unknown') -and -not (Test-IsAllowlisted $finding $allowlist)) {
       $blockingFindings += $finding
     }

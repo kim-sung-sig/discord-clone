@@ -231,6 +231,7 @@ describe('Discord shell API and Gateway contracts', () => {
     await shell.sendBackendMessage('channel-general', 'backend echo once', 'access-token')
     const body = JSON.parse(String(calls[0]?.init?.body))
     expect(body.clientEventId).toMatch(/^web-shell:/)
+    expect(body.idempotencyKey).toBe(body.clientEventId)
     expect(shell.pendingMutations).toHaveLength(0)
 
     expect(shell.applyGatewayDispatch({

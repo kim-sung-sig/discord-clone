@@ -1,4 +1,5 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +14,7 @@ const jsonResponse = (body: unknown, status = 200) =>
 
 const flushDashboard = async () => {
   for (let index = 0; index < 6; index += 1) {
+    await flushPromises()
     await Promise.resolve()
     await nextTick()
   }
@@ -792,5 +794,79 @@ describe('browser security dashboard', () => {
     expect(wrapper.get('[data-testid="operator-token-expiry"]').text()).toContain('2026-05-21T00:15:00.000Z')
     expect(wrapper.text()).not.toContain('bootstrap-token')
     expect(wrapper.text()).not.toContain('sdo_issued-dashboard-token')
+  })
+
+  it('forwards the signed-in bearer token when exchanging a bootstrap operator token', async () => {
+    const calls: Array<{ input: string, init?: RequestInit }> = []
+    const auth = useAuthStore()
+    auth.accessToken = 'backend-mfa-access-token'
+    vi.stubGlobal('fetch', async (input, init) => {
+      calls.push({ input: String(input), init })
+      if (String(input).includes('/api/security/operator-token/exchange')) {
+        return jsonResponse({
+          token: 'sdo_issued-dashboard-token',
+          expiresAt: '2026-05-21T00:15:00.000Z',
+          tokenId: 'abc123def456'
+        })
+      }
+      return jsonResponse({
+        summary: {
+          total: 1,
+          byEffectiveDirective: {
+            'style-src': 1
+          },
+          topDirectives: [
+            { directive: 'style-src', count: 1 }
+          ]
+        },
+        recent: []
+      })
+    })
+
+    const wrapper = await mountSuspended(SecurityPage, {
+      global: { plugins: [pinia] }
+    })
+    await flushDashboard()
+
+    await wrapper.get('[data-testid="operator-token-input"]').setValue('bootstrap-token')
+    await wrapper.get('[data-testid="operator-token-form"]').trigger('submit')
+    await flushDashboard()
+
+    const exchangeCall = calls.find((call) => call.input.includes('/api/security/operator-token/exchange'))
+    expect(exchangeCall?.init?.headers).toEqual({
+      'content-type': 'application/json',
+      Authorization: 'Bearer backend-mfa-access-token',
+      'x-operator-token': 'bootstrap-token'
+    })
+    expect(wrapper.text()).not.toContain('backend-mfa-access-token')
+    expect(wrapper.text()).not.toContain('bootstrap-token')
+  })
+
+  it('shows a step-up MFA message when operator token exchange requires MFA', async () => {
+    vi.stubGlobal('fetch', async (input) => {
+      if (String(input).includes('/api/security/operator-token/exchange')) {
+        return jsonResponse({ message: 'mfa_required' }, 403)
+      }
+      return jsonResponse({
+        summary: {
+          total: 0,
+          byEffectiveDirective: {},
+          topDirectives: []
+        },
+        recent: []
+      })
+    })
+
+    const wrapper = await mountSuspended(SecurityPage, {
+      global: { plugins: [pinia] }
+    })
+    await flushDashboard()
+
+    await wrapper.get('[data-testid="operator-token-input"]').setValue('bootstrap-token')
+    await wrapper.get('[data-testid="operator-token-form"]').trigger('submit')
+    await flushDashboard()
+
+    expect(wrapper.get('[data-testid="csp-error-state"]').text()).toContain('Step-up MFA is required')
+    expect(wrapper.text()).not.toContain('bootstrap-token')
   })
 })

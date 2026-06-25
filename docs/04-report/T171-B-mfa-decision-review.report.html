@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T171-B MFA 적용 범위 결정 및 구현 보고서</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --danger-soft: #fee2e2;
+      --danger-text: #991b1b;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --danger-soft: #3f1212;
+      --danger-text: #fca5a5;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 17px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+
+    code {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--heading);
+    }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+
+    .point-tag {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      background: var(--success-soft);
+      color: var(--success-text);
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .badge.warn {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+    }
+
+    .badge.danger {
+      background: var(--danger-soft);
+      color: var(--danger-text);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item, .risk, .decision {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .risk {
+      border-left: 5px solid var(--warning-text);
+      margin: 10px 0;
+    }
+
+    .decision {
+      border-left: 5px solid var(--success-text);
+      background: var(--success-soft);
+      margin: 14px 0;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      overflow-wrap: anywhere;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 840px) {
+      .layout {
+        display: block;
+        width: min(100% - 20px, 960px);
+        margin: 10px auto;
+      }
+      .sidebar {
+        position: static;
+        margin-bottom: 12px;
+      }
+      .document {
+        padding: 18px;
+      }
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="보고서 목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>T171-B MFA 적용 범위 결정 및 구현 보고서</h1>
+        <p>보안 대시보드, operator token lifecycle, 고위험 운영 동작의 step-up MFA 정책 및 구현 결과</p>
+      </header>
+
+      <section class="summary-box report-section" id="summary">
+        <span class="point-tag">핵심 요약</span>
+        <p><strong>결정 및 구현 결과는 전체 `/security` 조회에 즉시 MFA를 강제하기보다, operator token 발급/폐기와 향후 고위험 보안 동작에 step-up MFA를 먼저 요구하는 것이다.</strong></p>
+        <ul>
+          <li><strong>현재 상태:</strong> `/security` 읽기 경로는 기존 guard를 유지하고, operator token exchange/revoke는 신선한 MFA evidence를 요구한다.</li>
+          <li><strong>위험 지점:</strong> operator token bootstrap/exchange는 short-lived token과 audit를 갖췄지만, bootstrap secret 또는 관리자 세션이 탈취되면 두 번째 확인 없이 고위험 동작으로 이어질 수 있다.</li>
+          <li><strong>구현 방향:</strong> backend auth 또는 외부 IdP가 검증한 MFA evidence를 principal claim으로 전달하고, Nuxt route policy가 freshness를 검증한다.</li>
+          <li><strong>보안 경계:</strong> production에서는 static MFA bypass를 허용하지 않고, local/QA fixture는 명시적인 non-production 설정에서만 가능하다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="scope">
+        <h2>I. 검토 범위</h2>
+        <div class="metric-grid">
+          <div class="item"><span class="label">대상 화면</span><code>/security</code> dashboard, operator token form, operator token audit panel</div>
+          <div class="item"><span class="label">대상 API</span><code>/api/security/operator-token/exchange</code>, <code>/revoke</code>, <code>/audit</code>, CSP telemetry/ack routes</div>
+          <div class="item"><span class="label">결정 대상</span>MFA 적용 범위, MFA 증거 출처, recovery/break-glass, local QA fixture 방식</div>
+          <div class="item"><span class="label">제외 범위</span>실제 TOTP/WebAuthn 구현, 외부 IdP 연동 구현, recovery code 저장소 구현</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="current-state">
+        <h2>II. 현재 구현 관찰</h2>
+        <table>
+          <thead>
+            <tr><th>영역</th><th>현재 관찰</th><th>MFA 결정에 미치는 영향</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Dashboard access guard</td>
+              <td><code>authorizeSecurityDashboardAccess</code>가 backend verifier, JWT, issued operator token, static operator token, local-dev-open 순서로 평가한다.</td>
+              <td><span class="badge good">확장 완료</span> MFA evidence와 freshness metadata를 principal에 추가했다.</td>
+            </tr>
+            <tr>
+              <td>Operator token exchange</td>
+              <td>configured bootstrap token과 신선한 MFA evidence를 확인한 뒤 15분 기본 TTL의 issued operator token을 발급한다.</td>
+              <td><span class="badge good">보호됨</span> bootstrap secret만으로는 issued operator token을 발급할 수 없다.</td>
+            </tr>
+            <tr>
+              <td>Operator token revoke/audit</td>
+              <td>issued operator token store는 token hash와 audit row를 저장하고, UI는 12-character prefix만 표시한다.</td>
+              <td><span class="badge good">유지됨</span> MFA gate가 추가돼도 raw token은 payload/UI에 노출하지 않는다.</td>
+            </tr>
+            <tr>
+              <td>Local development</td>
+              <td>guard가 구성되지 않았고 production/required mode가 아니면 read-only local-dev-open이 가능하다.</td>
+              <td><span class="badge good">분리됨</span> operator action MFA fixture는 non-production 명시 설정에서만 동작한다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="risks">
+        <h2>III. 위험 분석</h2>
+        <div class="risk">
+          <strong>R1. 관리자 세션 탈취 후 고위험 보안 동작 실행</strong><br>
+          기본 dashboard guard만으로는 최근 MFA를 거친 사용자와 단순 bearer/JWT 또는 operator token 사용자를 구분하지 못한다.
+        </div>
+        <div class="risk">
+          <strong>R2. Bootstrap secret 탈취 시 short-lived token 발급 가능</strong><br>
+          T129/T170 이후 발급 토큰은 짧고 감사 가능하지만, bootstrap exchange 자체에 추가 확인이 없으면 발급 진입점이 높은 가치를 가진다.
+        </div>
+        <div class="risk">
+          <strong>R3. 전체 dashboard MFA 강제는 사고 대응 지연 가능</strong><br>
+          읽기 전용 CSP telemetry나 guard health 확인까지 매번 MFA를 요구하면 운영자가 incident state를 빠르게 확인하기 어렵다.
+        </div>
+        <div class="risk">
+          <strong>R4. Frontend-only MFA는 보안 경계가 될 수 없음</strong><br>
+          브라우저 상태, sessionStorage, UI flag만으로 MFA를 판단하면 사용자가 임의 조작할 수 있다. MFA evidence는 backend 또는 IdP가 서명/검증해야 한다.
+        </div>
+      </section>
+
+      <section class="report-section" id="options">
+        <h2>IV. 결정 옵션</h2>
+        <table>
+          <thead>
+            <tr><th>옵션</th><th>내용</th><th>장점</th><th>단점</th><th>권장</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A. 고위험 동작 step-up MFA</td>
+              <td>operator token exchange/revoke와 향후 security action에 MFA freshness를 요구한다. 읽기 전용 dashboard는 기존 guard로 유지한다.</td>
+              <td>위험 감소와 운영 응답성을 균형 있게 맞춘다. 기존 access guard를 route policy로 확장하기 쉽다.</td>
+              <td>route별 risk classification과 MFA claim 계약이 필요하다.</td>
+              <td><span class="badge good">권장</span></td>
+            </tr>
+            <tr>
+              <td>B. 전체 `/security` MFA</td>
+              <td>dashboard 진입과 모든 security API 호출에 MFA를 요구한다.</td>
+              <td>가장 단순하고 강한 보호 모델이다.</td>
+              <td>incident 조회와 guard health 확인도 느려지고 break-glass UX가 복잡해진다.</td>
+              <td><span class="badge warn">강화 모드</span></td>
+            </tr>
+            <tr>
+              <td>C. MFA 유예</td>
+              <td>현재 short-lived operator token, audit, fail-closed guard만 유지한다.</td>
+              <td>구현 비용이 없다.</td>
+              <td>bootstrap secret 또는 관리자 세션 탈취 시 두 번째 확인이 없다.</td>
+              <td><span class="badge danger">비권장</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="recommended-decision">
+        <h2>V. 권장 결정안</h2>
+        <div class="decision">
+          T171-B 결정: phase 1에서는 high-risk security operation에 step-up MFA를 요구한다. MFA evidence는 backend auth 또는 외부 IdP가 검증한 principal claim으로 전달하고, Nuxt는 해당 claim을 route policy에서 소비한다. production에서는 static MFA bypass를 허용하지 않는다.
+        </div>
+        <table>
+          <thead>
+            <tr><th>결정 항목</th><th>결정값</th><th>구현 결과</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>MFA 적용 범위</td>
+              <td>operator token exchange/revoke, future security action, global role/security operator mutation</td>
+              <td>exchange/revoke route가 fresh MFA evidence를 요구한다.</td>
+            </tr>
+            <tr>
+              <td>Read-only dashboard</td>
+              <td>기존 dashboard guard 유지. 단, production에서는 configured guard 필수</td>
+              <td>telemetry/audit read route는 기존 dashboard guard로 유지한다.</td>
+            </tr>
+            <tr>
+              <td>MFA 방식</td>
+              <td>backend/IdP claim 우선. TOTP/WebAuthn 자체 구현은 별도 auth backend task</td>
+              <td><code>mfaVerified</code>, <code>authTime</code>, <code>amr</code>/<code>acr</code>, <code>auth_time</code> claim을 정규화한다.</td>
+            </tr>
+            <tr>
+              <td>Recovery와 break-glass</td>
+              <td>production bypass 없음. break-glass는 별도 audited principal 또는 approved emergency token만 허용</td>
+              <td>raw token, recovery code, MFA secret를 응답/문서에 추가하지 않았다.</td>
+            </tr>
+            <tr>
+              <td>Local/QA</td>
+              <td>명시적 non-production fixture로 MFA evidence 시뮬레이션</td>
+              <td><code>NUXT_SECURITY_DASHBOARD_ALLOW_TEST_MFA_HEADER</code>는 production에서 비활성화된다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="approval-questions">
+        <h2>VI. 결정 결과</h2>
+        <ol>
+          <li>phase 1 MFA 적용 범위는 operator token lifecycle 같은 고위험 동작으로 확정했다.</li>
+          <li>MFA evidence는 backend auth 또는 외부 IdP claim만 신뢰하고, Nuxt/browser-only state는 신뢰하지 않는다.</li>
+          <li>production에서 static MFA bypass를 금지한다.</li>
+          <li>local/QA에서는 명시적인 non-production fixture로 MFA evidence를 시뮬레이션할 수 있다.</li>
+        </ol>
+      </section>
+
+      <section class="report-section" id="implementation-after-approval">
+        <h2>VII. 구현 결과</h2>
+        <p>사용자 승인 후 다음 RED/GREEN 순서로 구현했다.</p>
+        <ul>
+          <li>operator token exchange/revoke가 MFA evidence 없는 principal을 거부하는 RED 테스트를 추가했다.</li>
+          <li>backend/JWT principal에 MFA evidence와 freshness metadata를 담는 access guard를 추가했다.</li>
+          <li>production에서 MFA disable/test header 우회가 동작하지 않는 설정 테스트를 추가했다.</li>
+          <li>UI는 MFA secret/recovery code를 저장하거나 표시하지 않고 step-up required 상태만 표시한다.</li>
+          <li>exchange/revoke route factory를 추가해 고위험 action policy를 직접 검증한다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="verification">
+        <h2>VIII. 산출물 검증</h2>
+        <p>이번 작업은 결정 문서와 구현을 함께 갱신했다. 다음 검증을 통과했다.</p>
+        <ul>
+          <li><code>npm test --workspace @discord-clone/web -- security-dashboard-access.test.ts security-dashboard.test.ts</code></li>
+          <li><code>npm run lint:frontend</code></li>
+          <li><code>npm run build --workspace @discord-clone/web</code></li>
+          <li><code>npm test --workspaces</code></li>
+          <li><code>npm run openapi:check</code></li>
+          <li><code>./gradlew test</code></li>
+          <li><code>npm run lint:backend</code></li>
+          <li><code>qa/security-gate.contract.ps1</code>, <code>qa/real-backend-e2e.contract.ps1</code>, <code>qa/security-gate.ps1</code></li>
+          <li>raw operator token, recovery code, MFA secret 예시는 문서에 포함하지 않는다.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

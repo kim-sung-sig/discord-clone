@@ -210,7 +210,10 @@ class PresenceControllerTest {
 
     private AuthSession signup(String username) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
-                .header("X-Forwarded-For", testClientIp(username))
+                .with(request -> {
+                    request.setRemoteAddr(testClientIp(username));
+                    return request;
+                })
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {

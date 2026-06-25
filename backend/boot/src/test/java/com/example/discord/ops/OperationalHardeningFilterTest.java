@@ -151,8 +151,13 @@ class OperationalHardeningFilterTest {
 
     @Test
     void authLoginRateLimitRejectsByClientIpBeforeLockoutAbuse() throws Exception {
+        String remoteAddr = "198.51.100.19";
         for (int i = 0; i < 2; i++) {
             mockMvc.perform(post("/api/auth/login")
+                    .with(request -> {
+                        request.setRemoteAddr(remoteAddr);
+                        return request;
+                    })
                     .header("X-Forwarded-For", "203.0.113.19")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
@@ -165,6 +170,10 @@ class OperationalHardeningFilterTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
+                .with(request -> {
+                    request.setRemoteAddr(remoteAddr);
+                    return request;
+                })
                 .header("X-Forwarded-For", "203.0.113.19")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -210,6 +219,44 @@ class OperationalHardeningFilterTest {
                 .content("""
                     {
                       "email": "xff-spoof-final@example.com",
+                      "password": "wrong password"
+                    }
+                    """))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("X-RateLimit-Limit", "2"))
+            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+    }
+
+    @Test
+    void authLoginRateLimitIgnoresSpoofedForwardedForFromPrivateRemoteWithoutAllowlist() throws Exception {
+        String remoteAddr = "10.0.0.25";
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                    .with(request -> {
+                        request.setRemoteAddr(remoteAddr);
+                        return request;
+                    })
+                    .header("X-Forwarded-For", "203.0.113." + (120 + i))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "email": "private-xff-spoof-%d@example.com",
+                          "password": "wrong password"
+                        }
+                        """.formatted(i)))
+                .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(request -> {
+                    request.setRemoteAddr(remoteAddr);
+                    return request;
+                })
+                .header("X-Forwarded-For", "203.0.113.129")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "email": "private-xff-spoof-final@example.com",
                       "password": "wrong password"
                     }
                     """))
@@ -277,9 +324,10 @@ class OperationalHardeningFilterTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "content": "spam attempt"
+                          "content": "spam attempt",
+                          "idempotencyKey": "spam-%s"
                         }
-                        """))
+                        """.formatted(i)))
                 .andExpect(status().isUnauthorized());
         }
 
@@ -288,7 +336,8 @@ class OperationalHardeningFilterTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "content": "spam attempt"
+                      "content": "spam attempt",
+                      "idempotencyKey": "spam-final"
                     }
                     """))
             .andExpect(status().isTooManyRequests())
