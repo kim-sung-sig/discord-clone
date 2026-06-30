@@ -15,6 +15,9 @@ export type ApiPath =
   | '/api/gateway/sessions/{sessionId}/events'
   | '/api/guilds'
   | '/api/guilds/{guildId}/channels'
+  | '/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports'
+  | '/api/guilds/{guildId}/message-reports'
+  | '/api/guilds/{guildId}/message-reports/{reportId}/resolve'
   | '/api/security/csp-report'
   | '/api/users/@me/guilds'
   | '/api/voice/channels/{channelId}/join'
@@ -67,6 +70,21 @@ export const apiOperations = [
     "method": "POST",
     "path": "/api/guilds/{guildId}/channels",
     "operationId": "createChannel"
+  },
+  {
+    "method": "POST",
+    "path": "/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports",
+    "operationId": "reportMessage"
+  },
+  {
+    "method": "GET",
+    "path": "/api/guilds/{guildId}/message-reports",
+    "operationId": "listMessageReports"
+  },
+  {
+    "method": "POST",
+    "path": "/api/guilds/{guildId}/message-reports/{reportId}/resolve",
+    "operationId": "resolveMessageReport"
   },
   {
     "method": "POST",

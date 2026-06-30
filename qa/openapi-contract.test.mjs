@@ -6,6 +6,7 @@ const generatedTypes = readFileSync(
   new URL('../packages/api-client/src/generated/openapi-types.ts', import.meta.url),
   'utf8'
 )
+const contractScript = readFileSync(new URL('./openapi-contract.mjs', import.meta.url), 'utf8')
 
 assert.equal(spec.openapi, '3.1.0')
 assert.equal(spec.info.title, 'Discord Clone API')
@@ -22,6 +23,9 @@ for (const path of [
   '/api/guilds',
   '/api/users/@me/guilds',
   '/api/channels/{channelId}/messages',
+  '/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports',
+  '/api/guilds/{guildId}/message-reports',
+  '/api/guilds/{guildId}/message-reports/{reportId}/resolve',
   '/api/voice/channels/{channelId}/join',
   '/api/gateway/sessions/{sessionId}/events',
   '/api/security/csp-report'
@@ -34,3 +38,10 @@ assert.match(generatedTypes, /export type ApiPath =/)
 assert.match(generatedTypes, /'\/api\/auth\/login'/)
 assert.match(generatedTypes, /'\/api\/users\/@me\/guilds'/)
 assert.match(generatedTypes, /'\/api\/channels\/\{channelId\}\/messages'/)
+assert.match(generatedTypes, /'\/api\/guilds\/\{guildId\}\/message-reports'/)
+assert.deepEqual(spec.components.schemas.CreateMessageRequest.required.sort(), ['content', 'idempotencyKey'])
+assert.ok(spec.components.schemas.CreateMessageRequest.properties.idempotencyKey)
+assert.deepEqual(spec.components.schemas.ReportMessageRequest.required, ['reason'])
+assert.deepEqual(spec.components.schemas.ResolveMessageReportRequest.properties.status.enum, ['RESOLVED', 'DISMISSED'])
+assert.match(contractScript, /normalizeLineEndings/)
+assert.match(contractScript, /replace\(\/\\r\\n\/g, '\\n'\)/)

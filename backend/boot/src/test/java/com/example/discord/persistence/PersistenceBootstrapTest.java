@@ -38,6 +38,7 @@ class PersistenceBootstrapTest {
             assertThat(tableExists(statement, "channels")).isTrue();
             assertThat(tableExists(statement, "messages")).isTrue();
             assertThat(tableExists(statement, "message_idempotency_keys")).isTrue();
+            assertThat(tableExists(statement, "message_read_projection")).isTrue();
             assertThat(tableExists(statement, "message_publication_outbox")).isTrue();
             assertThat(columnExists(statement, "message_publication_outbox", "claim_token")).isTrue();
             assertThat(columnExists(statement, "message_publication_outbox", "dead_lettered_at")).isTrue();

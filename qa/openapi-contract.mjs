@@ -76,6 +76,7 @@ const spec = {
     { name: 'auth' },
     { name: 'guilds' },
     { name: 'messages' },
+    { name: 'moderation' },
     { name: 'voice' },
     { name: 'gateway' },
     { name: 'security' }
@@ -150,6 +151,48 @@ const spec = {
         responses: { 201: { $ref: '#/components/responses/Message' } }
       })
     },
+    '/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports': {
+      post: operation({
+        operationId: 'reportMessage',
+        tags: ['moderation'],
+        summary: 'Report a visible channel message for moderator review.',
+        parameters: [
+          authHeader,
+          { name: 'guildId', in: 'path', required: true, schema: uuid },
+          { name: 'channelId', in: 'path', required: true, schema: uuid },
+          { name: 'messageId', in: 'path', required: true, schema: uuid }
+        ],
+        requestBody: jsonBody({ $ref: '#/components/schemas/ReportMessageRequest' }),
+        responses: { 201: { $ref: '#/components/responses/MessageReport' } }
+      })
+    },
+    '/api/guilds/{guildId}/message-reports': {
+      get: operation({
+        operationId: 'listMessageReports',
+        tags: ['moderation'],
+        summary: 'List pending message reports for moderators.',
+        parameters: [
+          authHeader,
+          { name: 'guildId', in: 'path', required: true, schema: uuid },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } }
+        ],
+        responses: { 200: { $ref: '#/components/responses/MessageReportList' } }
+      })
+    },
+    '/api/guilds/{guildId}/message-reports/{reportId}/resolve': {
+      post: operation({
+        operationId: 'resolveMessageReport',
+        tags: ['moderation'],
+        summary: 'Resolve or dismiss a pending message report.',
+        parameters: [
+          authHeader,
+          { name: 'guildId', in: 'path', required: true, schema: uuid },
+          { name: 'reportId', in: 'path', required: true, schema: uuid }
+        ],
+        requestBody: jsonBody({ $ref: '#/components/schemas/ResolveMessageReportRequest' }),
+        responses: { 200: { $ref: '#/components/responses/MessageReport' } }
+      })
+    },
     '/api/voice/channels/{channelId}/join': {
       post: operation({
         operationId: 'joinVoiceChannel',
@@ -215,8 +258,21 @@ const spec = {
       },
       CreateMessageRequest: {
         type: 'object',
-        required: ['content'],
-        properties: { content: { type: 'string' }, clientEventId: { type: 'string' } }
+        required: ['content', 'idempotencyKey'],
+        properties: { content: { type: 'string' }, idempotencyKey: { type: 'string' }, clientEventId: { type: 'string' } }
+      },
+      ReportMessageRequest: {
+        type: 'object',
+        required: ['reason'],
+        properties: { reason: { type: 'string', minLength: 1 } }
+      },
+      ResolveMessageReportRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: {
+          status: { type: 'string', enum: ['RESOLVED', 'DISMISSED'] },
+          resolution: { type: 'string' }
+        }
       }
     },
     responses: Object.fromEntries(
@@ -243,6 +299,8 @@ for (const [name, description] of [
   ['Channel', 'Channel response.'],
   ['Message', 'Message response.'],
   ['MessageList', 'Message list response.'],
+  ['MessageReport', 'Message report response.'],
+  ['MessageReportList', 'Pending message report list response.'],
   ['VoiceJoin', 'Voice join response.'],
   ['GatewayEvents', 'Gateway events response.'],
   ['GlobalRoleAuditLog', 'Global role audit log response.']
@@ -299,9 +357,13 @@ function write(filePath, content) {
 
 function assertFresh(filePath, expected) {
   const current = readFileSync(filePath, 'utf8')
-  if (current !== expected) {
+  if (normalizeLineEndings(current) !== normalizeLineEndings(expected)) {
     throw new Error(`${filePath} is stale. Run node qa/openapi-contract.mjs --write`)
   }
+}
+
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n/g, '\n')
 }
 
 function operations(openApiSpec) {

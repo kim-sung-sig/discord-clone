@@ -3,8 +3,11 @@ package com.example.discord.moderation;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.GuildMember;
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.message.ChannelMessageTarget;
+import com.example.discord.message.MessageLookupPort;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -27,15 +30,18 @@ import org.springframework.web.server.ResponseStatusException;
 class ModerationController {
     private final InMemoryModerationService moderationService;
     private final InMemoryGuildService guildService;
+    private final MessageLookupPort messages;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ModerationController(
         InMemoryModerationService moderationService,
         InMemoryGuildService guildService,
+        MessageLookupPort messages,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.moderationService = moderationService;
         this.guildService = guildService;
+        this.messages = messages;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -130,6 +136,60 @@ class ModerationController {
             .toList();
     }
 
+    @PostMapping("/channels/{channelId}/messages/{messageId}/reports")
+    ResponseEntity<MessageReportResponse> reportMessage(
+        @PathVariable UUID guildId,
+        @PathVariable UUID channelId,
+        @PathVariable UUID messageId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody ReportMessageRequest request
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireRequest(request);
+        if (!guildService.canViewChannel(guildId, channelId, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
+        }
+        messages.requireMessage(new ChannelMessageTarget(guildId, channelId), messageId);
+        MessageReport report = moderationService.reportMessage(new ReportMessageCommand(
+            guildId,
+            channelId,
+            messageId,
+            requesterId,
+            request.reason()
+        ));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageReportResponse.from(report));
+    }
+
+    @GetMapping("/message-reports")
+    List<MessageReportResponse> messageReports(
+        @PathVariable UUID guildId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestParam(defaultValue = "50") int limit
+    ) {
+        requireManageMessages(guildId, authorization);
+        return moderationService.pendingMessageReports(guildId, limit).stream()
+            .map(MessageReportResponse::from)
+            .toList();
+    }
+
+    @PostMapping("/message-reports/{reportId}/resolve")
+    MessageReportResponse resolveMessageReport(
+        @PathVariable UUID guildId,
+        @PathVariable UUID reportId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody ResolveMessageReportRequest request
+    ) {
+        UUID requesterId = requireManageMessages(guildId, authorization);
+        requireRequest(request);
+        return MessageReportResponse.from(moderationService.resolveMessageReport(
+            guildId,
+            reportId,
+            requesterId,
+            request.status(),
+            request.resolution()
+        ));
+    }
+
     private UUID requireManageRoles(UUID guildId, String authorization) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         if (!guildService.canManageRoles(guildId, requesterId)) {
@@ -173,6 +233,12 @@ class ModerationController {
     }
 
     record CreateAutoModRuleRequest(AutoModRuleType type, String name, List<String> keywords) {
+    }
+
+    record ReportMessageRequest(String reason) {
+    }
+
+    record ResolveMessageReportRequest(MessageReportStatus status, String resolution) {
     }
 
     record OnboardingQuestionResponse(UUID id, UUID guildId, String prompt, List<OnboardingAnswerResponse> answers) {
@@ -246,6 +312,37 @@ class ModerationController {
                 alert.severity(),
                 alert.reason(),
                 alert.createdAt()
+            );
+        }
+    }
+
+    record MessageReportResponse(
+        UUID id,
+        UUID guildId,
+        UUID channelId,
+        UUID messageId,
+        UUID reporterId,
+        String reason,
+        MessageReportStatus status,
+        UUID moderatorId,
+        String resolution,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        static MessageReportResponse from(MessageReport report) {
+            Optional<UUID> moderatorId = report.moderatorId();
+            return new MessageReportResponse(
+                report.id(),
+                report.guildId(),
+                report.channelId(),
+                report.messageId(),
+                report.reporterId(),
+                report.reason(),
+                report.status(),
+                moderatorId.orElse(null),
+                report.resolution(),
+                report.createdAt(),
+                report.updatedAt()
             );
         }
     }

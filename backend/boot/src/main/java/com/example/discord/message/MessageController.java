@@ -34,8 +34,7 @@ class MessageController {
     private final EditMessageUseCase editMessage;
     private final DeleteMessageUseCase deleteMessage;
     private final PinMessageUseCase pinMessage;
-    private final ChannelMessageReader channelMessageReader;
-    private final ChannelMessageSearchPort messageSearch;
+    private final ChannelMessageQueryService messageQueries;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
@@ -45,8 +44,7 @@ class MessageController {
         EditMessageUseCase editMessage,
         DeleteMessageUseCase deleteMessage,
         PinMessageUseCase pinMessage,
-        ChannelMessageReader channelMessageReader,
-        ChannelMessageSearchPort messageSearch,
+        ChannelMessageQueryService messageQueries,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
@@ -55,8 +53,7 @@ class MessageController {
         this.editMessage = editMessage;
         this.deleteMessage = deleteMessage;
         this.pinMessage = pinMessage;
-        this.channelMessageReader = channelMessageReader;
-        this.messageSearch = messageSearch;
+        this.messageQueries = messageQueries;
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -91,7 +88,7 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = guildIdFor(channelId);
-        MessagePage page = channelMessageReader.read(new ChannelMessageQuery(
+        MessageReadPage page = messageQueries.read(new ChannelMessageQuery(
             new UserMessageAuthor(requesterId),
             new ChannelMessageTarget(guildId, channelId),
             before,
@@ -173,18 +170,15 @@ class MessageController {
         @RequestParam(defaultValue = "50") int limit
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        UUID guildId = requireView(channelId, requesterId);
-        return messageSearch.search(new ChannelMessageTarget(guildId, channelId), q, limit).stream()
+        UUID guildId = guildIdFor(channelId);
+        return messageQueries.search(new ChannelMessageQuery(
+                new UserMessageAuthor(requesterId),
+                new ChannelMessageTarget(guildId, channelId),
+                null,
+                limit
+            ), q, limit).stream()
             .map(MessageResponse::from)
             .toList();
-    }
-
-    private UUID requireView(UUID channelId, UUID requesterId) {
-        UUID guildId = guildIdFor(channelId);
-        if (!guildService.canViewChannel(guildId, channelId, requesterId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
-        }
-        return guildId;
     }
 
     private UUID guildIdFor(UUID channelId) {
@@ -239,7 +233,7 @@ class MessageController {
     }
 
     record MessagePageResponse(List<MessageResponse> messages, String nextCursor) {
-        static MessagePageResponse from(MessagePage page) {
+        static MessagePageResponse from(MessageReadPage page) {
             return new MessagePageResponse(
                 page.messages().stream().map(MessageResponse::from).toList(),
                 page.nextCursor()
@@ -273,6 +267,23 @@ class MessageController {
                 message.deleted(),
                 message.edited(),
                 message.editHistory().stream().map(MessageEditResponse::from).toList(),
+                message.createdAt(),
+                message.updatedAt()
+            );
+        }
+
+        static MessageResponse from(MessageReadModel message) {
+            return new MessageResponse(
+                message.id(),
+                message.guildId(),
+                message.channelId(),
+                message.authorId(),
+                message.content(),
+                message.mentions(),
+                message.pinned(),
+                message.deleted(),
+                message.edited(),
+                List.of(),
                 message.createdAt(),
                 message.updatedAt()
             );
