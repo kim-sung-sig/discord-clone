@@ -27,6 +27,7 @@ class JdbcMessageStore implements
     MessagePublicationStore,
     ChannelMessagePagePort,
     ChannelMessageSearchPort,
+    ChannelMessageReadModelPort,
     MessageLookupPort,
     MessagePublicationOutbox,
     MessagePublicationOutboxQueue,
@@ -96,6 +97,7 @@ class JdbcMessageStore implements
                 upsertMessage(connection, message);
                 replaceMentions(connection, message);
                 replaceEdits(connection, message);
+                upsertReadProjection(connection, message);
                 connection.commit();
                 return message;
             } catch (SQLException exception) {
@@ -120,6 +122,7 @@ class JdbcMessageStore implements
                 upsertMessage(connection, message);
                 replaceMentions(connection, message);
                 replaceEdits(connection, message);
+                upsertReadProjection(connection, message);
                 insertIdempotencyKey(connection, message, idempotencyKey);
                 connection.commit();
                 return message;
@@ -150,6 +153,7 @@ class JdbcMessageStore implements
                 upsertMessage(connection, message);
                 replaceMentions(connection, message);
                 replaceEdits(connection, message);
+                upsertReadProjection(connection, message);
                 insertIdempotencyKey(connection, message, idempotencyKey);
                 MessageScope scope = MessageScope.from(event.author(), event.target())
                     .orElseThrow(() -> new IllegalArgumentException("unsupported message publication scope"));
@@ -209,6 +213,50 @@ class JdbcMessageStore implements
             return findMessages(connection, statement);
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to search channel messages", exception);
+        }
+    }
+
+    @Override
+    public MessageReadPage readModels(ChannelMessageTarget target, String beforeCursor, int limit) {
+        Objects.requireNonNull(target, "target must not be null");
+        int pageSize = pageSize(limit);
+        Cursor before = beforeCursor == null || beforeCursor.isBlank() ? null : Cursor.decode(beforeCursor);
+        try (Connection connection = dataSource.getConnection()) {
+            List<MessageReadModel> messages = readModelPage(connection, target, before, pageSize + 1);
+            boolean hasMore = messages.size() > pageSize;
+            List<MessageReadModel> visiblePage = hasMore ? messages.subList(0, pageSize) : messages;
+            String nextCursor = hasMore ? Cursor.from(visiblePage.getLast()).encode() : null;
+            return new MessageReadPage(visiblePage, nextCursor);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to read channel message projections", exception);
+        }
+    }
+
+    @Override
+    public List<MessageReadModel> searchModels(ChannelMessageTarget target, String query, int limit) {
+        Objects.requireNonNull(target, "target must not be null");
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+                 FROM message_read_projection
+                 WHERE guild_id = ?
+                   AND channel_id = ?
+                   AND deleted = false
+                   AND LOWER(content) LIKE ?
+                 ORDER BY created_at DESC, message_id DESC
+                 LIMIT ?
+                 """)) {
+            statement.setObject(1, target.guildId());
+            statement.setObject(2, target.channelId());
+            statement.setString(3, "%" + normalized + "%");
+            statement.setInt(4, pageSize(limit));
+            return findReadModels(connection, statement);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to search channel message projections", exception);
         }
     }
 
@@ -469,6 +517,23 @@ class JdbcMessageStore implements
         );
     }
 
+    private static MessageReadModel readModelFrom(ResultSet resultSet) throws SQLException {
+        UUID messageId = resultSet.getObject("message_id", UUID.class);
+        return new MessageReadModel(
+            messageId,
+            resultSet.getObject("guild_id", UUID.class),
+            resultSet.getObject("channel_id", UUID.class),
+            resultSet.getObject("author_id", UUID.class),
+            resultSet.getString("content"),
+            mentionTokensFrom(resultSet),
+            resultSet.getBoolean("pinned"),
+            resultSet.getBoolean("deleted"),
+            resultSet.getBoolean("edited"),
+            resultSet.getTimestamp("created_at").toInstant(),
+            resultSet.getTimestamp("updated_at").toInstant()
+        );
+    }
+
     private static List<Message> readPage(
         Connection connection,
         ChannelMessageTarget target,
@@ -510,6 +575,47 @@ class JdbcMessageStore implements
         }
     }
 
+    private static List<MessageReadModel> readModelPage(
+        Connection connection,
+        ChannelMessageTarget target,
+        Cursor before,
+        int limit
+    ) throws SQLException {
+        if (before == null) {
+            try (var statement = connection.prepareStatement("""
+                SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+                FROM message_read_projection
+                WHERE guild_id = ?
+                  AND channel_id = ?
+                ORDER BY created_at DESC, message_id DESC
+                LIMIT ?
+                """)) {
+                statement.setObject(1, target.guildId());
+                statement.setObject(2, target.channelId());
+                statement.setInt(3, limit);
+                return findReadModels(connection, statement);
+            }
+        }
+
+        try (var statement = connection.prepareStatement("""
+            SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+            FROM message_read_projection
+            WHERE guild_id = ?
+              AND channel_id = ?
+              AND (created_at < ? OR (created_at = ? AND message_id::text < ?))
+            ORDER BY created_at DESC, message_id DESC
+            LIMIT ?
+            """)) {
+            statement.setObject(1, target.guildId());
+            statement.setObject(2, target.channelId());
+            statement.setTimestamp(3, Timestamp.from(before.createdAt()));
+            statement.setTimestamp(4, Timestamp.from(before.createdAt()));
+            statement.setString(5, before.id());
+            statement.setInt(6, limit);
+            return findReadModels(connection, statement);
+        }
+    }
+
     private static List<Message> findMessages(
         Connection connection,
         java.sql.PreparedStatement statement
@@ -518,6 +624,19 @@ class JdbcMessageStore implements
             List<Message> messages = new ArrayList<>();
             while (resultSet.next()) {
                 findById(connection, resultSet.getObject("id", UUID.class)).ifPresent(messages::add);
+            }
+            return List.copyOf(messages);
+        }
+    }
+
+    private static List<MessageReadModel> findReadModels(
+        Connection connection,
+        java.sql.PreparedStatement statement
+    ) throws SQLException {
+        try (ResultSet resultSet = statement.executeQuery()) {
+            List<MessageReadModel> messages = new ArrayList<>();
+            while (resultSet.next()) {
+                messages.add(readModelFrom(resultSet));
             }
             return List.copyOf(messages);
         }
@@ -544,6 +663,36 @@ class JdbcMessageStore implements
             statement.setBoolean(4, message.edited());
             statement.setTimestamp(5, Timestamp.from(message.updatedAt()));
             statement.setObject(6, message.id());
+            statement.executeUpdate();
+        }
+    }
+
+    private static void upsertReadProjection(Connection connection, Message message) throws SQLException {
+        try (var statement = connection.prepareStatement("""
+            INSERT INTO message_read_projection(
+                message_id, guild_id, channel_id, author_id, content, mention_tokens,
+                pinned, deleted, edited, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (message_id) DO UPDATE
+            SET content = EXCLUDED.content,
+                mention_tokens = EXCLUDED.mention_tokens,
+                pinned = EXCLUDED.pinned,
+                deleted = EXCLUDED.deleted,
+                edited = EXCLUDED.edited,
+                updated_at = EXCLUDED.updated_at
+            """)) {
+            statement.setObject(1, message.id());
+            statement.setObject(2, message.guildId());
+            statement.setObject(3, message.channelId());
+            statement.setObject(4, message.authorId());
+            statement.setString(5, message.content().value());
+            statement.setArray(6, connection.createArrayOf("text", mentionTokens(message).toArray(String[]::new)));
+            statement.setBoolean(7, message.pinned());
+            statement.setBoolean(8, message.deleted());
+            statement.setBoolean(9, message.edited());
+            statement.setTimestamp(10, Timestamp.from(message.createdAt()));
+            statement.setTimestamp(11, Timestamp.from(message.updatedAt()));
             statement.executeUpdate();
         }
     }
@@ -628,6 +777,30 @@ class JdbcMessageStore implements
                 return List.copyOf(mentions);
             }
         }
+    }
+
+    private static List<String> mentionTokens(Message message) {
+        return message.mentions().stream()
+            .map(JdbcMessageStore::mentionToken)
+            .toList();
+    }
+
+    private static List<String> mentionTokensFrom(ResultSet resultSet) throws SQLException {
+        Object[] tokens = (Object[]) resultSet.getArray("mention_tokens").getArray();
+        List<String> values = new ArrayList<>(tokens.length);
+        for (Object token : tokens) {
+            values.add((String) token);
+        }
+        return List.copyOf(values);
+    }
+
+    private static String mentionToken(MessageMentionTarget mention) {
+        return switch (mention) {
+            case UserMentionTarget user -> user.userId().toString();
+            case RoleMentionTarget role -> role.roleId().toString();
+            case ChannelMentionTarget channel -> channel.channelId().toString();
+            case SpecialMentionTarget special -> special.kind().name().toLowerCase(Locale.ROOT);
+        };
     }
 
     private static void replaceEdits(Connection connection, Message message) throws SQLException {
@@ -878,6 +1051,10 @@ class JdbcMessageStore implements
 
     private record Cursor(Instant createdAt, String id) {
         static Cursor from(Message message) {
+            return new Cursor(message.createdAt(), message.id().toString());
+        }
+
+        static Cursor from(MessageReadModel message) {
             return new Cursor(message.createdAt(), message.id().toString());
         }
 

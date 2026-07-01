@@ -28,6 +28,7 @@ public class InMemoryMessageService
     MessagePublicationDeadLetterQueue,
     ChannelMessagePagePort,
     ChannelMessageSearchPort,
+    ChannelMessageReadModelPort,
     MessageLookupPort {
     private static final Comparator<MessageOrder> NEWEST_MESSAGE_ORDER = Comparator
         .comparing(MessageOrder::createdAt)
@@ -248,6 +249,15 @@ public class InMemoryMessageService
         return messages(target.guildId(), target.channelId(), beforeCursor, limit);
     }
 
+    @Override
+    public synchronized MessageReadPage readModels(ChannelMessageTarget target, String beforeCursor, int limit) {
+        MessagePage page = read(target, beforeCursor, limit);
+        return new MessageReadPage(
+            page.messages().stream().map(MessageReadModel::from).toList(),
+            page.nextCursor()
+        );
+    }
+
     public synchronized Message edit(EditMessageCommand command) {
         requireCommand(command);
         MessageContent content = requireContent(command.content());
@@ -312,6 +322,13 @@ public class InMemoryMessageService
     public synchronized List<Message> search(ChannelMessageTarget target, String query, int limit) {
         Objects.requireNonNull(target, "target must not be null");
         return search(target.guildId(), target.channelId(), query, limit);
+    }
+
+    @Override
+    public synchronized List<MessageReadModel> searchModels(ChannelMessageTarget target, String query, int limit) {
+        return search(target, query, limit).stream()
+            .map(MessageReadModel::from)
+            .toList();
     }
 
     public synchronized List<Message> search(UUID guildId, Set<UUID> allowedChannelIds, String query, int limit) {

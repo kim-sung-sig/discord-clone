@@ -192,6 +192,69 @@ class ModerationControllerTest {
             .andExpect(jsonPath("$[0].actorId").value(owner.userId().toString()));
     }
 
+    @Test
+    void memberCanReportMessageAndModeratorCanResolveIt() throws Exception {
+        AuthSession owner = signup("moderation_report_owner");
+        AuthSession member = signup("moderation_report_member");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "reports", owner);
+        addMember(guildId, member.userId(), owner);
+        grantRole(guildId, member.userId(), "report-sender", "SEND_MESSAGES", owner);
+        String messageId = createMessage(channelId, "bad message", member);
+
+        MvcResult reportResult = mockMvc.perform(post(
+                    "/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports",
+                    guildId,
+                    channelId,
+                    messageId
+                )
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "reason": "harassment"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.messageId").value(messageId))
+            .andExpect(jsonPath("$.reporterId").value(member.userId().toString()))
+            .andExpect(jsonPath("$.status").value("OPEN"))
+            .andReturn();
+
+        String reportId = JsonPath.read(reportResult.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(get("/api/guilds/{guildId}/message-reports", guildId)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/guilds/{guildId}/message-reports", guildId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(reportId));
+
+        mockMvc.perform(post("/api/guilds/{guildId}/message-reports/{reportId}/resolve", guildId, reportId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "status": "RESOLVED",
+                      "resolution": "message removed"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("RESOLVED"))
+            .andExpect(jsonPath("$.moderatorId").value(owner.userId().toString()));
+
+        mockMvc.perform(get("/api/guilds/{guildId}/message-reports", guildId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+
+        assertAuditAction(guildId, owner, "MESSAGE_REPORTED", member.userId().toString(), messageId);
+        assertAuditAction(guildId, owner, "MESSAGE_REPORT_RESOLVED", messageId);
+    }
+
     private MvcResult createKeywordRule(String guildId, String keyword, AuthSession requester) throws Exception {
         return mockMvc.perform(post("/api/guilds/{guildId}/automod/rules", guildId)
                 .header("Authorization", requester.bearer())
@@ -310,6 +373,16 @@ class ModerationControllerTest {
     }
 
     private void assertAuditAction(String guildId, AuthSession requester, String action, String targetId) throws Exception {
+        assertAuditAction(guildId, requester, action, requester.userId().toString(), targetId);
+    }
+
+    private void assertAuditAction(
+        String guildId,
+        AuthSession requester,
+        String action,
+        String actorId,
+        String targetId
+    ) throws Exception {
         mockMvc.perform(get("/api/guilds/{guildId}/audit-logs", guildId)
                 .header("Authorization", requester.bearer())
                 .param("action", action)
@@ -317,7 +390,7 @@ class ModerationControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(1)))
             .andExpect(jsonPath("$[0].action").value(action))
-            .andExpect(jsonPath("$[0].actorId").value(requester.userId().toString()))
+            .andExpect(jsonPath("$[0].actorId").value(actorId))
             .andExpect(jsonPath("$[0].targetId").value(targetId))
             .andExpect(jsonPath("$[0].createdAt").exists());
     }
