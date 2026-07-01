@@ -66,6 +66,14 @@ class MessageConfiguration {
     }
 
     @Bean
+    ChannelMessageQueryService channelMessageQueryService(
+        ChannelMessageReadGuard readGuard,
+        ChannelMessageReadModelPort readModels
+    ) {
+        return new DefaultChannelMessageQueryService(readGuard, readModels);
+    }
+
+    @Bean
     MessagePublicationRelay messagePublicationRelay(
         MessagePublicationOutboxQueue outbox,
         MessagePublishedDispatcher dispatcher,

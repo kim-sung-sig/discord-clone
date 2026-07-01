@@ -98,6 +98,28 @@
         },
         "description": "Message list response."
       },
+      "MessageReport": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Message report response."
+      },
+      "MessageReportList": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Pending message report list response."
+      },
       "NotFound": {
         "content": {
           "application/json": {
@@ -205,10 +227,14 @@
           },
           "content": {
             "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
           }
         },
         "required": [
-          "content"
+          "content",
+          "idempotencyKey"
         ],
         "type": "object"
       },
@@ -225,6 +251,36 @@
         "required": [
           "email",
           "password"
+        ],
+        "type": "object"
+      },
+      "ReportMessageRequest": {
+        "properties": {
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ResolveMessageReportRequest": {
+        "properties": {
+          "resolution": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "RESOLVED",
+              "DISMISSED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
         ],
         "type": "object"
       }
@@ -716,6 +772,228 @@
         ]
       }
     },
+    "/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports": {
+      "post": {
+        "operationId": "reportMessage",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/MessageReport"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Report a visible channel message for moderator review.",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/message-reports": {
+      "get": {
+        "operationId": "listMessageReports",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MessageReportList"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "List pending message reports for moderators.",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/message-reports/{reportId}/resolve": {
+      "post": {
+        "operationId": "resolveMessageReport",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveMessageReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MessageReport"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Resolve or dismiss a pending message report.",
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
     "/api/security/csp-report": {
       "post": {
         "operationId": "submitCspReport",
@@ -880,6 +1158,9 @@
     },
     {
       "name": "messages"
+    },
+    {
+      "name": "moderation"
     },
     {
       "name": "voice"

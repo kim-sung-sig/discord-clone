@@ -34,6 +34,9 @@ class JdbcMessageStoreTest {
     private ChannelMessageSearchPort search;
 
     @Autowired
+    private ChannelMessageReadModelPort readModels;
+
+    @Autowired
     private MessageLookupPort lookup;
 
     @Autowired
@@ -62,6 +65,7 @@ class JdbcMessageStoreTest {
             statement.executeUpdate("DELETE FROM message_publication_outbox_mentions");
             statement.executeUpdate("DELETE FROM message_publication_outbox");
             statement.executeUpdate("DELETE FROM message_idempotency_keys");
+            statement.executeUpdate("DELETE FROM message_read_projection");
             statement.executeUpdate("DELETE FROM message_mention_targets");
             statement.executeUpdate("DELETE FROM message_mention_tokens");
             statement.executeUpdate("DELETE FROM message_mentions");
@@ -86,6 +90,7 @@ class JdbcMessageStoreTest {
         assertThat(publications).isSameAs(messages);
         assertThat(pages).isSameAs(messages);
         assertThat(search).isSameAs(messages);
+        assertThat(readModels).isSameAs(messages);
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
         assertThat(outboxQueue).isSameAs(messages);
@@ -204,10 +209,11 @@ class JdbcMessageStoreTest {
 
     @Test
     void persistsMessageThroughStoreReadSearchLookupAndOutboxPorts() throws Exception {
+        UUID roleId = UUID.randomUUID();
         Message message = message(
             "hello searchable",
             List.of(
-                new RoleMentionTarget(UUID.randomUUID()),
+                new RoleMentionTarget(roleId),
                 new SpecialMentionTarget(SpecialMentionKind.HERE)
             )
         );
@@ -233,7 +239,18 @@ class JdbcMessageStoreTest {
         assertThat(search.search(target(), "searchable", 10))
             .extracting(Message::id)
             .containsExactly(message.id());
+        assertThat(readModels.readModels(target(), null, 10).messages())
+            .singleElement()
+            .satisfies(readModel -> {
+                assertThat(readModel.id()).isEqualTo(message.id());
+                assertThat(readModel.content()).isEqualTo("hello searchable");
+                assertThat(readModel.mentions()).containsExactly(roleId.toString(), "here");
+            });
+        assertThat(readModels.searchModels(target(), "searchable", 10))
+            .extracting(MessageReadModel::id)
+            .containsExactly(message.id());
         assertThat(lookup.requireMessage(target(), message.id())).isEqualTo(message);
+        assertThat(rowCount("message_read_projection")).isEqualTo(1);
         assertThat(rowCount("message_publication_outbox")).isEqualTo(1);
         assertThat(rowCount("message_publication_outbox_mentions")).isEqualTo(2);
     }
