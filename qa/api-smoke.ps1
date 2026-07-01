@@ -60,7 +60,10 @@ Assert $textId 'text channel missing'
 Request PUT "/api/guilds/$guildId/members/$memberId" $null $ownerToken | Out-Null
 Request GET "/api/guilds/$guildId/channels/visible?memberId=$ownerId" $null $ownerToken | Out-Null
 
-$msg = Request POST "/api/channels/$textId/messages" @{ content='runtime smoke message <@00000000-0000-0000-0000-000000000099>' } $ownerToken
+$msg = Request POST "/api/channels/$textId/messages" @{
+  content='runtime smoke message <@00000000-0000-0000-0000-000000000099>'
+  idempotencyKey="api-smoke-message-$stamp"
+} $ownerToken
 $msgId = $msg.body.id
 Assert ($msg.body.content -like 'runtime smoke message*') 'message content mismatch'
 Request GET "/api/channels/$textId/messages" $null $ownerToken | Out-Null
@@ -90,7 +93,10 @@ $tag = Request POST "/api/channels/$forumId/forum-tags" @{ name='runtime' } $own
 Request POST "/api/channels/$forumId/forum-posts" @{ title='Runtime forum post'; tagIds=@($tag.body.id); autoArchiveMinutes=60 } $ownerToken | Out-Null
 
 Request POST "/api/guilds/$guildId/automod/rules" @{ type='KEYWORD'; name='Block secret'; keywords=@('secret') } $ownerToken | Out-Null
-ExpectStatus POST "/api/channels/$textId/messages" 403 @{ content='secret should block' } $ownerToken
+ExpectStatus POST "/api/channels/$textId/messages" 403 @{
+  content='secret should block'
+  idempotencyKey="api-smoke-automod-$stamp"
+} $ownerToken
 Request GET "/api/guilds/$guildId/audit-logs" $null $ownerToken | Out-Null
 
 $voiceJoin = Request POST "/api/voice/channels/$voiceId/join" $null $ownerToken

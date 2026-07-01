@@ -62,7 +62,13 @@ const guildPaths = Object.assign(
     memberRole: (guildId: string, memberId: string, roleId: string) =>
       `/api/guilds/${segment(guildId)}/members/${segment(memberId)}/roles/${segment(roleId)}`,
     channelRoleOverwrite: (guildId: string, channelId: string, roleId: string) =>
-      `/api/guilds/${segment(guildId)}/channels/${segment(channelId)}/overwrites/roles/${segment(roleId)}`
+      `/api/guilds/${segment(guildId)}/channels/${segment(channelId)}/overwrites/roles/${segment(roleId)}`,
+    messageReport: (guildId: string, channelId: string, messageId: string) =>
+      `/api/guilds/${segment(guildId)}/channels/${segment(channelId)}/messages/${segment(messageId)}/reports`,
+    messageReports: (guildId: string, query: { limit?: number } = {}) =>
+      withQuery(`/api/guilds/${segment(guildId)}/message-reports`, query),
+    resolveMessageReport: (guildId: string, reportId: string) =>
+      `/api/guilds/${segment(guildId)}/message-reports/${segment(reportId)}/resolve`
   }
 )
 

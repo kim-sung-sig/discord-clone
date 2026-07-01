@@ -15,7 +15,8 @@ subprojects {
     apply(plugin = "checkstyle")
 
     extra["tomcat.version"] = "10.1.55"
-    extra["netty.version"] = "4.1.133.Final"
+    extra["jackson.version"] = "2.21.4"
+    extra["netty.version"] = "4.1.135.Final"
     extra["kafka.version"] = "4.2.0"
 
     java {

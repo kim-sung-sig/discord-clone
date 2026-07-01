@@ -60,6 +60,7 @@ Assert ($gateText.Contains('GetFullPath')) 'security gate must normalize artifac
 Assert ($gateText.Contains('SECURITY_ARTIFACT_DIR must be under qa/artifacts')) 'security gate must reject artifact paths outside qa/artifacts'
 Assert ($gateText.Contains('[string]$entry.severity -eq [string]$finding.severity')) 'security gate allowlist matching must include severity'
 Assert ($gateText.Contains("'unknown'")) 'security gate must fail closed on unknown OSV severity findings'
+Assert (-not [regex]::IsMatch($gateText, '(?im)^\s*\$isWindows\s*=')) 'security gate must not assign PowerShell automatic variable $IsWindows'
 
 $packageJson = Get-Content -Path (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json
 Assert ($packageJson.devDependencies.commander -eq '^13.1.0') 'root package must pin commander 13 so npm workspace SBOM satisfies @bomb.sh/tab optional peer'

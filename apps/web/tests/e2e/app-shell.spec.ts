@@ -108,6 +108,55 @@ test('clears a channel unread badge after selecting the channel', async ({ page 
   await expect(page.getByTestId('unread-badge-channel-architecture')).toHaveCount(0)
 })
 
+test('opens notification inbox and jumps to unread channel work', async ({ page }) => {
+  await page.route('**/api/auth/refresh', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ accessToken: 'inbox-e2e-access-token' })
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByTestId('message-input')).toBeEnabled()
+
+  await page.getByTestId('activity-inbox').click()
+
+  await expect(page.getByTestId('workbench-inbox-view')).toContainText('Notification inbox')
+  await expect(page.getByTestId('workbench-inbox-mention-message-architecture-notes')).toContainText('architecture')
+  await expect(page.getByTestId('workbench-inbox-unread-channel-architecture')).toContainText('1')
+  await expect(page.getByTestId('workbench-inbox-dm-dm-cto-bot')).toContainText('2')
+
+  await page.getByTestId('workbench-inbox-unread-channel-architecture').getByRole('button').click()
+
+  await expect(page.getByTestId('workspace')).toHaveAttribute('data-active-workbench-view', 'explorer')
+  await expect(page.getByTestId('active-channel')).toContainText('# architecture')
+  await expect(page.getByTestId('unread-badge-channel-architecture')).toHaveCount(0)
+})
+
+test('searches messages and resolves a moderation report from the workbench', async ({ page }) => {
+  await page.route('**/api/auth/refresh', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ accessToken: 'search-e2e-access-token' })
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByTestId('message-input')).toBeEnabled()
+
+  await page.getByTestId('activity-search').click()
+  await page.getByTestId('workbench-search-input').fill('API contract')
+
+  await expect(page.getByTestId('workbench-search-message-message-architecture-notes')).toContainText('API contract')
+  await page.getByTestId('workbench-report-message-message-architecture-notes').click()
+
+  const report = page.getByTestId('workbench-report-queue').locator('[data-testid^="workbench-report-"]').first()
+  await expect(report).toContainText('Needs moderator review')
+  await report.getByRole('button', { name: 'Resolve' }).click()
+
+  await expect(page.getByTestId('workbench-report-queue')).not.toContainText('Needs moderator review')
+})
+
 test('shows active channel typing state in the message viewport', async ({ page }) => {
   await page.goto('/')
 

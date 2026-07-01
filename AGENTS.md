@@ -45,10 +45,15 @@ When changing or validating local agent execution setup, verify in this order:
 Use the external Obsidian wiki as a selective context layer, not as a full-context dump.
 
 These hooks are project-local. Do not install or maintain them as global Codex skills.
-The project-local skill documents live under:
+The primary project-local skill documents live under:
 
+- `.codex\skills\discord-llmwiki-development-loop\SKILL.md`
 - `.codex\skills\discord-wiki-before-development\SKILL.md`
-- `.codex\skills\discord-wiki-after-development\SKILL.md`
+- `.codex\skills\discord-raw-to-docs-policy\SKILL.md`
+- `.codex\skills\discord-llm-wiki-synthesis\SKILL.md`
+- `.codex\skills\discord-implementation-blueprint\SKILL.md`
+- `.codex\skills\discord-wiki-change-impact\SKILL.md`
+- `.codex\skills\discord-wiki-publish-accepted-knowledge\SKILL.md`
 
 Current wiki root:
 
@@ -56,9 +61,17 @@ Current wiki root:
 
 If the user provides a different available Vault path later, use the same file layout there.
 
-### Before Development
+### Development Loop
 
-Before editing code, identify the task domain and read only the minimum wiki pages needed.
+For normal implementation, bugfix, refactor, QA, CI, runtime, or documentation-affecting work, use the project-local LLM Wiki development loop as the user-facing workflow:
+
+`discord-llmwiki-development-loop`
+
+This loop wraps selective wiki context, raw-to-docs promotion, synthesis, blueprint writing, implementation, blueprint-vs-implementation review, verification, and accepted-knowledge publishing.
+
+### Before Development Primitive
+
+When the loop or a narrow primitive task needs context selection, identify the task domain and read only the minimum wiki pages needed.
 
 - Always start with `index.md`.
 - Read `wiki\Agent Development Guide.md` only when delegating, planning, or choosing verification scope.
@@ -70,9 +83,9 @@ Before editing code, identify the task domain and read only the minimum wiki pag
 
 Do not load the entire Vault by default. In the work summary, mention which wiki pages were used.
 
-### After Development
+### Accepted Knowledge Publishing
 
-After implementation and verification, update the wiki only for durable knowledge:
+After the LLM Wiki development loop review and verification accept the work, update the wiki only for durable knowledge:
 
 - architecture or boundary changes
 - new or changed verification commands

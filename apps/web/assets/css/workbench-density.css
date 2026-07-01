@@ -212,6 +212,29 @@
   border-color: color-mix(in srgb, var(--workbench-accent) 54%, var(--workbench-border));
 }
 
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-inbox"]::before {
+  width: 15px;
+  height: 17px;
+  border: 2px solid currentColor;
+  border-radius: 8px 8px 4px 4px;
+  box-shadow: 0 8px 0 -6px currentColor;
+}
+
+.vscode-shell.app-shell .workbench-list-row button {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--workbench-fg);
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
 .vscode-shell.app-shell .bottom-panel {
   position: absolute;
   grid-column: 1 / -1;

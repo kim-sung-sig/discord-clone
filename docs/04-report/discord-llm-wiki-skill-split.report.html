@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord LLM Wiki 스킬 분리 리포트</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --danger-soft: #fee2e2;
+      --danger-text: #991b1b;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --danger-soft: #3f1111;
+      --danger-text: #fca5a5;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.68;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3, h4 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 28px; margin: 0 0 8px; line-height: 1.25; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+    h4 { font-size: 16px; margin: 16px 0 8px; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      word-break: break-all;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar { display: grid; gap: 10px; margin-bottom: 14px; }
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title { display: block; font-weight: 800; color: var(--heading); margin-bottom: 8px; }
+    .toc { display: grid; gap: 6px; max-height: 58vh; overflow: auto; padding-right: 4px; }
+    .toc a { display: block; color: var(--muted); font-size: 0.92rem; padding: 6px 8px; border-radius: 6px; }
+    .toc a:hover, .toc a.active { background: var(--primary-soft); color: var(--primary); text-decoration: none; }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+    .point-tag { background: var(--primary); color: #fff; padding: 3px 10px; margin-bottom: 8px; }
+    .badge { background: var(--success-soft); color: var(--success-text); padding: 2px 8px; margin: 3px 4px 3px 0; }
+    .badge.warn { background: var(--warning-soft); color: var(--warning-text); }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+    .item { background: var(--paper); border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+    .label { display: block; color: var(--muted); font-weight: 800; font-size: 0.85rem; margin-bottom: 4px; }
+
+    .skill-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .skill-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--bg); }
+    .skill-card strong { color: var(--heading); display: block; margin-bottom: 6px; }
+
+    .flow { display: grid; gap: 8px; margin: 12px 0; }
+    .flow-step { border: 1px solid var(--line); border-left: 5px solid var(--primary); border-radius: 8px; padding: 10px 12px; background: var(--paper); }
+    .flow-arrow { text-align: center; color: var(--muted); font-weight: 800; }
+
+    .decision { background: var(--warning-soft); color: var(--warning-text); border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent); border-radius: 10px; padding: 14px; margin: 12px 0; font-weight: 700; }
+    .ok { background: var(--success-soft); color: var(--success-text); border: 1px solid color-mix(in srgb, var(--success-text) 28%, transparent); border-radius: 10px; padding: 14px; margin: 12px 0; font-weight: 700; }
+    .risk { background: var(--danger-soft); color: var(--danger-text); border: 1px solid color-mix(in srgb, var(--danger-text) 28%, transparent); border-radius: 10px; padding: 14px; margin: 12px 0; }
+
+    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
+    th { background: var(--primary-soft); color: var(--heading); }
+
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+    .table-wrap table { margin: 0; min-width: 720px; border: 0; }
+    .table-wrap th:first-child, .table-wrap td:first-child { border-left: 0; }
+    .table-wrap th:last-child, .table-wrap td:last-child { border-right: 0; }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; width: min(100% - 20px, 720px); margin: 10px auto; gap: 12px; }
+      .sidebar { position: static; padding: 12px; border-radius: 10px; }
+      .toc { max-height: 190px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .document { padding: 18px; border-radius: 10px; }
+      .metric-grid, .skill-card-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 23px; }
+      h2 { font-size: 18px; margin-top: 28px; }
+      h3 { font-size: 16px; }
+      body { line-height: 1.72; }
+    }
+
+    @media (max-width: 520px) {
+      .toc { grid-template-columns: 1fr; }
+      .document { padding: 15px; }
+      .header { text-align: left; }
+      .summary-box { padding: 14px; }
+      ul { padding-left: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>Discord LLM Wiki 스킬 분리 리포트</h1>
+        <p>프로젝트 단위 스킬 재구성 및 에이전트팀 설계 결과</p>
+      </header>
+
+      <section class="summary-box report-section" id="summary">
+        <span class="point-tag">핵심 요약</span>
+        <p><strong>개별 스킬을 사람이 골라 쓰는 구조를 7개 프로젝트-local 스킬과 blueprint 중심 development loop로 감쌌습니다.</strong></p>
+        <ul>
+          <li><strong>성과:</strong> loop coordinator, 라우팅, raw-to-docs 정책, 지식 그래프 합성, 구현 청사진, 자연어 변경 영향 분석, accepted knowledge publishing을 독립 책임으로 나눴습니다.</li>
+          <li><strong>검증:</strong> `quick_validate.py`로 7개 LLM Wiki 스킬이 모두 유효함을 확인했습니다.</li>
+          <li><strong>위치:</strong> 사용자 단위가 아니라 `C:\git\discord\.codex\skills` 아래 프로젝트 단위 스킬로만 구성했습니다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="intent">
+        <h2>I. 요청 의도 해석</h2>
+        <p>요청의 핵심은 “Karpathy식 LLM Wiki 운영 방식”을 이 저장소의 개발 루프에 넣는 것이었습니다. 단순히 위키를 읽는 것이 아니라, 흩어진 정보를 도메인 언어와 관계 그래프로 키우고, 그 그래프에서 구현 글을 만들며, 자연어 요구사항이 바뀌면 코드 영향까지 추적하는 체계가 필요했습니다.</p>
+        <div class="decision">따라서 `discord-wiki-before-development` 하나에 모든 기능을 넣지 않고, 목적이 다른 기능을 별도 스킬로 분리하는 쪽이 더 타당하다고 판단했습니다.</div>
+      </section>
+
+      <section class="report-section" id="before-after">
+        <h2>II. Before & After</h2>
+        <div class="metric-grid">
+          <div class="item"><span class="label">기존 구조</span>개별 wiki 스킬을 사람이 골라 호출하는 구조였습니다.</div>
+          <div class="item"><span class="label">변경 구조</span>`discord-llmwiki-development-loop`가 사용자-facing entrypoint가 되고, primitive 스킬들은 루프 내부 단계가 되었습니다.</div>
+        </div>
+        <div class="flow">
+          <div class="flow-step"><strong>이전</strong><br>개발 전 위키 선택 → 구현 → 개발 후 위키 반영</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><strong>현재</strong><br>context intake → raw-to-docs → synthesis → blueprint → implementation → blueprint-vs-implementation review loop → verification → accepted knowledge publishing</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="skills">
+        <h2>III. 작성된 프로젝트-local 스킬</h2>
+        <div class="skill-card-grid">
+          <div class="skill-card">
+            <strong>discord-llmwiki-development-loop</strong>
+            <span class="badge">Loop</span>
+            <p>일반 개발 작업의 사용자-facing entrypoint입니다. context intake부터 accepted knowledge publishing까지 전체 루프를 조율합니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-wiki-before-development</strong>
+            <span class="badge">라우터</span>
+            <p>개발 시작 전 `index.md`와 관련 wiki page만 읽고, 필요한 경우 다른 LLM Wiki 스킬로 넘기는 경량 진입점입니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-raw-to-docs-policy</strong>
+            <span class="badge">Raw To Docs</span>
+            <p>Karpathy식 LLM Wiki 정책에 따라 raw source와 synthesis docs를 분리하고, index/log/cross-link/contradiction 규칙을 적용합니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-llm-wiki-synthesis</strong>
+            <span class="badge">지식 그래프</span>
+            <p>코드, 위키, 설문, 노트를 도메인 언어, tier/layer map, structure graph, behavior flow로 합성합니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-implementation-blueprint</strong>
+            <span class="badge">구현 글</span>
+            <p>구현 전에 capability, 참여 코드, 클래스/컴포넌트 관계, invariant, verification gate를 포함한 구현 청사진을 작성합니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-wiki-change-impact</strong>
+            <span class="badge">변경 영향</span>
+            <p>위키 문장, 도메인 언어, 로드맵, 사용자 정정이 바뀌었을 때 graph node와 repository path, 테스트 영향을 추적합니다.</p>
+          </div>
+          <div class="skill-card">
+            <strong>discord-wiki-publish-accepted-knowledge</strong>
+            <span class="badge">Accepted Publish</span>
+            <p>blueprint-vs-implementation review와 verification이 통과한 accepted knowledge만 외부 Obsidian Wiki에 반영합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section" id="agent-team">
+        <h2>IV. 에이전트팀 구성</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>에이전트</th><th>주 스킬</th><th>책임</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Loop Coordinator Agent</td><td>`discord-llmwiki-development-loop`</td><td>전체 blueprint 중심 개발 루프를 조율합니다.</td></tr>
+              <tr><td>Wiki Router Agent</td><td>`discord-wiki-before-development`</td><td>작업 도메인을 분류하고 최소 위키 컨텍스트를 선택합니다.</td></tr>
+              <tr><td>Raw-to-Docs Steward Agent</td><td>`discord-raw-to-docs-policy`</td><td>raw source를 durable docs로 승격하기 전에 Karpathy식 LLM Wiki 정책을 적용합니다.</td></tr>
+              <tr><td>Knowledge Graph Curator Agent</td><td>`discord-llm-wiki-synthesis`</td><td>도메인 언어, 관계 그래프, tier/layer map을 정리합니다.</td></tr>
+              <tr><td>Implementation Architect Agent</td><td>`discord-implementation-blueprint`</td><td>구현 전에 상세 구현 글과 검증 기준을 작성합니다.</td></tr>
+              <tr><td>Change Impact Analyst Agent</td><td>`discord-wiki-change-impact`</td><td>자연어 변경을 코드 영향 분석으로 변환합니다.</td></tr>
+              <tr><td>Implementation Agent</td><td>작업별 개발 스킬</td><td>청사진과 실제 코드 기준으로 구현합니다.</td></tr>
+              <tr><td>Verification Agent</td><td>QA/test gate</td><td>청사진이 지정한 테스트와 계약 검증을 실행합니다.</td></tr>
+              <tr><td>Wiki Publisher Agent</td><td>`discord-wiki-publish-accepted-knowledge`</td><td>리뷰와 검증을 통과한 accepted knowledge만 위키에 발행합니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="report-section" id="routing">
+        <h2>V. 동작 흐름</h2>
+        <h3>작은 버그 수정</h3>
+        <div class="flow">
+          <div class="flow-step">before-development</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">필요 시 implementation-blueprint</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">구현 → blueprint-vs-implementation review → 검증 → 필요 시 publish-accepted-knowledge</div>
+        </div>
+        <h3>위키/요구사항 문구 변경</h3>
+        <div class="flow">
+          <div class="flow-step">before-development</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">wiki-change-impact</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">필요 시 llm-wiki-synthesis</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">필요 시 implementation-blueprint → 구현 → review loop → 검증 → publish-accepted-knowledge</div>
+        </div>
+        <h3>큰 기능/아키텍처 작업</h3>
+        <div class="flow">
+          <div class="flow-step">before-development</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">raw-to-docs-policy when source material is raw</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">llm-wiki-synthesis</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">implementation-blueprint</div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">구현 에이전트 분담 → review loop → 검증 → publish-accepted-knowledge</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="files">
+        <h2>VI. 변경 파일</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>파일</th><th>변경 내용</th></tr></thead>
+            <tbody>
+              <tr><td>`.codex/skills/discord-llmwiki-development-loop/SKILL.md`</td><td>전체 LLM Wiki 개발 루프를 감싸는 사용자-facing entrypoint입니다.</td></tr>
+              <tr><td>`.codex/skills/discord-wiki-before-development/SKILL.md`</td><td>선택적 위키 조회와 스킬 라우팅만 담당하도록 축소했습니다.</td></tr>
+              <tr><td>`.codex/skills/discord-raw-to-docs-policy/SKILL.md`</td><td>raw source를 durable docs로 승격하는 Karpathy식 정책 스킬입니다.</td></tr>
+              <tr><td>`.codex/skills/discord-llm-wiki-synthesis/SKILL.md`</td><td>도메인 언어, graph, tier/layer map, stale fact를 만드는 신규 스킬입니다.</td></tr>
+              <tr><td>`.codex/skills/discord-implementation-blueprint/SKILL.md`</td><td>구현 전 상세 구현 글과 verification gate를 만드는 신규 스킬입니다.</td></tr>
+              <tr><td>`.codex/skills/discord-wiki-change-impact/SKILL.md`</td><td>자연어 변경을 코드 영향 분석으로 변환하는 신규 스킬입니다.</td></tr>
+              <tr><td>`.codex/skills/discord-wiki-publish-accepted-knowledge/SKILL.md`</td><td>리뷰와 검증을 통과한 accepted knowledge만 위키에 반영하는 publish 스킬입니다.</td></tr>
+              <tr><td>`wiki/LLM Wiki Agent Team.md`</td><td>외부 Obsidian Wiki에 에이전트팀과 라우팅 패턴을 새로 문서화했습니다.</td></tr>
+              <tr><td>`index.md`, `Agent Development Guide.md`, before/after wiki rule, `log.md`</td><td>새 스킬 구조와 agent team 링크를 반영했습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="report-section" id="project-local">
+        <h2>VII. 프로젝트 단위 정리 상태</h2>
+        <div class="ok">스킬은 `C:\git\discord\.codex\skills` 아래 프로젝트-local로 구성되었습니다.</div>
+        <p>사용자 단위 위치인 `C:\Users\kimsungsig\.codex\skills`와 `C:\Users\kimsungsig\.agents\skills`에서 `discord-wiki*`, `discord-llm*`, `discord-implementation*` 계열 스킬을 검색했지만 발견되지 않았습니다. 따라서 제거할 사용자 단위 이전 스킬은 없었습니다.</p>
+      </section>
+
+      <section class="report-section" id="verification">
+        <h2>VIII. 검증 결과</h2>
+        <ul>
+          <li>`quick_validate.py` 실행 결과: 7개 LLM Wiki project-local 스킬 모두 `Skill is valid!`</li>
+          <li>`git status --short`로 변경 범위를 확인했습니다.</li>
+          <li>외부 Wiki에서 `LLM Wiki Agent Team`, `discord-llm-wiki-synthesis`, `discord-implementation-blueprint`, `discord-wiki-change-impact` 참조가 들어간 것을 확인했습니다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="risks">
+        <h2>IX. 잔여 리스크와 주의점</h2>
+        <div class="risk">현재 작업과 무관한 기존 dirty 파일들이 저장소에 남아 있습니다. 이번 리포트와 스킬 변경은 `.codex/skills/discord-*` 및 외부 Wiki 문서에 한정됩니다.</div>
+        <ul>
+          <li>새 스킬은 구조와 트리거 검증까지 완료했지만, 실제 개발 작업에서 forward-test는 아직 하지 않았습니다.</li>
+          <li>외부 Obsidian Wiki는 저장소 밖 `C:\tmp\ObsidianVaults\discord-llm-wiki`에 있으므로, git diff에는 직접 포함되지 않습니다.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

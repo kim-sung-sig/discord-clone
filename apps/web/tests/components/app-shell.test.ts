@@ -49,6 +49,15 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="workbench-search-results"]').text()).toContain('general')
     expect(wrapper.find('[data-testid="editor-chat"]').exists()).toBe(false)
 
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('inbox')
+    expect(wrapper.get('[data-testid="activity-inbox"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.get('[data-testid="workbench-inbox-view"]').text()).toContain('Notification inbox')
+    expect(wrapper.get('[data-testid="workbench-inbox-mention-message-architecture-notes"]').text()).toContain('architecture')
+    expect(wrapper.get('[data-testid="workbench-inbox-unread-channel-architecture"]').text()).toContain('1')
+    expect(wrapper.get('[data-testid="workbench-inbox-dm-dm-cto-bot"]').text()).toContain('2')
+
     await wrapper.get('[data-testid="activity-calls"]').trigger('click')
 
     expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('calls')
@@ -159,6 +168,95 @@ describe('Discord app shell', () => {
     ;(shell as any).markChannelRead?.('channel-architecture')
 
     expect((shell as any).unreadCountForChannel?.('channel-architecture')).toBe(0)
+  })
+
+  it('opens mention inbox rows and clears channel unread state', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+    await nextTick()
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    expect(wrapper.get('[data-testid="workbench-inbox-mention-message-architecture-notes"]').text()).toContain('cto-bot')
+
+    await wrapper.get('[data-testid="workbench-inbox-unread-channel-architecture"] button').trigger('click')
+
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('explorer')
+    expect(shell.activeChannelId).toBe('channel-architecture')
+    expect((shell as any).unreadCountForChannel?.('channel-architecture')).toBe(0)
+  })
+
+  it('searches messages and drives the local moderation report queue', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+
+    await wrapper.get('[data-testid="activity-search"]').trigger('click')
+    await wrapper.get('[data-testid="workbench-search-input"]').setValue('API contract')
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="workbench-search-message-message-architecture-notes"]').text()).toContain('API contract')
+    expect(wrapper.get('[data-testid="workbench-search-message-message-architecture-notes"]').text()).toContain('cto-bot')
+
+    await wrapper.get('[data-testid="workbench-report-message-message-architecture-notes"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workbench-report-queue"]').text()).toContain('Needs moderator review')
+    expect(shell.openMessageReports).toHaveLength(1)
+    expect(shell.moderation.auditLogs[0].action).toBe('MESSAGE_REPORTED')
+
+    const reportId = shell.openMessageReports[0]!.id
+    await wrapper.get(`[data-testid="workbench-resolve-report-${reportId}"]`).trigger('click')
+
+    expect(shell.openMessageReports).toHaveLength(0)
+    expect(shell.moderation.auditLogs[0].action).toBe('MESSAGE_REPORT_RESOLVED')
+  })
+
+  it('reports and resolves messages through the backend when a bearer token is available', async () => {
+    await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+    const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      if (String(input).endsWith('/api/guilds/guild-discord-clone/channels/channel-architecture/messages/message-architecture-notes/reports')) {
+        return jsonResponse({
+          id: 'report-backend-1',
+          channelId: 'channel-architecture',
+          messageId: 'message-architecture-notes',
+          reporterId: 'user-backend',
+          reason: 'MODERATOR_REVIEW',
+          status: 'OPEN',
+          moderatorId: null,
+          resolution: '',
+          createdAt: '2026-06-30T00:00:00.000Z',
+          updatedAt: '2026-06-30T00:00:00.000Z'
+        }, 201)
+      }
+      if (String(input).endsWith('/api/guilds/guild-discord-clone/message-reports/report-backend-1/resolve')) {
+        return jsonResponse({
+          id: 'report-backend-1',
+          channelId: 'channel-architecture',
+          messageId: 'message-architecture-notes',
+          reporterId: 'user-backend',
+          reason: 'MODERATOR_REVIEW',
+          status: 'RESOLVED',
+          moderatorId: 'moderator-backend',
+          resolution: 'resolved',
+          createdAt: '2026-06-30T00:00:00.000Z',
+          updatedAt: '2026-06-30T00:01:00.000Z'
+        })
+      }
+      return jsonResponse({ message: 'unexpected path' }, 404)
+    })
+
+    await expect(shell.reportMessage('message-architecture-notes', 'access-token')).resolves.toBe(true)
+    expect(shell.openMessageReports[0]?.id).toBe('report-backend-1')
+    expect((calls[0]?.init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ reason: 'MODERATOR_REVIEW' })
+
+    await expect(shell.resolveMessageReport('report-backend-1', 'RESOLVED', 'access-token')).resolves.toBe(true)
+    expect(shell.openMessageReports).toHaveLength(0)
+    expect(shell.moderation.messageReports[0]?.moderator).toBe('moderator-backend')
   })
 
   it('sends composed messages from the active channel composer', async () => {

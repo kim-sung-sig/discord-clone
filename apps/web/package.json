@@ -10,7 +10,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "nuxt": "4.4.6",
+    "nuxt": "4.4.8",
     "pinia": "3.0.4",
     "postgres": "^3.4.9",
     "redis": "^5.12.1",

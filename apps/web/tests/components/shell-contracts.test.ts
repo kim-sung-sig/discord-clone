@@ -22,6 +22,15 @@ describe('Discord shell API and Gateway contracts', () => {
     expect(discordApiPaths.auth.sessions()).toBe('/api/auth/sessions')
     expect(discordApiPaths.auth.session('session-1')).toBe('/api/auth/sessions/session-1')
     expect(discordApiPaths.guild('guild-1')).toBe('/api/guilds/guild-1')
+    expect(discordApiPaths.guild.messageReport('guild-1', 'channel-1', 'message-1')).toBe(
+      '/api/guilds/guild-1/channels/channel-1/messages/message-1/reports'
+    )
+    expect(discordApiPaths.guild.messageReports('guild-1', { limit: 25 })).toBe(
+      '/api/guilds/guild-1/message-reports?limit=25'
+    )
+    expect(discordApiPaths.guild.resolveMessageReport('guild-1', 'report-1')).toBe(
+      '/api/guilds/guild-1/message-reports/report-1/resolve'
+    )
     expect(discordApiPaths.channelMessages('channel-1', { before: 'msg-9', limit: 25 })).toBe(
       '/api/channels/channel-1/messages?before=msg-9&limit=25'
     )

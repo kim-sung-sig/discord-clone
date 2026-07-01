@@ -90,6 +90,19 @@ interface BackendStageSessionResponse {
   pendingSpeakerIds: string[]
 }
 
+interface BackendMessageReportResponse {
+  id: string
+  channelId: string
+  messageId: string
+  reporterId: string
+  reason: string
+  status: ShellMessageReportStatus
+  moderatorId: string | null
+  resolution: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ShellMessage {
   id: string
   channelId: string
@@ -106,6 +119,22 @@ export interface ShellMessage {
   clientEventId?: string
   requestId?: string
   serverVersion?: number
+}
+
+export interface ShellMentionInboxItem {
+  id: string
+  channelId: string
+  channelName: string
+  author: string
+}
+
+export interface ShellMessageSearchResult {
+  id: string
+  channelId: string
+  channelName: string
+  author: string
+  body: string
+  createdAt: string
 }
 
 type ShellMutationAction = 'MESSAGE_CREATE' | 'VOICE_JOIN' | 'STAGE_START'
@@ -320,12 +349,27 @@ export interface ShellAuditLogEntry {
   createdAt: string
 }
 
+export type ShellMessageReportStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+
+export interface ShellMessageReport {
+  id: string
+  messageId: string
+  channelId: string
+  reporter: string
+  reasonCode: 'MODERATOR_REVIEW'
+  status: ShellMessageReportStatus
+  createdAt: string
+  resolvedAt: string | null
+  moderator: string | null
+}
+
 export interface ShellModerationState {
   onboardingQuestion: ShellOnboardingQuestion
   selectedAnswerId: string | null
   assignedRoleName: string
   automodRules: ShellAutoModRule[]
   decision: string
+  messageReports: ShellMessageReport[]
   auditLogs: ShellAuditLogEntry[]
 }
 
@@ -607,12 +651,12 @@ export const useShellStore = defineStore('shell', {
         channelId: 'channel-architecture',
         sequence: 3,
         author: 'cto-bot',
-        body: 'Architecture notes belong in this channel.',
+        body: 'Architecture notes belong in this channel. @vibe-coder should review the next API contract.',
         createdAt: '2026-05-13T09:10:00.000Z',
         edited: false,
         pinned: false,
         deleted: false,
-        mentions: [],
+        mentions: ['vibe-coder'],
         attachments: []
       }
     ] satisfies ShellMessage[],
@@ -838,6 +882,7 @@ export const useShellStore = defineStore('shell', {
         }
       ],
       decision: 'Ready',
+      messageReports: [],
       auditLogs: [
         {
           id: 'audit-rule-created',
@@ -938,6 +983,53 @@ export const useShellStore = defineStore('shell', {
       state.messages.filter((message) => message.channelId === state.activeChannelId),
     activeMessagePageCursor: (state): string | null =>
       state.activeChannelId ? state.messagePageCursors[state.activeChannelId] ?? null : null,
+    messageSearchResults: (state) => (query: string): ShellMessageSearchResult[] => {
+      const normalizedQuery = query.trim().toLowerCase()
+      if (!normalizedQuery) {
+        return []
+      }
+
+      const channels = new Map(
+        state.channelGroups
+          .flatMap((group) => group.channels)
+          .filter((channel) => channel.type === 'GUILD_TEXT' || channel.type === 'GUILD_FORUM')
+          .map((channel) => [channel.id, channel])
+      )
+
+      return state.messages
+        .filter((message) =>
+          !message.deleted &&
+          channels.has(message.channelId) &&
+          message.body.toLowerCase().includes(normalizedQuery)
+        )
+        .sort((left, right) => right.sequence - left.sequence)
+        .slice(0, 10)
+        .map((message) => ({
+          id: message.id,
+          channelId: message.channelId,
+          channelName: channels.get(message.channelId)?.name ?? message.channelId,
+          author: message.author,
+          body: message.body,
+          createdAt: message.createdAt
+        }))
+    },
+    mentionInboxItems: (state): ShellMentionInboxItem[] => {
+      const channels = new Map(
+        state.channelGroups
+          .flatMap((group) => group.channels)
+          .map((channel) => [channel.id, channel])
+      )
+
+      return state.messages
+        .filter((message) => !message.deleted && message.mentions.includes(state.currentUser))
+        .sort((left, right) => right.sequence - left.sequence)
+        .map((message) => ({
+          id: message.id,
+          channelId: message.channelId,
+          channelName: channels.get(message.channelId)?.name ?? message.channelId,
+          author: message.author
+        }))
+    },
     presenceStatusForUser: (state) => (userId: string): ShellPresenceStatus => {
       const record = state.presence.users[userId]
 
@@ -1066,6 +1158,8 @@ export const useShellStore = defineStore('shell', {
       state.moderation.auditLogs.filter((entry) =>
         ['ROLE_PERMISSION_UPDATED', 'ROLE_ASSIGNED', 'MESSAGE_DELETED', 'MESSAGE_PINNED', 'MESSAGE_UNPINNED'].includes(entry.action)
       ),
+    openMessageReports: (state): ShellMessageReport[] =>
+      state.moderation.messageReports.filter((report) => report.status === 'OPEN'),
     invitePreviewSummary: (state) => {
       const channel = state.channelGroups
         .flatMap((group) => group.channels)
@@ -2091,6 +2185,82 @@ export const useShellStore = defineStore('shell', {
         createdAt: new Date().toISOString()
       })
     },
+    async reportMessage(messageId: string, bearerToken?: string | null): Promise<boolean> {
+      const message = this.messages.find((candidate) => candidate.id === messageId && !candidate.deleted)
+      if (!message) {
+        return false
+      }
+
+      const existingOpenReport = this.moderation.messageReports.find(
+        (report) => report.messageId === messageId && report.status === 'OPEN'
+      )
+      if (existingOpenReport) {
+        return false
+      }
+
+      if (bearerToken) {
+        const report = await this.withBackendRequest((client, requestId) =>
+          client.post<BackendMessageReportResponse>(
+            discordApiPaths.guild.messageReport(this.guild.id, message.channelId, messageId),
+            { reason: 'MODERATOR_REVIEW' },
+            { bearerToken, requestId }
+          )
+        )
+        if (report) {
+          this.moderation.messageReports.unshift(toShellMessageReport(report, this.currentUser))
+          this.appendAuditLog('MESSAGE_REPORTED', `${this.currentUser} reported ${messageId}`)
+          return true
+        }
+      }
+
+      this.moderation.messageReports.unshift({
+        id: `report-${Date.now()}-${this.moderation.messageReports.length}`,
+        messageId,
+        channelId: message.channelId,
+        reporter: this.currentUser,
+        reasonCode: 'MODERATOR_REVIEW',
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        resolvedAt: null,
+        moderator: null
+      })
+      this.appendAuditLog('MESSAGE_REPORTED', `${this.currentUser} reported ${messageId}`)
+      return true
+    },
+    async resolveMessageReport(
+      reportId: string,
+      status: Exclude<ShellMessageReportStatus, 'OPEN'> = 'RESOLVED',
+      bearerToken?: string | null
+    ): Promise<boolean> {
+      const report = this.moderation.messageReports.find((candidate) => candidate.id === reportId)
+      if (!report || report.status !== 'OPEN') {
+        return false
+      }
+
+      if (bearerToken) {
+        const resolved = await this.withBackendRequest((client, requestId) =>
+          client.post<BackendMessageReportResponse>(
+            discordApiPaths.guild.resolveMessageReport(this.guild.id, reportId),
+            { status, resolution: status.toLowerCase() },
+            { bearerToken, requestId }
+          )
+        )
+        if (!resolved) {
+          report.status = status
+          report.resolvedAt = new Date().toISOString()
+          report.moderator = this.currentUser
+          this.appendAuditLog('MESSAGE_REPORT_RESOLVED', `${status.toLowerCase()} ${report.messageId}`)
+          return true
+        }
+        Object.assign(report, toShellMessageReport(resolved, report.reporter, this.currentUser))
+      } else {
+        report.status = status
+        report.resolvedAt = new Date().toISOString()
+        report.moderator = this.currentUser
+      }
+      this.appendAuditLog('MESSAGE_REPORT_RESOLVED', `${status.toLowerCase()} ${report.messageId}`)
+      return true
+    },
     applyPermissionDraft(): boolean {
       const draft = this.adminConsole.permissionDraft
       if (!draft) {
@@ -2290,4 +2460,20 @@ export const useShellStore = defineStore('shell', {
       return enabled
     }
   }
+})
+
+const toShellMessageReport = (
+  report: BackendMessageReportResponse,
+  fallbackReporter: string,
+  fallbackModerator: string | null = null
+): ShellMessageReport => ({
+  id: report.id,
+  messageId: report.messageId,
+  channelId: report.channelId,
+  reporter: report.reporterId || fallbackReporter,
+  reasonCode: 'MODERATOR_REVIEW',
+  status: report.status,
+  createdAt: report.createdAt,
+  resolvedAt: report.status === 'OPEN' ? null : report.updatedAt,
+  moderator: report.moderatorId ?? fallbackModerator
 })

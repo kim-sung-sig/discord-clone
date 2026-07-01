@@ -66,5 +66,9 @@ foreach ($snippet in $requiredSnippets) {
 
 Assert ($apiSmokeContent.Contains('Request GET "/api/guilds/$guildId/channels/visible?memberId=$ownerId" $null $ownerToken')) `
   'qa/api-smoke.ps1 must authenticate the visible channels request'
+Assert ($apiSmokeContent.Contains('idempotencyKey="api-smoke-message-$stamp"')) `
+  'qa/api-smoke.ps1 must include the required idempotency key when creating the runtime smoke message'
+Assert ($apiSmokeContent.Contains('idempotencyKey="api-smoke-automod-$stamp"')) `
+  'qa/api-smoke.ps1 must include the required idempotency key when probing automod message rejection'
 
 Write-Output 'REAL_BACKEND_E2E_CONTRACT_PASS'

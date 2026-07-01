@@ -22,7 +22,7 @@ const shell = useShellStore()
 const preferences = usePreferencesStore()
 
 type MobilePane = 'channels' | 'chat' | 'members' | 'voice'
-type WorkbenchView = 'explorer' | 'search' | 'calls' | 'settings'
+type WorkbenchView = 'explorer' | 'search' | 'inbox' | 'calls' | 'settings'
 
 const activeMobilePane = ref<MobilePane>('chat')
 const activeWorkbenchView = ref<WorkbenchView>('explorer')
@@ -67,10 +67,25 @@ const searchableChannels = computed(() => {
       return `${channel.name} ${channel.groupName} ${channel.type}`.toLowerCase().includes(normalizedQuery)
     })
 })
+const messageSearchResults = computed(() => shell.messageSearchResults(searchQuery.value))
 const voiceChannels = computed(() =>
   shell.channelGroups
     .flatMap((group) => group.channels)
     .filter((channel) => channel.type === 'GUILD_VOICE')
+)
+const unreadInboxChannels = computed(() =>
+  shell.channelGroups
+    .flatMap((group) =>
+      group.channels.map((channel) => ({
+        ...channel,
+        groupName: group.name,
+        unreadCount: shell.unreadCountForChannel(channel.id)
+      }))
+    )
+    .filter((channel) => channel.unreadCount > 0)
+)
+const directMessageInboxItems = computed(() =>
+  shell.socialDirectSummaries.filter((dm) => dm.unreadCount > 0 && dm.friend)
 )
 const statusText = computed(() => `${preferences.t('status.ready')} ${shell.gateway.lastSequence}`)
 const shellThemeStyle = computed(() => ({
@@ -102,6 +117,18 @@ function updateTheme(event: Event) {
 function setWorkbenchView(view: WorkbenchView) {
   activeWorkbenchView.value = view
   bottomPanelOpen.value = false
+}
+
+function openInboxChannel(channelId: string) {
+  shell.selectChannel(channelId)
+  activeWorkbenchView.value = 'explorer'
+  activeMobilePane.value = 'chat'
+}
+
+function openInboxDirectMessage(directMessageId: string) {
+  if (shell.selectDirectDm(directMessageId)) {
+    activeWorkbenchView.value = 'explorer'
+  }
 }
 
 async function runRealBackendSmoke() {
@@ -218,6 +245,16 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
+        data-testid="activity-inbox"
+        :aria-current="activeWorkbenchView === 'inbox' ? 'page' : undefined"
+        :title="preferences.t('activity.inbox')"
+        @click="setWorkbenchView('inbox')"
+      >
+        <span>{{ preferences.t('activity.inbox') }}</span>
+        <strong>{{ preferences.t('activity.inbox') }}</strong>
+      </button>
+      <button
+        type="button"
         data-testid="activity-calls"
         :aria-current="activeWorkbenchView === 'calls' ? 'page' : undefined"
         title="Calls"
@@ -327,6 +364,24 @@ onBeforeUnmount(() => {
         </label>
         <section class="workbench-list" data-testid="workbench-search-results">
           <article
+            v-for="message in messageSearchResults"
+            :key="`message-${message.id}`"
+            class="workbench-list-row"
+            :data-testid="`workbench-search-message-${message.id}`"
+          >
+            <button type="button" @click="openInboxChannel(message.channelId)">
+              # {{ message.channelName }} - {{ message.body }}
+            </button>
+            <small>{{ message.author }}</small>
+            <button
+              type="button"
+              :data-testid="`workbench-report-message-${message.id}`"
+              @click="shell.reportMessage(message.id, auth.accessToken)"
+            >
+              {{ preferences.t('view.search.report') }}
+            </button>
+          </article>
+          <article
             v-for="channel in searchableChannels"
             :key="channel.id"
             class="workbench-list-row"
@@ -335,6 +390,76 @@ onBeforeUnmount(() => {
             <span>{{ channel.type === 'GUILD_TEXT' ? '#' : preferences.t('channel.kind.voice') }} {{ channel.name }}</span>
             <small>{{ channel.groupName }}</small>
             <strong v-if="channel.unreadCount > 0">{{ channel.unreadCount }}</strong>
+          </article>
+        </section>
+        <section class="workbench-list" data-testid="workbench-report-queue">
+          <article
+            v-for="report in shell.openMessageReports"
+            :key="report.id"
+            class="workbench-list-row"
+            :data-testid="`workbench-report-${report.id}`"
+          >
+            <span>{{ preferences.t('view.search.reportReason.moderatorReview') }}</span>
+            <small>{{ report.messageId }}</small>
+            <button
+              type="button"
+              :data-testid="`workbench-resolve-report-${report.id}`"
+              @click="shell.resolveMessageReport(report.id, 'RESOLVED', auth.accessToken)"
+            >
+              {{ preferences.t('view.search.resolveReport') }}
+            </button>
+          </article>
+        </section>
+      </section>
+      <section
+        v-if="activeWorkbenchView === 'inbox'"
+        class="workbench-secondary-view workbench-inbox-view"
+        data-testid="workbench-inbox-view"
+        :aria-label="preferences.t('view.inbox.title')"
+      >
+        <header>
+          <p>{{ preferences.t('activity.inbox') }}</p>
+          <h2>{{ preferences.t('view.inbox.title') }}</h2>
+          <span>{{ preferences.t('view.inbox.description') }}</span>
+        </header>
+        <section class="workbench-list" data-testid="workbench-inbox-mentions">
+          <article
+            v-for="item in shell.mentionInboxItems"
+            :key="`mention-${item.id}`"
+            class="workbench-list-row"
+            :data-testid="`workbench-inbox-mention-${item.id}`"
+          >
+            <button type="button" @click="openInboxChannel(item.channelId)">
+              # {{ item.channelName }}
+            </button>
+            <small>{{ item.author }}</small>
+            <strong>@</strong>
+          </article>
+        </section>
+        <section class="workbench-list" data-testid="workbench-inbox-unreads">
+          <article
+            v-for="channel in unreadInboxChannels"
+            :key="`unread-${channel.id}`"
+            class="workbench-list-row"
+            :data-testid="`workbench-inbox-unread-${channel.id}`"
+          >
+            <button type="button" @click="openInboxChannel(channel.id)">
+              # {{ channel.name }}
+            </button>
+            <small>{{ channel.groupName }}</small>
+            <strong>{{ channel.unreadCount }}</strong>
+          </article>
+          <article
+            v-for="dm in directMessageInboxItems"
+            :key="`dm-${dm.id}`"
+            class="workbench-list-row"
+            :data-testid="`workbench-inbox-dm-${dm.id}`"
+          >
+            <button type="button" @click="openInboxDirectMessage(dm.id)">
+              {{ dm.friend?.name }}
+            </button>
+            <small>{{ preferences.t('view.inbox.directMessage') }}</small>
+            <strong>{{ dm.unreadCount }}</strong>
           </article>
         </section>
       </section>
