@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 # Agent Rules
 
-Project-local rules live in `.agents/rules/*.md`.
+Project-local rules live in `.agents/rules/**/*.md`.
 
 Before work, load rule files whose frontmatter matches the task:
 
@@ -14,4 +14,5 @@ Before work, load rule files whose frontmatter matches the task:
 - `triggers` matches task intent words.
 - `appliesTo` names broad areas such as `backend`, `frontend`, `qa`, `git`, or `docs`.
 
+Prefer nested rule paths for domain-specific rules, for example `.agents/rules/backend/logging.md`.
 Keep `AGENTS.md` as the bootstrap and put detailed operating rules here.

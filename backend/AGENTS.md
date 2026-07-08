@@ -2,7 +2,7 @@
 
 These rules apply to all work under `backend/`.
 
-Also load matching project rule files from `.agents/rules/*.md`; for logging or observability-related backend work, read `.agents/rules/backend-logging.md`.
+Also load matching project rule files from `.agents/rules/**/*.md`; for logging or observability-related backend work, read `.agents/rules/backend/logging.md`.
 
 ## Architecture
 - Keep domain modules framework-light. Spring MVC, persistence adapters, scheduling, and web concerns belong in `backend/boot`.

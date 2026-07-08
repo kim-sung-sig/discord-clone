@@ -2,10 +2,11 @@
 
 ## Project Rule Files
 
-Detailed project-local rules live in `.agents/rules/*.md`.
+Detailed project-local rules live in `.agents/rules/**/*.md`.
 
 - Read `.agents/rules/README.md` before implementation, review, QA, runtime, documentation, or agent-rule work.
 - Load matching rule files by frontmatter: `alwaysApply`, `globs`, `triggers`, and `appliesTo`.
+- Prefer nested rule paths such as `.agents/rules/backend/logging.md` for domain-specific rules.
 - Keep this `AGENTS.md` as the bootstrap; prefer adding detailed reusable rules under `.agents/rules/`.
 
 ## Shell And Command Policy
