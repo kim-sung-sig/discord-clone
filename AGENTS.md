@@ -1,5 +1,13 @@
 # Project Agent Rules
 
+## Project Rule Files
+
+Detailed project-local rules live in `.agents/rules/*.md`.
+
+- Read `.agents/rules/README.md` before implementation, review, QA, runtime, documentation, or agent-rule work.
+- Load matching rule files by frontmatter: `alwaysApply`, `globs`, `triggers`, and `appliesTo`.
+- Keep this `AGENTS.md` as the bootstrap; prefer adding detailed reusable rules under `.agents/rules/`.
+
 ## Shell And Command Policy
 
 For this repository, run agent shell commands through Git Bash by default.

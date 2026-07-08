@@ -2,6 +2,8 @@
 
 These rules apply to all work under `backend/`.
 
+Also load matching project rule files from `.agents/rules/*.md`; for logging or observability-related backend work, read `.agents/rules/backend-logging.md`.
+
 ## Architecture
 - Keep domain modules framework-light. Spring MVC, persistence adapters, scheduling, and web concerns belong in `backend/boot`.
 - Prefer DDD boundaries: commands and value objects enter domain services; controllers translate HTTP into use cases and response records.
@@ -34,12 +36,6 @@ These rules apply to all work under `backend/`.
 - Never log raw access tokens, refresh tokens, passwords, or internal publisher tokens.
 - Store reusable token state as hashes where possible and compare internal/webhook shared secrets with constant-time comparison.
 - Use explicit error responses for client recovery, but avoid leaking sensitive implementation details.
-
-## Logging
-- Log application boundary method entry and completion at `info` when the operation is meaningful. Include safe parameters and safe result identifiers when useful.
-- Do not log message bodies, tokens, cookies, passwords, authorization headers, shared secrets, or other sensitive values. Omit parameter/result logging when it cannot be safely summarized.
-- Log database insert, update, and delete effects at `info` with entity type, safe identifiers, operation, and row count or status.
-- Use `debug` for intermediate diagnostic values and `warn` for rejected, degraded, retried, or recoverable failure paths.
 
 ## Runtime And Scale
 - Keep hot reads, event replay, and searches bounded by cursor, limit, retention, or per-resource indexes.
