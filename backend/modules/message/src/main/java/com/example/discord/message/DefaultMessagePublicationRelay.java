@@ -3,8 +3,11 @@ package com.example.discord.message;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class DefaultMessagePublicationRelay implements MessagePublicationRelay {
+    private static final Logger log = LoggerFactory.getLogger(DefaultMessagePublicationRelay.class);
     private static final int MAX_BATCH_SIZE = 100;
 
     private final MessagePublicationOutboxQueue outbox;
@@ -50,16 +53,26 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
     @Override
     public int relay(int limit) {
         int delivered = 0;
+        int batchSize = batchSize(limit);
+        log.info("Relaying message publications started requestedLimit={} batchSize={}", limit, batchSize);
         for (ClaimedMessagePublication publication : outbox.claimPendingPublications(
-            batchSize(limit),
+            batchSize,
             clock.instant(),
             claimLease
         )) {
             MessagePublished event = publication.event();
             try {
+                log.debug("Dispatching message publication eventId={} messageId={}", event.eventId(), event.messageId());
                 dispatcher.dispatch(event);
                 outbox.markPublished(event.eventId(), publication.claimToken(), clock.instant());
+                log.info("Message publication marked published eventId={} messageId={}", event.eventId(), event.messageId());
             } catch (RuntimeException exception) {
+                log.warn(
+                    "Message publication dispatch failed eventId={} messageId={}",
+                    event.eventId(),
+                    event.messageId(),
+                    exception
+                );
                 outbox.releaseFailed(
                     event.eventId(),
                     publication.claimToken(),
@@ -71,6 +84,7 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
             }
             delivered++;
         }
+        log.info("Relaying message publications finished delivered={}", delivered);
         return delivered;
     }
 

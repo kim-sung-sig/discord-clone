@@ -4,8 +4,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class DefaultDeleteMessageUseCase implements DeleteMessageUseCase {
+    private static final Logger log = LoggerFactory.getLogger(DefaultDeleteMessageUseCase.class);
+
     private final MessageMutationGuard mutationGuard;
     private final MessageStore messages;
     private final Clock clock;
@@ -23,6 +27,8 @@ public final class DefaultDeleteMessageUseCase implements DeleteMessageUseCase {
     @Override
     public DeleteMessageResult delete(DeleteMessageRequest request) {
         Objects.requireNonNull(request, "request must not be null");
+        Object requesterId = authorId(request.requester());
+        log.info("Deleting message started messageId={} requesterId={}", request.messageId(), requesterId);
         Message current = messages.findById(request.messageId()).orElseThrow(MessageNotFoundException::new);
         mutationGuard.requireCanDelete(request.requester(), current);
         Instant now = clock.instant();
@@ -38,6 +44,19 @@ public final class DefaultDeleteMessageUseCase implements DeleteMessageUseCase {
             current.createdAt(),
             now
         );
-        return new DeleteMessageResult(messages.save(deleted));
+        Message saved = messages.save(deleted);
+        log.info(
+            "Message soft-deleted messageId={} requesterId={} guildId={} channelId={}",
+            saved.id(),
+            requesterId,
+            saved.guildId(),
+            saved.channelId()
+        );
+        log.info("Deleting message finished messageId={} requesterId={}", saved.id(), requesterId);
+        return new DeleteMessageResult(saved);
+    }
+
+    private static Object authorId(MessageAuthor author) {
+        return author instanceof UserMessageAuthor user ? user.userId() : author.getClass().getSimpleName();
     }
 }

@@ -18,6 +18,8 @@ import javax.sql.DataSource;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Repository
 @Profile("postgres")
@@ -32,6 +34,7 @@ class JdbcMessageStore implements
     MessagePublicationOutbox,
     MessagePublicationOutboxQueue,
     MessagePublicationDeadLetterQueue {
+    private static final Logger log = LoggerFactory.getLogger(JdbcMessageStore.class);
     private static final Duration IDEMPOTENCY_RETENTION = Duration.ofDays(7);
     private static final int MAX_PUBLICATION_ATTEMPTS = 10;
 
@@ -99,6 +102,15 @@ class JdbcMessageStore implements
                 replaceEdits(connection, message);
                 upsertReadProjection(connection, message);
                 connection.commit();
+                log.info(
+                    "Message database state saved messageId={} guildId={} channelId={} deleted={} pinned={} edited={}",
+                    message.id(),
+                    message.guildId(),
+                    message.channelId(),
+                    message.deleted(),
+                    message.pinned(),
+                    message.edited()
+                );
                 return message;
             } catch (SQLException exception) {
                 connection.rollback();
@@ -118,13 +130,19 @@ class JdbcMessageStore implements
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                cleanupExpiredIdempotencyKeys(connection);
+                logExpiredIdempotencyKeyCleanup(cleanupExpiredIdempotencyKeys(connection));
                 upsertMessage(connection, message);
                 replaceMentions(connection, message);
                 replaceEdits(connection, message);
                 upsertReadProjection(connection, message);
                 insertIdempotencyKey(connection, message, idempotencyKey);
                 connection.commit();
+                log.info(
+                    "Message database state saved with idempotency key messageId={} guildId={} channelId={}",
+                    message.id(),
+                    message.guildId(),
+                    message.channelId()
+                );
                 return message;
             } catch (SQLException exception) {
                 connection.rollback();
@@ -149,7 +167,7 @@ class JdbcMessageStore implements
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                cleanupExpiredIdempotencyKeys(connection);
+                logExpiredIdempotencyKeyCleanup(cleanupExpiredIdempotencyKeys(connection));
                 upsertMessage(connection, message);
                 replaceMentions(connection, message);
                 replaceEdits(connection, message);
@@ -160,6 +178,14 @@ class JdbcMessageStore implements
                 insertOutboxEvent(connection, event, scope);
                 insertOutboxMentions(connection, event);
                 connection.commit();
+                log.info(
+                    "Published message database state saved messageId={} eventId={} guildId={} channelId={} mentionCount={}",
+                    message.id(),
+                    event.eventId(),
+                    message.guildId(),
+                    message.channelId(),
+                    message.mentions().size()
+                );
                 return message;
             } catch (SQLException exception) {
                 connection.rollback();
@@ -280,6 +306,12 @@ class JdbcMessageStore implements
                 insertOutboxEvent(connection, event, scope);
                 insertOutboxMentions(connection, event);
                 connection.commit();
+                log.info(
+                    "Message publication outbox event appended eventId={} messageId={} mentionCount={}",
+                    event.eventId(),
+                    event.messageId(),
+                    event.mentions().size()
+                );
             } catch (SQLException exception) {
                 connection.rollback();
                 throw exception;
@@ -342,6 +374,12 @@ class JdbcMessageStore implements
                         resultSet.getObject("claim_token", UUID.class)
                     ));
                 }
+                log.info(
+                    "Message publication outbox events claimed requestedLimit={} claimedCount={} leaseSeconds={}",
+                    limit,
+                    publications.size(),
+                    lease.toSeconds()
+                );
                 return List.copyOf(publications);
             }
         } catch (SQLException exception) {
@@ -368,7 +406,8 @@ class JdbcMessageStore implements
             statement.setTimestamp(1, Timestamp.from(publishedAt));
             statement.setObject(2, eventId);
             statement.setObject(3, claimToken);
-            statement.executeUpdate();
+            int updated = statement.executeUpdate();
+            log.info("Message publication outbox event marked published eventId={} updatedRows={}", eventId, updated);
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to mark message publication outbox event published", exception);
         }
@@ -412,7 +451,13 @@ class JdbcMessageStore implements
             statement.setTimestamp(5, Timestamp.from(failedAt.plus(retryDelay)));
             statement.setObject(6, eventId);
             statement.setObject(7, claimToken);
-            statement.executeUpdate();
+            int updated = statement.executeUpdate();
+            log.info(
+                "Message publication outbox event released after failure eventId={} updatedRows={} retryDelaySeconds={}",
+                eventId,
+                updated,
+                retryDelay.toSeconds()
+            );
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to release failed message publication outbox event", exception);
         }
@@ -474,9 +519,11 @@ class JdbcMessageStore implements
                  WHERE event_id = ?
                    AND published_at IS NULL
                    AND dead_lettered_at IS NOT NULL
-                 """)) {
+            """)) {
             statement.setObject(1, eventId);
-            return statement.executeUpdate() > 0;
+            int updated = statement.executeUpdate();
+            log.info("Message publication dead letter requeued eventId={} updatedRows={}", eventId, updated);
+            return updated > 0;
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to requeue message publication dead letter", exception);
         }
@@ -864,10 +911,16 @@ class JdbcMessageStore implements
         }
     }
 
-    private static void cleanupExpiredIdempotencyKeys(Connection connection) throws SQLException {
+    private static int cleanupExpiredIdempotencyKeys(Connection connection) throws SQLException {
         try (var statement = connection.prepareStatement("DELETE FROM message_idempotency_keys WHERE expires_at <= ?")) {
             statement.setTimestamp(1, Timestamp.from(Instant.now()));
-            statement.executeUpdate();
+            return statement.executeUpdate();
+        }
+    }
+
+    private static void logExpiredIdempotencyKeyCleanup(int deletedRows) {
+        if (deletedRows > 0) {
+            log.info("Expired message idempotency keys deleted deletedRows={}", deletedRows);
         }
     }
 

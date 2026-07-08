@@ -35,6 +35,12 @@ These rules apply to all work under `backend/`.
 - Store reusable token state as hashes where possible and compare internal/webhook shared secrets with constant-time comparison.
 - Use explicit error responses for client recovery, but avoid leaking sensitive implementation details.
 
+## Logging
+- Log application boundary method entry and completion at `info` when the operation is meaningful. Include safe parameters and safe result identifiers when useful.
+- Do not log message bodies, tokens, cookies, passwords, authorization headers, shared secrets, or other sensitive values. Omit parameter/result logging when it cannot be safely summarized.
+- Log database insert, update, and delete effects at `info` with entity type, safe identifiers, operation, and row count or status.
+- Use `debug` for intermediate diagnostic values and `warn` for rejected, degraded, retried, or recoverable failure paths.
+
 ## Runtime And Scale
 - Keep hot reads, event replay, and searches bounded by cursor, limit, retention, or per-resource indexes.
 - Keep moderation, audit, alert, report, and webhook audit logs bounded per resource or per service.
