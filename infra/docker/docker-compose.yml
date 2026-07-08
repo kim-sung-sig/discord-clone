@@ -73,3 +73,65 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+
+  loki:
+    image: grafana/loki:latest
+    profiles:
+      - observability
+    command: ["-config.file=/etc/loki/loki.yml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles:
+      - observability
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  alloy:
+    image: grafana/alloy:latest
+    profiles:
+      - observability
+    command:
+      - "run"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "/etc/alloy/config.alloy"
+    depends_on:
+      - loki
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./observability/alloy.alloy:/etc/alloy/config.alloy:ro
+      - ./observability/logs:/var/log/discord:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles:
+      - observability
+    depends_on:
+      - loki
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  loki-data:
+  prometheus-data:
+  grafana-data:
