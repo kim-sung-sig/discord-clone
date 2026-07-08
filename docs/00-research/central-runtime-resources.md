@@ -10,6 +10,10 @@ Date: 2026-05-19
 | PostgreSQL replica | `postgres-replica` | `127.0.0.1:15433` | `5432` | Read replica or recovery drill target |
 | Redis | `ms-redis` | `127.0.0.1:16379` | `6379` | Presence TTL, gateway Redis streams, backend rate limits |
 | Kafka | `ms-kafka` | `127.0.0.1:29092` | `29092` | Future cross-node event fanout and async product events |
+| Grafana | `grafana` | `http://127.0.0.1:3001` | `3000` | Local observability UI with provisioned Prometheus and Loki datasources |
+| Loki | `loki` | `http://127.0.0.1:3100` | `3100` | Local log store for backend file logs |
+| Prometheus | `prometheus` | `http://127.0.0.1:9090` | `9090` | Local metrics store scraping Spring Actuator `/actuator/prometheus` |
+| Grafana Alloy | `alloy` | `http://127.0.0.1:12345` | `12345` | Local log collector forwarding `infra/docker/observability/logs/*.log` to Loki |
 
 Reference compose path: `C:\git\chat-platform\docker\compose.yml`.
 
@@ -31,6 +35,16 @@ $env:SPRING_DATA_REDIS_PORT='16379'
 $env:SPRING_DATA_REDIS_PASSWORD='dev_password'
 $env:SPRING_KAFKA_BOOTSTRAP_SERVERS='127.0.0.1:29092'
 ```
+
+## Local Observability
+
+Use the opt-in Compose profile for local observability:
+
+```powershell
+docker compose -f infra/docker/docker-compose.yml --profile observability up -d loki prometheus alloy grafana
+```
+
+Prometheus scrapes the backend at `host.docker.internal:8080` and `host.docker.internal:18080` on `/actuator/prometheus`. For host-run backend logs, write boot output to `infra/docker/observability/logs/*.log` so Alloy can forward it to Loki.
 
 ## Nuxt Runtime
 
