@@ -105,7 +105,7 @@ class AuthController {
 
     @GetMapping("/admin/global-roles/audit-log")
     GlobalRoleAuditLogResponse globalRoleAuditLog(
-        @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestParam(required = false) UUID targetUserId,
         @RequestParam(defaultValue = "50") int limit
     ) {

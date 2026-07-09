@@ -233,6 +233,13 @@ class AuthControllerTest {
     }
 
     @Test
+    void globalRoleAuditReviewRejectsMissingBearerToken() throws Exception {
+        mockMvc.perform(get("/api/admin/global-roles/audit-log"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.message").value("bearer token required"));
+    }
+
+    @Test
     void locksLoginAfterRepeatedInvalidPasswordAttempts() throws Exception {
         mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)
