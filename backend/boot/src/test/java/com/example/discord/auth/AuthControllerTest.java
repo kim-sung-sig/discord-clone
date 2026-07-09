@@ -240,6 +240,26 @@ class AuthControllerTest {
     }
 
     @Test
+    void globalRoleAuditReviewRejectsLimitOutsideExportBounds() throws Exception {
+        MvcResult adminSignup = signupResult("audit-limit-admin@example.com", "audit_limit_admin", "Audit Limit Admin");
+        String adminToken = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.accessToken");
+        String adminId = com.jayway.jsonpath.JsonPath.read(adminSignup.getResponse().getContentAsString(), "$.user.id");
+        authStore.grantGlobalRole(UUID.fromString(adminId), "SECURITY_ADMIN");
+
+        mockMvc.perform(get("/api/admin/global-roles/audit-log")
+                .queryParam("limit", "0")
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("invalid request"));
+
+        mockMvc.perform(get("/api/admin/global-roles/audit-log")
+                .queryParam("limit", "101")
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("invalid request"));
+    }
+
+    @Test
     void locksLoginAfterRepeatedInvalidPasswordAttempts() throws Exception {
         mockMvc.perform(signupRequest()
                 .contentType(MediaType.APPLICATION_JSON)

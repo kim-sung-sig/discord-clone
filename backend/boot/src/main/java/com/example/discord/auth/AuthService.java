@@ -153,11 +153,13 @@ class AuthService {
         if (!store.globalRolesForUser(requesterId).contains(GlobalRole.SECURITY_ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "forbidden");
         }
-        int boundedLimit = Math.min(Math.max(limit, 1), GLOBAL_ROLE_AUDIT_MAX_EXPORT_ENTRIES);
+        if (limit < 1 || limit > GLOBAL_ROLE_AUDIT_MAX_EXPORT_ENTRIES) {
+            throw new IllegalArgumentException("global role audit limit is invalid");
+        }
         Instant retentionCutoff = clock.instant().minus(Duration.ofDays(GLOBAL_ROLE_AUDIT_RETENTION_DAYS));
         List<GlobalRoleAuditEntry> entries = targetUserId == null
-            ? store.globalRoleAuditLog(boundedLimit)
-            : store.globalRoleAuditLog(targetUserId, boundedLimit);
+            ? store.globalRoleAuditLog(limit)
+            : store.globalRoleAuditLog(targetUserId, limit);
         return new AuthController.GlobalRoleAuditLogResponse(entries.stream()
             .filter(entry -> !entry.occurredAt().isBefore(retentionCutoff))
             .map(AuthController.GlobalRoleAuditEntryResponse::from)
