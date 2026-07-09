@@ -53,7 +53,8 @@ class MessageOutboxControllerTest {
             .andExpect(jsonPath("$.events[0].messageId").value(event.messageId().toString()))
             .andExpect(jsonPath("$.events[0].target.type").value("CHANNEL"))
             .andExpect(jsonPath("$.events[0].attempts").value(10))
-            .andExpect(jsonPath("$.events[0].lastError").value("gateway down 10"));
+            .andExpect(jsonPath("$.events[0].lastError").value("gateway down 10"))
+            .andExpect(jsonPath("$.unpublishedBacklogCount").value(0));
 
         mockMvc.perform(post("/api/internal/messages/outbox/dead-letter/{eventId}/replay", event.eventId())
                 .header(INTERNAL_OPERATOR_HEADER, "test-outbox-operator"))

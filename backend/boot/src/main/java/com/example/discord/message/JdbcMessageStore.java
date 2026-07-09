@@ -464,6 +464,23 @@ class JdbcMessageStore implements
     }
 
     @Override
+    public long unpublishedBacklogCount() {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT COUNT(*) AS backlog_count
+                 FROM message_publication_outbox
+                 WHERE published_at IS NULL
+                   AND dead_lettered_at IS NULL
+                 """);
+             ResultSet resultSet = statement.executeQuery()) {
+            resultSet.next();
+            return resultSet.getLong("backlog_count");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to count unpublished message publication outbox events", exception);
+        }
+    }
+
+    @Override
     public List<DeadLetteredMessagePublication> listDeadLetters(int limit) {
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement("""

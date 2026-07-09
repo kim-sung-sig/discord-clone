@@ -23,13 +23,16 @@ class MessageOutboxController {
     private static final String INTERNAL_OPERATOR_HEADER = "X-Internal-Message-Outbox-Operator";
 
     private final MessagePublicationDeadLetterQueue deadLetters;
+    private final MessagePublicationOutboxQueue outboxQueue;
     private final String operatorToken;
 
     MessageOutboxController(
         MessagePublicationDeadLetterQueue deadLetters,
+        MessagePublicationOutboxQueue outboxQueue,
         @Value("${discord.message.outbox-operator-token:}") String operatorToken
     ) {
         this.deadLetters = deadLetters;
+        this.outboxQueue = outboxQueue;
         this.operatorToken = operatorToken;
     }
 
@@ -42,7 +45,8 @@ class MessageOutboxController {
         return new DeadLetterResponse(
             deadLetters.listDeadLetters(limit).stream()
                 .map(DeadLetterEventResponse::from)
-                .toList()
+                .toList(),
+            outboxQueue.unpublishedBacklogCount()
         );
     }
 
@@ -77,7 +81,7 @@ class MessageOutboxController {
         );
     }
 
-    record DeadLetterResponse(List<DeadLetterEventResponse> events) {
+    record DeadLetterResponse(List<DeadLetterEventResponse> events, long unpublishedBacklogCount) {
     }
 
     record DeadLetterEventResponse(

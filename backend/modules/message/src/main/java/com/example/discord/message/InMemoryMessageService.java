@@ -169,6 +169,11 @@ public class InMemoryMessageService
     }
 
     @Override
+    public synchronized long unpublishedBacklogCount() {
+        return pendingPublications.size();
+    }
+
+    @Override
     public synchronized List<DeadLetteredMessagePublication> listDeadLetters(int limit) {
         return deadLetterPublications.values().stream()
             .limit(pageSize(limit))

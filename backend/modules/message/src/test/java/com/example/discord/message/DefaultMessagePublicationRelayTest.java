@@ -115,5 +115,10 @@ class DefaultMessagePublicationRelayTest {
             releaseErrors.add(errorMessage);
             releaseRetryDelays.add(retryDelay);
         }
+
+        @Override
+        public long unpublishedBacklogCount() {
+            return events.size();
+        }
     }
 }
