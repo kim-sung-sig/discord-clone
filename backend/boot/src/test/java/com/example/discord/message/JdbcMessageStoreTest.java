@@ -14,6 +14,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(properties = "spring.task.scheduling.enabled=false")
 @ActiveProfiles("postgres")
@@ -50,6 +51,9 @@ class JdbcMessageStoreTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockitoBean
+    private MessagePublicationRelayWorker relayWorker;
 
     private UUID ownerId;
     private UUID guildId;
@@ -212,9 +216,10 @@ class JdbcMessageStoreTest {
         publications.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
 
         for (int attempt = 1; attempt <= 10; attempt++) {
+            Instant failedAt = NOW.plusSeconds(attempt * 60L);
             ClaimedMessagePublication claimed = outboxQueue.claimPendingPublications(
                     1,
-                    NOW.plusSeconds(attempt * 31L),
+                    failedAt,
                     Duration.ofSeconds(30)
                 )
                 .getFirst();
@@ -222,7 +227,7 @@ class JdbcMessageStoreTest {
                 event.eventId(),
                 claimed.claimToken(),
                 "gateway down " + attempt,
-                NOW.plusSeconds(attempt * 31L),
+                failedAt,
                 Duration.ofSeconds(30)
             );
         }
@@ -291,6 +296,84 @@ class JdbcMessageStoreTest {
     }
 
     @Test
+    void readsNewestMessagesBeforeOpaqueCursorWithinChannel() throws Exception {
+        UUID otherChannelId = UUID.randomUUID();
+        insertChannel(otherChannelId, "other");
+        Message first = messageAt(target(), "first", NOW.plusSeconds(1));
+        Message second = messageAt(target(), "second", NOW.plusSeconds(2));
+        Message third = messageAt(target(), "third", NOW.plusSeconds(3));
+        messages.save(first);
+        messages.save(second);
+        messages.save(third);
+        messages.save(messageAt(new ChannelMessageTarget(guildId, otherChannelId), "other channel", NOW.plusSeconds(4)));
+
+        MessagePage firstPage = pages.read(target(), null, 2);
+        MessagePage secondPage = pages.read(target(), firstPage.nextCursor(), 2);
+
+        assertThat(firstPage.messages()).extracting(Message::id).containsExactly(third.id(), second.id());
+        assertThat(firstPage.nextCursor()).isNotBlank();
+        assertThat(secondPage.messages()).extracting(Message::id).containsExactly(first.id());
+        assertThat(secondPage.nextCursor()).isNull();
+    }
+
+    @Test
+    void persistsMessageFlagsMentionsAndEditHistory() {
+        UUID roleId = UUID.randomUUID();
+        Message message = new Message(
+            UUID.randomUUID(),
+            new UserMessageAuthor(ownerId),
+            target(),
+            new MessageContent("after edit"),
+            List.of(new RoleMentionTarget(roleId)),
+            true,
+            false,
+            List.of(new MessageEdit(new MessageContent("before edit"), NOW.minusSeconds(1))),
+            NOW,
+            NOW.plusSeconds(1)
+        );
+
+        messages.save(message);
+
+        assertThat(messages.findById(message.id()))
+            .contains(message);
+        assertThat(readModels.readModels(target(), null, 10).messages())
+            .singleElement()
+            .satisfies(readModel -> {
+                assertThat(readModel.id()).isEqualTo(message.id());
+                assertThat(readModel.pinned()).isTrue();
+                assertThat(readModel.edited()).isTrue();
+                assertThat(readModel.deleted()).isFalse();
+                assertThat(readModel.mentions()).containsExactly(roleId.toString());
+            });
+    }
+
+    @Test
+    void searchExcludesDeletedMessages() {
+        Message visible = messageAt(target(), "moderation search live", NOW.plusSeconds(1));
+        Message deleted = new Message(
+            UUID.randomUUID(),
+            new UserMessageAuthor(ownerId),
+            target(),
+            new MessageContent("moderation search deleted"),
+            List.of(),
+            false,
+            true,
+            List.of(),
+            NOW.plusSeconds(2),
+            NOW.plusSeconds(2)
+        );
+        messages.save(visible);
+        messages.save(deleted);
+
+        assertThat(search.search(target(), "moderation", 10))
+            .extracting(Message::id)
+            .containsExactly(visible.id());
+        assertThat(readModels.searchModels(target(), "moderation", 10))
+            .extracting(MessageReadModel::id)
+            .containsExactly(visible.id());
+    }
+
+    @Test
     void ignoresExpiredIdempotencyKeys() throws Exception {
         Message message = message("ttl message", List.of());
         IdempotencyKey idempotencyKey = new IdempotencyKey("send-" + UUID.randomUUID());
@@ -319,6 +402,21 @@ class JdbcMessageStoreTest {
 
     private ChannelMessageTarget target() {
         return new ChannelMessageTarget(guildId, channelId);
+    }
+
+    private Message messageAt(ChannelMessageTarget target, String content, Instant createdAt) {
+        return new Message(
+            UUID.randomUUID(),
+            new UserMessageAuthor(ownerId),
+            target,
+            new MessageContent(content),
+            List.of(),
+            false,
+            false,
+            List.of(),
+            createdAt,
+            createdAt
+        );
     }
 
     private void expireIdempotencyKey(IdempotencyKey idempotencyKey) throws Exception {
@@ -411,6 +509,17 @@ class JdbcMessageStoreTest {
             channel.setObject(1, channelId);
             channel.setObject(2, guildId);
             channel.setString(3, "general");
+            channel.setString(4, "GUILD_TEXT");
+            channel.executeUpdate();
+        }
+    }
+
+    private void insertChannel(UUID id, String name) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var channel = connection.prepareStatement("INSERT INTO channels(id, guild_id, name, type) VALUES (?, ?, ?, ?)")) {
+            channel.setObject(1, id);
+            channel.setObject(2, guildId);
+            channel.setString(3, name);
             channel.setString(4, "GUILD_TEXT");
             channel.executeUpdate();
         }

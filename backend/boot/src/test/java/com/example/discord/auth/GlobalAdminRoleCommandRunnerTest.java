@@ -11,19 +11,50 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.lang.reflect.Constructor;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.test.context.ActiveProfiles;
 
+@SpringBootTest
+@ActiveProfiles("postgres")
+@EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
 class GlobalAdminRoleCommandRunnerTest {
-    private final InMemoryAuthStore store = new InMemoryAuthStore();
+    @Autowired
+    private AuthStore store;
+
+    @Autowired
+    private DataSource dataSource;
+
     private UUID userId;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM invite_acceptances");
+            statement.executeUpdate("DELETE FROM invite_role_grants");
+            statement.executeUpdate("DELETE FROM invites");
+            statement.executeUpdate("DELETE FROM channel_role_overwrites");
+            statement.executeUpdate("DELETE FROM guild_member_roles");
+            statement.executeUpdate("DELETE FROM channels");
+            statement.executeUpdate("DELETE FROM guild_roles");
+            statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM guilds");
+            statement.executeUpdate("DELETE FROM auth_refresh_sessions");
+            statement.executeUpdate("DELETE FROM auth_revoked_access_tokens");
+            statement.executeUpdate("DELETE FROM user_global_role_audit_log");
+            statement.executeUpdate("DELETE FROM user_global_roles");
+            statement.executeUpdate("DELETE FROM auth_accounts");
+            statement.executeUpdate("DELETE FROM users");
+        }
+
         userId = UUID.randomUUID();
         UserProfile profile = UserProfile.create(
             userId,

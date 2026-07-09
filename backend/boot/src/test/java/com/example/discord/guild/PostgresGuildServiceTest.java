@@ -48,7 +48,7 @@ class PostgresGuildServiceTest {
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
         insertUser(memberId, "member" + memberId.toString().substring(0, 8), "Member");
 
-        InMemoryGuildService service = new PersistentGuildService(snapshots);
+        PersistentGuildService service = new PersistentGuildService(snapshots);
         Guild guild = service.createGuild("Persisted Guild", ownerId);
         Channel channel = service.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
         Role manager = service.createRole(
@@ -59,8 +59,13 @@ class PostgresGuildServiceTest {
         service.addMember(guild.id(), memberId);
         service.assignRoleToMember(guild.id(), memberId, manager.id());
 
-        InMemoryGuildService reloaded = new PersistentGuildService(snapshots);
+        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
 
+        assertThat(guild.name()).isEqualTo("Persisted Guild");
+        assertThat(guild.ownerId()).isEqualTo(ownerId);
+        assertThat(guild.members()).extracting(GuildMember::userId).containsExactly(ownerId, memberId);
+        assertThat(guild.everyoneRole().name()).isEqualTo("@everyone");
+        assertThat(guild.member(ownerId).roleIds()).contains(guild.everyoneRole().id());
         assertThat(reloaded.guildIdsForMember(ownerId)).containsExactly(guild.id());
         assertThat(reloaded.guildIdsForMember(memberId)).containsExactly(guild.id());
         assertThat(reloaded.channel(guild.id(), channel.id()).name()).isEqualTo("general");
@@ -68,6 +73,57 @@ class PostgresGuildServiceTest {
             .extracting(Role::name)
             .contains("@everyone", "manager");
         assertThat(reloaded.canManageChannels(guild.id(), memberId)).isTrue();
+    }
+
+    @Test
+    void filtersVisibleChannelsUsingPersistedEffectiveViewChannelPermission() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
+
+        PersistentGuildService service = new PersistentGuildService(snapshots);
+        Guild guild = service.createGuild("Persisted Guild", ownerId);
+        Channel general = service.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        Channel staff = service.createChannel(guild.id(), "staff", ChannelType.GUILD_TEXT, null);
+
+        service.assignRolePermissions(guild.id(), guild.everyoneRole().id(), PermissionSet.empty().grant(Permission.VIEW_CHANNEL));
+        service.addChannelRoleOverwrite(
+            guild.id(),
+            staff.id(),
+            guild.everyoneRole().id(),
+            PermissionSet.empty(),
+            PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
+        );
+
+        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
+
+        assertThat(reloaded.visibleChannels(guild.id(), ownerId)).extracting(Channel::id)
+            .containsExactly(general.id());
+    }
+
+    @Test
+    void administratorRoleSeesPersistedChannelEvenWhenEveryoneDenied() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
+
+        PersistentGuildService service = new PersistentGuildService(snapshots);
+        Guild guild = service.createGuild("Persisted Guild", ownerId);
+        Channel adminOnly = service.createChannel(guild.id(), "admin-only", ChannelType.GUILD_TEXT, null);
+        Role adminRole = service.createRole(guild.id(), "admin");
+
+        service.assignRolePermissions(guild.id(), adminRole.id(), PermissionSet.empty().grant(Permission.ADMINISTRATOR));
+        service.assignRoleToMember(guild.id(), ownerId, adminRole.id());
+        service.addChannelRoleOverwrite(
+            guild.id(),
+            adminOnly.id(),
+            guild.everyoneRole().id(),
+            PermissionSet.empty(),
+            PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
+        );
+
+        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
+
+        assertThat(reloaded.visibleChannels(guild.id(), ownerId)).extracting(Channel::id)
+            .containsExactly(adminOnly.id());
     }
 
     private void insertUser(UUID id, String username, String displayName) throws Exception {

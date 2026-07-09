@@ -437,8 +437,8 @@ class JdbcMessageStore implements
                      claim_token = NULL,
                      claimed_at = NULL,
                      claim_expires_at = CASE
-                         WHEN attempts + 1 >= ? THEN NULL
-                         ELSE ?
+                         WHEN attempts + 1 >= ? THEN NULL::TIMESTAMPTZ
+                         ELSE ?::TIMESTAMPTZ
                      END
                  WHERE event_id = ?
                    AND claim_token = ?
