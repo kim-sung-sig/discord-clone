@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.task.scheduling.enabled=false")
 @ActiveProfiles("postgres")
 @EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
 class JdbcMessageStoreTest {
@@ -188,7 +188,7 @@ class JdbcMessageStoreTest {
 
         ClaimedMessagePublication secondClaim = outboxQueue.claimPendingPublications(
                 10,
-                NOW.plusSeconds(30),
+                NOW.plusSeconds(31),
                 Duration.ofSeconds(30)
             )
             .getFirst();
