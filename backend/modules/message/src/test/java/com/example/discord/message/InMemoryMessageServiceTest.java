@@ -201,42 +201,6 @@ class InMemoryMessageServiceTest {
             .isEqualTo(event);
     }
 
-    @Test
-    void pendingPublicationIsNotClaimedAgainUntilClaimLeaseExpires() {
-        InMemoryMessageService service = service();
-        Message message = new Message(
-            UUID.randomUUID(),
-            new UserMessageAuthor(AUTHOR_ID),
-            new ChannelMessageTarget(GUILD_ID, CHANNEL_ID),
-            new MessageContent("lease me"),
-            List.of(),
-            false,
-            false,
-            List.of(),
-            Instant.parse("2026-05-13T00:00:00Z"),
-            Instant.parse("2026-05-13T00:00:00Z")
-        );
-        MessagePublished event = new MessagePublished(
-            UUID.randomUUID(),
-            message.id(),
-            message.author(),
-            message.target(),
-            message.mentions(),
-            "correlation-lease",
-            message.createdAt()
-        );
-        service.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
-        Instant firstClaim = Instant.parse("2026-05-13T00:00:10Z");
-
-        service.claimPendingPublications(1, firstClaim, Duration.ofSeconds(30));
-
-        assertThat(service.claimPendingPublications(1, firstClaim.plusSeconds(29), Duration.ofSeconds(30))).isEmpty();
-        assertThat(service.claimPendingPublications(1, firstClaim.plusSeconds(30), Duration.ofSeconds(30)))
-            .singleElement()
-            .extracting(ClaimedMessagePublication::event)
-            .isEqualTo(event);
-    }
-
     private static InMemoryMessageService service() {
         AtomicInteger ticks = new AtomicInteger();
         Clock clock = new IncrementingClock(Instant.parse("2026-05-13T00:00:00Z"), ticks);

@@ -163,6 +163,41 @@ class JdbcMessageStoreTest {
     }
 
     @Test
+    void claimLeasePreventsDuplicateClaimsUntilItExpires() throws Exception {
+        Message message = message("lease me", List.of());
+        MessagePublished event = new MessagePublished(
+            UUID.randomUUID(),
+            message.id(),
+            message.author(),
+            message.target(),
+            message.mentions(),
+            "correlation-lease",
+            NOW
+        );
+        publications.savePublished(message, new IdempotencyKey("send-" + UUID.randomUUID()), event);
+
+        ClaimedMessagePublication firstClaim = outboxQueue.claimPendingPublications(
+                10,
+                NOW,
+                Duration.ofSeconds(30)
+            )
+            .getFirst();
+
+        assertThat(firstClaim.event()).isEqualTo(event);
+        assertThat(outboxQueue.claimPendingPublications(10, NOW.plusSeconds(29), Duration.ofSeconds(30))).isEmpty();
+
+        ClaimedMessagePublication secondClaim = outboxQueue.claimPendingPublications(
+                10,
+                NOW.plusSeconds(30),
+                Duration.ofSeconds(30)
+            )
+            .getFirst();
+
+        assertThat(secondClaim.event()).isEqualTo(event);
+        assertThat(secondClaim.claimToken()).isNotEqualTo(firstClaim.claimToken());
+    }
+
+    @Test
     void listsAndRequeuesDeadLetterPublications() throws Exception {
         Message message = message("dead letter replay", List.of(new SpecialMentionTarget(SpecialMentionKind.HERE)));
         MessagePublished event = new MessagePublished(

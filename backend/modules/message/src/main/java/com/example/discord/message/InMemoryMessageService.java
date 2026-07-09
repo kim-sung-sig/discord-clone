@@ -41,7 +41,6 @@ public class InMemoryMessageService
     private final Map<IdempotencyScope, UUID> messageIdsByIdempotency = new LinkedHashMap<>();
     private final Map<UUID, MessagePublished> pendingPublications = new LinkedHashMap<>();
     private final Map<UUID, UUID> publicationClaimTokens = new LinkedHashMap<>();
-    private final Map<UUID, Instant> publicationClaimExpiresAt = new LinkedHashMap<>();
     private final Map<UUID, Integer> publicationAttempts = new LinkedHashMap<>();
     private final Map<UUID, String> publicationLastErrors = new LinkedHashMap<>();
     private final Map<UUID, Instant> publicationRetryAfter = new LinkedHashMap<>();
@@ -113,13 +112,12 @@ public class InMemoryMessageService
         Objects.requireNonNull(claimedAt, "claimedAt must not be null");
         Objects.requireNonNull(lease, "lease must not be null");
         return pendingPublications.values().stream()
-            .filter(event -> !hasActiveClaim(event.eventId(), claimedAt))
+            .filter(event -> !publicationClaimTokens.containsKey(event.eventId()))
             .filter(event -> eligibleForRetry(event, claimedAt))
             .limit(pageSize(limit))
             .map(event -> {
                 UUID claimToken = UUID.randomUUID();
                 publicationClaimTokens.put(event.eventId(), claimToken);
-                publicationClaimExpiresAt.put(event.eventId(), claimedAt.plus(lease));
                 return new ClaimedMessagePublication(event, claimToken);
             })
             .toList();
@@ -135,7 +133,6 @@ public class InMemoryMessageService
         }
         pendingPublications.remove(eventId);
         publicationClaimTokens.remove(eventId);
-        publicationClaimExpiresAt.remove(eventId);
         publicationRetryAfter.remove(eventId);
     }
 
@@ -153,7 +150,6 @@ public class InMemoryMessageService
         Objects.requireNonNull(retryDelay, "retryDelay must not be null");
         if (claimToken.equals(publicationClaimTokens.get(eventId))) {
             publicationClaimTokens.remove(eventId);
-            publicationClaimExpiresAt.remove(eventId);
             int attempts = publicationAttempts.merge(eventId, 1, Integer::sum);
             String lastError = errorMessage == null ? "" : errorMessage;
             publicationLastErrors.put(eventId, lastError);
@@ -198,11 +194,6 @@ public class InMemoryMessageService
         publicationRetryAfter.remove(eventId);
         pendingPublications.put(eventId, deadLetter.event());
         return true;
-    }
-
-    private boolean hasActiveClaim(UUID eventId, Instant claimedAt) {
-        Instant claimExpiresAt = publicationClaimExpiresAt.get(eventId);
-        return claimExpiresAt != null && claimExpiresAt.isAfter(claimedAt);
     }
 
     private boolean eligibleForRetry(MessagePublished event, Instant claimedAt) {
