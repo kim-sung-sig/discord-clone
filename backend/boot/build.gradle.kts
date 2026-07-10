@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":backend:modules:invite"))
     implementation(project(":backend:modules:message"))
     implementation(project(":backend:modules:moderation"))
+    implementation(project(":backend:modules:notification"))
     implementation(project(":backend:modules:permission"))
     implementation(project(":backend:modules:presence"))
     implementation(project(":backend:modules:social"))

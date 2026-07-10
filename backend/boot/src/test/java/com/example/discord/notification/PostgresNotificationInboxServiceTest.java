@@ -2,15 +2,26 @@ package com.example.discord.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.discord.channel.ChannelType;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
-class InMemoryNotificationInboxServiceTest {
+@SpringBootTest
+@ActiveProfiles("postgres")
+@EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
+class PostgresNotificationInboxServiceTest {
     private static final UUID GUILD_ID = UUID.fromString("00000000-0000-0000-0000-000000000431");
     private static final UUID CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000432");
     private static final UUID MESSAGE_ID = UUID.fromString("00000000-0000-0000-0000-000000000433");
@@ -19,8 +30,33 @@ class InMemoryNotificationInboxServiceTest {
     private static final UUID HIDDEN_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000436");
     private static final Instant NOW = Instant.parse("2026-05-18T00:00:00Z");
 
-    private final InMemoryNotificationInboxService service =
-        new InMemoryNotificationInboxService(Clock.fixed(NOW, ZoneOffset.UTC));
+    private JdbcNotificationInboxService service;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @BeforeEach
+    void cleanAndSeed() throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM notification_items");
+            statement.executeUpdate("DELETE FROM notification_preferences");
+            statement.executeUpdate("DELETE FROM premium_entitlements");
+            statement.executeUpdate("DELETE FROM channel_role_overwrites");
+            statement.executeUpdate("DELETE FROM guild_member_roles");
+            statement.executeUpdate("DELETE FROM channels");
+            statement.executeUpdate("DELETE FROM guild_roles");
+            statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM guilds");
+            statement.executeUpdate("DELETE FROM auth_accounts");
+            statement.executeUpdate("DELETE FROM users");
+        }
+        insertUser(AUTHOR_ID, "author");
+        insertUser(VISIBLE_USER_ID, "visible");
+        insertUser(HIDDEN_USER_ID, "hidden");
+        insertGuildAndChannel();
+        service = new JdbcNotificationInboxService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
 
     @Test
     void createsMentionOnlyForVisibleMentionedRecipients() {
@@ -85,5 +121,37 @@ class InMemoryNotificationInboxServiceTest {
             .filteredOn(NotificationItem::read)
             .extracting(NotificationItem::sequence)
             .containsExactly(11L);
+    }
+
+    private void insertUser(UUID id, String username) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 INSERT INTO users(id, username, display_name, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 """)) {
+            Timestamp createdAt = Timestamp.from(Instant.parse("2026-01-01T00:00:00Z"));
+            statement.setObject(1, id);
+            statement.setString(2, username);
+            statement.setString(3, username);
+            statement.setTimestamp(4, createdAt);
+            statement.setTimestamp(5, createdAt);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertGuildAndChannel() throws Exception {
+        try (var connection = dataSource.getConnection();
+             var guild = connection.prepareStatement("INSERT INTO guilds(id, name, owner_id) VALUES (?, ?, ?)");
+             var channel = connection.prepareStatement("INSERT INTO channels(id, guild_id, name, type) VALUES (?, ?, ?, ?)")) {
+            guild.setObject(1, GUILD_ID);
+            guild.setString(2, "notifications");
+            guild.setObject(3, AUTHOR_ID);
+            guild.executeUpdate();
+            channel.setObject(1, CHANNEL_ID);
+            channel.setObject(2, GUILD_ID);
+            channel.setString(3, "general");
+            channel.setString(4, ChannelType.GUILD_TEXT.name());
+            channel.executeUpdate();
+        }
     }
 }
