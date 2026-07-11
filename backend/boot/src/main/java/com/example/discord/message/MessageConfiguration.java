@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Configuration
 class MessageConfiguration {
     @Bean
-    @Profile("!postgres & !production & !admin-cli")
+    @Profile("test")
     InMemoryMessageService inMemoryMessageService() {
         return new InMemoryMessageService();
     }
