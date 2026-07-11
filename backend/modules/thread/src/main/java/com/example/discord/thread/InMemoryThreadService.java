@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-public final class InMemoryThreadService {
+public final class InMemoryThreadService implements ThreadService {
     private final Clock clock;
     private final Map<UUID, ThreadChannel> threads = new LinkedHashMap<>();
     private final Map<UUID, ForumTag> forumTags = new LinkedHashMap<>();

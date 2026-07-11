@@ -23,12 +23,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 class ThreadController {
-    private final InMemoryThreadService threadService;
+    private final ThreadService threadService;
     private final InMemoryGuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ThreadController(
-        InMemoryThreadService threadService,
+        ThreadService threadService,
         InMemoryGuildService guildService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
