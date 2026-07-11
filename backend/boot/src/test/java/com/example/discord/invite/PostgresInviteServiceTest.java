@@ -29,9 +29,6 @@ class PostgresInviteServiceTest {
     private static final Instant NOW = Instant.parse("2026-05-13T00:00:00Z");
 
     @Autowired
-    private InviteSnapshotStore snapshots;
-
-    @Autowired
     private DataSource dataSource;
 
     private UUID ownerId;
@@ -65,13 +62,34 @@ class PostgresInviteServiceTest {
     }
 
     @Test
+    void jdbcServiceClaimsMaxUsesAtomicallyAcrossInstances() throws Exception {
+        JdbcInviteService writer = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
+        Invite invite = writer.create(new CreateInviteCommand(guildId, channelId, ownerId, 0, 1, false, List.of()));
+        UUID secondMemberId = UUID.randomUUID();
+        insertUser(secondMemberId, "member" + secondMemberId.toString().substring(0, 8));
+        AtomicInteger accepted = new AtomicInteger();
+
+        for (UUID acceptor : List.of(memberId, secondMemberId)) {
+            try {
+                new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC)).accept(invite.code(), acceptor);
+                accepted.incrementAndGet();
+            } catch (InviteMaxUsesExceededException ignored) {
+                // Exactly one distinct member may claim this invite.
+            }
+        }
+
+        assertThat(accepted).hasValue(1);
+        assertThat(new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC)).preview(invite.code()).uses()).isEqualTo(1);
+    }
+
+    @Test
     void persistsInvitesAndReloadsAcceptedMembersAndDeletion() {
-        PersistentInviteService service = new PersistentInviteService(snapshots, java.time.Clock.systemUTC());
+        JdbcInviteService service = new JdbcInviteService(dataSource, java.time.Clock.systemUTC());
         Invite created = service.create(new CreateInviteCommand(guildId, channelId, ownerId, 0, 5, false, java.util.List.of()));
         service.accept(created.code(), memberId);
         service.delete(created.code());
 
-        PersistentInviteService reloaded = new PersistentInviteService(snapshots, java.time.Clock.systemUTC());
+        JdbcInviteService reloaded = new JdbcInviteService(dataSource, java.time.Clock.systemUTC());
         Invite invite = reloaded.get(created.code());
 
         assertThat(invite.uses()).isEqualTo(1);
@@ -82,11 +100,11 @@ class PostgresInviteServiceTest {
     @Test
     void rejectsExpiredPersistedInviteAccept() {
         MutableClock clock = new MutableClock(NOW);
-        PersistentInviteService service = new PersistentInviteService(snapshots, clock);
+        JdbcInviteService service = new JdbcInviteService(dataSource, clock);
         Invite invite = service.create(new CreateInviteCommand(guildId, channelId, ownerId, 60, 0, false, List.of()));
 
         clock.advanceSeconds(61);
-        PersistentInviteService reloaded = new PersistentInviteService(snapshots, clock);
+        JdbcInviteService reloaded = new JdbcInviteService(dataSource, clock);
 
         assertThatThrownBy(() -> reloaded.accept(invite.code(), UUID.randomUUID()))
             .isInstanceOf(InviteExpiredException.class);
@@ -94,7 +112,7 @@ class PostgresInviteServiceTest {
 
     @Test
     void enforcesPersistedMaxUsesUnderConcurrentAccepts() throws Exception {
-        PersistentInviteService service = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService service = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
         Invite invite = service.create(new CreateInviteCommand(guildId, channelId, ownerId, 0, 1, false, List.of()));
         List<UUID> acceptorIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         insertUser(acceptorIds.get(0), "acceptor" + acceptorIds.get(0).toString().substring(0, 8));
@@ -126,7 +144,7 @@ class PostgresInviteServiceTest {
             }
         }
 
-        PersistentInviteService reloaded = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService reloaded = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThat(accepted).hasValue(1);
         assertThat(reloaded.preview(invite.code()).uses()).isEqualTo(1);
@@ -134,12 +152,12 @@ class PostgresInviteServiceTest {
 
     @Test
     void sameMemberPersistedAcceptIsIdempotentAndDoesNotConsumeAdditionalUse() {
-        PersistentInviteService service = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService service = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
         Invite invite = service.create(new CreateInviteCommand(guildId, channelId, ownerId, 0, 1, false, List.of()));
 
         InviteAcceptResult first = service.accept(invite.code(), memberId);
         InviteAcceptResult second = service.accept(invite.code(), memberId);
-        PersistentInviteService reloaded = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService reloaded = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThat(first.alreadyAccepted()).isFalse();
         assertThat(second.alreadyAccepted()).isTrue();
@@ -148,11 +166,11 @@ class PostgresInviteServiceTest {
 
     @Test
     void rejectsDeletedPersistedInviteReuse() {
-        PersistentInviteService service = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService service = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
         Invite invite = service.create(new CreateInviteCommand(guildId, channelId, ownerId, 0, 0, false, List.of()));
 
         service.delete(invite.code());
-        PersistentInviteService reloaded = new PersistentInviteService(snapshots, Clock.fixed(NOW, ZoneOffset.UTC));
+        JdbcInviteService reloaded = new JdbcInviteService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThatThrownBy(() -> reloaded.accept(invite.code(), UUID.randomUUID()))
             .isInstanceOf(InviteDeletedException.class);
