@@ -26,13 +26,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 class ExpressionController {
-    private final InMemoryExpressionService expressionService;
+    private final ExpressionService expressionService;
     private final InMemoryGuildService guildService;
     private final MessageLookupPort messageLookup;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ExpressionController(
-        InMemoryExpressionService expressionService,
+        ExpressionService expressionService,
         InMemoryGuildService guildService,
         MessageLookupPort messageLookup,
         AuthenticatedUserResolver authenticatedUserResolver
