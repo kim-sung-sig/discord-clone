@@ -55,8 +55,9 @@ class PostgresExpressionServiceTest {
 
         CustomEmoji emoji = service.createCustomEmoji(GUILD_ID, "shipit_2026", "emoji/shipit.png", USER_ID);
         Sticker sticker = service.createSticker(GUILD_ID, "approved", "approved sticker", USER_ID);
-        assertThat(service.customEmojis(GUILD_ID)).extracting(CustomEmoji::id).containsExactly(emoji.id());
-        assertThat(service.stickers(GUILD_ID)).extracting(Sticker::id).containsExactly(sticker.id());
+        JdbcExpressionService reader = new JdbcExpressionService(dataSource);
+        assertThat(reader.customEmojis(GUILD_ID)).extracting(CustomEmoji::id).containsExactly(emoji.id());
+        assertThat(reader.stickers(GUILD_ID)).extracting(Sticker::id).containsExactly(sticker.id());
         assertThatThrownBy(() -> service.createCustomEmoji(GUILD_ID, "bad name", "emoji/shipit.png", USER_ID))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("emoji name");
     }

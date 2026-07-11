@@ -5,14 +5,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -21,6 +30,32 @@ import org.springframework.test.web.servlet.MvcResult;
 class ExpressionControllerTest {
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private ExpressionService expressionService;
+
+    private final List<Sticker> stickers = new ArrayList<>();
+    private final Set<UUID> reactionUsers = new LinkedHashSet<>();
+
+    @BeforeEach
+    void setUpExpressionService() {
+        doAnswer(invocation -> new CustomEmoji(
+            UUID.randomUUID(), invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2), invocation.getArgument(3)
+        )).when(expressionService).createCustomEmoji(any(), any(), any(), any());
+        doAnswer(invocation -> {
+            Sticker sticker = new Sticker(UUID.randomUUID(), invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2), invocation.getArgument(3));
+            stickers.add(sticker);
+            return sticker;
+        }).when(expressionService).createSticker(any(), any(), any(), any());
+        when(expressionService.stickers(any())).thenAnswer(invocation -> List.copyOf(stickers));
+        doAnswer(invocation -> {
+            reactionUsers.add(invocation.getArgument(3));
+            return null;
+        }).when(expressionService).addReaction(any(), any(), any(), any());
+        when(expressionService.reactionSummaries(any(), any())).thenAnswer(invocation ->
+            List.of(new ReactionSummary("wave", reactionUsers.size(), Set.copyOf(reactionUsers)))
+        );
+    }
 
     @Test
     void customEmojiCreationRequiresManageExpressions() throws Exception {
