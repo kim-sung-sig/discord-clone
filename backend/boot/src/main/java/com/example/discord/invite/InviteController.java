@@ -27,13 +27,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 class InviteController {
-    private final InMemoryInviteService inviteService;
+    private final InviteService inviteService;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     InviteController(
-        InMemoryInviteService inviteService,
+        InviteService inviteService,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
