@@ -12,12 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import javax.sql.DataSource;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Repository;
-
-@Repository
-@Profile("postgres")
-class JdbcThreadService {
+class JdbcThreadService implements ThreadService {
     private final DataSource dataSource;
     private final Clock clock;
 
@@ -26,7 +21,7 @@ class JdbcThreadService {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    ThreadChannel createThread(CreateThreadCommand command) {
+    public ThreadChannel createThread(CreateThreadCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         require(command.guildId(), "guildId must not be null");
         require(command.parentChannelId(), "parentChannelId must not be null");
@@ -45,7 +40,7 @@ class JdbcThreadService {
         } catch (SQLException exception) { throw new IllegalStateException("failed to create thread", exception); }
     }
 
-    ForumTag createForumTag(UUID guildId, UUID forumChannelId, String name) {
+    public ForumTag createForumTag(UUID guildId, UUID forumChannelId, String name) {
         require(guildId, "guildId must not be null"); require(forumChannelId, "forumChannelId must not be null");
         ForumTag tag = new ForumTag(UUID.randomUUID(), guildId, forumChannelId, text(name, "forum tag name is required"));
         try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement(
@@ -55,7 +50,7 @@ class JdbcThreadService {
         } catch (SQLException exception) { throw new IllegalStateException("failed to create forum tag", exception); }
     }
 
-    ForumPost createForumPost(CreateForumPostCommand command) {
+    public ForumPost createForumPost(CreateForumPostCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         require(command.guildId(), "guildId must not be null"); require(command.forumChannelId(), "forumChannelId must not be null"); require(command.authorId(), "authorId must not be null");
         if (command.tagIds() == null || command.tagIds().isEmpty()) throw new IllegalArgumentException("forum post requires at least one allowed tag");
@@ -73,7 +68,7 @@ class JdbcThreadService {
         } catch (SQLException exception) { throw new IllegalStateException("failed to create forum post", exception); }
     }
 
-    ThreadWriteReceipt write(ThreadWriteCommand command) {
+    public ThreadWriteReceipt write(ThreadWriteCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         ThreadChannel thread = thread(command.guildId(), command.threadId());
         if (thread.archived()) throw new IllegalStateException("archived thread cannot receive writes");
@@ -85,16 +80,16 @@ class JdbcThreadService {
         } catch (SQLException exception) { throw new IllegalStateException("failed to write thread message", exception); }
     }
 
-    ThreadChannel archive(UUID guildId, UUID threadId) { return updateThread(thread(guildId, threadId), true, null); }
-    ThreadChannel reopen(UUID guildId, UUID threadId) { Instant now = clock.instant(); return updateThread(thread(guildId, threadId), false, now); }
-    ThreadChannel thread(UUID guildId, UUID threadId) {
+    public ThreadChannel archive(UUID guildId, UUID threadId) { return updateThread(thread(guildId, threadId), true, null); }
+    public ThreadChannel reopen(UUID guildId, UUID threadId) { Instant now = clock.instant(); return updateThread(thread(guildId, threadId), false, now); }
+    public ThreadChannel thread(UUID guildId, UUID threadId) {
         require(guildId, "guildId must not be null"); require(threadId, "threadId must not be null");
         try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement("SELECT * FROM threads WHERE id = ? AND guild_id = ?")) {
             statement.setObject(1, threadId); statement.setObject(2, guildId); try (ResultSet result = statement.executeQuery()) { if (!result.next()) throw new ThreadNotFoundException(); return thread(result); }
         } catch (SQLException exception) { throw new IllegalStateException("failed to read thread", exception); }
     }
 
-    int archiveExpired() {
+    public int archiveExpired() {
         Instant now = clock.instant(); List<ThreadChannel> expired = new ArrayList<>();
         try (Connection connection = dataSource.getConnection(); PreparedStatement statement = connection.prepareStatement("SELECT * FROM threads WHERE archived = FALSE AND last_activity_at + (auto_archive_minutes * INTERVAL '1 minute') <= ?")) {
             statement.setTimestamp(1, Timestamp.from(now)); try (ResultSet result = statement.executeQuery()) { while (result.next()) expired.add(thread(result)); }
