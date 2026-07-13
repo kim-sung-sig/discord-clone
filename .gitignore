@@ -20,6 +20,7 @@ qa/artifacts/
 
 .bkit/
 .serena/
+.claude/*.local.md
 .codex/config.toml
 .idea/
 .playwright-mcp/
