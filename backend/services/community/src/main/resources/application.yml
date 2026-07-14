@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: community-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

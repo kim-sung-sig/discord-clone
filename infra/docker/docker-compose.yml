@@ -1,6 +1,93 @@
 name: discord-clone
 
 services:
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "18080:8080"
+    volumes:
+      - ../gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      message-service:
+        condition: service_healthy
+      websocket-service:
+        condition: service_healthy
+      community-service:
+        condition: service_healthy
+
+  identity-service:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: backend:services:identity
+        SERVICE_PATH: identity
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-source:5432/discord_identity
+    ports:
+      - "18081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  message-service:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: backend:services:message
+        SERVICE_PATH: message
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-source:5432/discord_message
+    ports:
+      - "18082:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  websocket-service:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: backend:services:websocket
+        SERVICE_PATH: websocket
+    environment:
+      SERVER_PORT: "8080"
+    ports:
+      - "18083:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  community-service:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: backend:services:community
+        SERVICE_PATH: community
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-source:5432/discord_community
+    ports:
+      - "18084:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   postgres-source:
     image: postgres:16-alpine
     environment:

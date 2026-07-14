@@ -15,6 +15,10 @@ dependencyResolutionManagement {
 rootProject.name = "discord-clone"
 
 include(":backend:boot")
+include(":backend:services:identity")
+include(":backend:services:message")
+include(":backend:services:websocket")
+include(":backend:services:community")
 include(":backend:modules:identity")
 include(":backend:modules:channel")
 include(":backend:modules:guild")
@@ -37,6 +41,10 @@ include(":backend:modules:voice")
 include(":backend:shared:common")
 
 project(":backend:boot").projectDir = file("backend/boot")
+project(":backend:services:identity").projectDir = file("backend/services/identity")
+project(":backend:services:message").projectDir = file("backend/services/message")
+project(":backend:services:websocket").projectDir = file("backend/services/websocket")
+project(":backend:services:community").projectDir = file("backend/services/community")
 project(":backend:modules:identity").projectDir = file("backend/modules/identity")
 project(":backend:modules:channel").projectDir = file("backend/modules/channel")
 project(":backend:modules:guild").projectDir = file("backend/modules/guild")
