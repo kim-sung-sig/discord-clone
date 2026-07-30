@@ -40,7 +40,7 @@ qa/verify-jwt-kubernetes-config.sh --server-dry-run
 
 ## 키 순환
 
-1. 새 공개키와 새 `kid`를 ConfigMap에 배포한다.
-2. identity-service의 활성 `kid`를 새 값으로 변경한다.
+1. 새 공개키와 새 `kid`를 기존 키와 함께 ConfigMap에 배포하고, 모든 JWT consumer와 identity-service를 rollout한다.
+2. identity-service의 활성 `kid`를 새 값으로 변경하고 identity-service를 rollout한다.
 3. access-token TTL이 끝날 때까지 기다린다.
-4. 이전 공개키와 이전 `kid`를 ConfigMap에서 제거한다.
+4. 이전 공개키와 이전 `kid`를 ConfigMap에서 제거하고 모든 JWT consumer를 rollout한다.
