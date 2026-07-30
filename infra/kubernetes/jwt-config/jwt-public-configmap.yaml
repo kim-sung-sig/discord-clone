@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: discord-jwt-public-config
+data:
+  discord.auth.jwt.issuer: discord-identity
+  discord.auth.jwt.audience: discord-api
+  discord.auth.jwt.key-id: replace-before-deploy
+  discord.auth.jwt.private-key-location: file:/etc/discord-secret/jwt-private.pem
+  discord.auth.jwt.public-key-locations.replace-before-deploy: file:/etc/discord-config/jwt-public.pem
+  jwt-public.pem: |-
+    -----BEGIN PUBLIC KEY-----
+    REPLACE_BEFORE_DEPLOY
+    -----END PUBLIC KEY-----

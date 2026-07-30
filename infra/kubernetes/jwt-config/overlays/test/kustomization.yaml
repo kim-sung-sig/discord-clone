@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: discord-jwt-public-config
+    literals:
+      - discord.auth.jwt.issuer=discord-identity
+      - discord.auth.jwt.audience=discord-api
+      - discord.auth.jwt.key-id=test-ed25519
+      - discord.auth.jwt.private-key-location=file:/etc/discord-secret/jwt-private.pem
+      - discord.auth.jwt.public-key-locations.test-ed25519=file:/etc/discord-config/jwt-public.pem
+    files:
+      - jwt-public.pem=jwt-public.pem

@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:configtree:${DISCORD_JWT_CONFIG_TREE:/etc/discord-config/}
   application:
     name: message-service
 management:

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: identity-service
+          volumeMounts:
+            - name: discord-jwt-public-config
+              mountPath: /etc/discord-config
+              readOnly: true
+            - name: discord-identity-jwt-private-key
+              mountPath: /etc/discord-secret
+              readOnly: true
+      volumes:
+        - name: discord-jwt-public-config
+          configMap:
+            name: discord-jwt-public-config
+        - name: discord-identity-jwt-private-key
+          secret:
+            secretName: discord-identity-jwt-private-key

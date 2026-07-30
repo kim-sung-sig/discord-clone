@@ -54,10 +54,21 @@ flowchart LR
 
 ## 검증 게이트
 
-- `qa/verify-jwt-kubernetes-config.sh`는 모든 manifest를 render하고 잘못된 private-key 배치를 거부한다.
-- `kubectl` 사용 가능 시 `kubectl kustomize infra/kubernetes/jwt-config`가 성공한다.
-- 선택적 cluster gate: `kubectl apply --dry-run=server -k infra/kubernetes/jwt-config`.
+- `qa/verify-jwt-kubernetes-config.sh`는 test overlay를 render하고 mount/Secret text 계약을 검사해 잘못된 private-key 배치를 거부한다.
+- `kubectl` 사용 가능 시 test overlay의 `kubectl kustomize infra/kubernetes/jwt-config/overlays/test`가 성공한다.
+- 선택적 cluster gate: `kubectl apply --dry-run=server -k infra/kubernetes/jwt-config/overlays/test`.
 - 기존 Ed25519 Gradle regression gate는 계속 green이어야 한다.
+
+base ConfigMap은 배포 전 template이며 placeholder를 의도적으로 포함한다. `overlays/test`만 공개 Ed25519 테스트키와 `kid=test-ed25519`로 이를 교체해 결정적 검증 대상으로 사용한다. 어느 쪽도 private key나 Secret 값을 포함하지 않는다.
+
+배포 전에는 실제 공개키와 활성 `kid`로 template placeholder를 교체하고 다음 순서로 검증한다.
+
+```bash
+qa/verify-jwt-kubernetes-config.sh
+qa/verify-jwt-kubernetes-config.sh --server-dry-run # 선택한 클러스터가 있을 때만
+```
+
+키 순환 순서는 고정한다: 새 공개키와 `kid` 배포 → identity-service 활성 `kid` 변경 → access-token TTL 대기 → 이전 공개키와 `kid` 제거.
 
 ## 리뷰 점수 기준
 

@@ -131,30 +131,35 @@ Expected: ConfigMap YAML render 성공.
 
 - [ ] **Step 1: 실패하는 manifest 보안 검사 작성**
 
-스크립트는 `jwt-public-configmap.yaml`에서 다음을 검사한다.
+스크립트는 test overlay로 렌더한 ConfigMap의 private-key marker와 배포 전 placeholder, Secret 참조 템플릿의 Secret 값 블록을 분리해 검사한다. base ConfigMap은 배포 전 template이므로 이 검증 대상이 아니다.
 
 ```bash
-rg -q 'PRIVATE KEY|^\s*(data|stringData):' infra/kubernetes/jwt-config/jwt-public-configmap.yaml
+kubectl kustomize infra/kubernetes/jwt-config/overlays/test >/tmp/jwt-kustomize.yaml
+! rg -q 'PRIVATE KEY|replace-before-deploy|REPLACE_BEFORE_DEPLOY' /tmp/jwt-kustomize.yaml
+! rg -q '^\s*(data|stringData):' infra/kubernetes/jwt-config/identity-private-key-secret.example.yaml
 ```
 
-private key marker 또는 Secret data block이 있으면 non-zero로 종료한다. 초기에는 스크립트가 없으므로 실행이 실패해야 한다.
+test overlay ConfigMap에 private key marker 또는 배포 전 placeholder가 있거나 Secret 참조 템플릿에 `data`/`stringData` 블록이 있으면 non-zero로 종료한다. ConfigMap의 공개 설정 `data` 블록은 허용한다. 초기에는 스크립트가 없으므로 실행이 실패해야 한다.
 
 - [ ] **Step 2: 최소 검증 스크립트 구현**
 
 스크립트는 다음을 순서대로 수행한다.
 
 ```bash
-kubectl kustomize infra/kubernetes/jwt-config >/dev/null
-rg -q 'discord.auth.jwt.issuer:' infra/kubernetes/jwt-config/jwt-public-configmap.yaml
-rg -q 'discord.auth.jwt.audience:' infra/kubernetes/jwt-config/jwt-public-configmap.yaml
-! rg -q 'PRIVATE KEY|^\s*(data|stringData):' infra/kubernetes/jwt-config/jwt-public-configmap.yaml
+kubectl kustomize infra/kubernetes/jwt-config/overlays/test >/tmp/jwt-kustomize.yaml
+rg -q 'discord.auth.jwt.issuer:' /tmp/jwt-kustomize.yaml
+rg -q 'discord.auth.jwt.audience:' /tmp/jwt-kustomize.yaml
+! rg -q 'PRIVATE KEY|replace-before-deploy|REPLACE_BEFORE_DEPLOY' /tmp/jwt-kustomize.yaml
+! rg -q '^\s*(data|stringData):' infra/kubernetes/jwt-config/identity-private-key-secret.example.yaml
 rg -q 'discord-identity-jwt-private-key' infra/kubernetes/jwt-config/identity-volume-mount.patch.yaml
 ! rg -q 'discord-identity-jwt-private-key' infra/kubernetes/jwt-config/consumer-volume-mount.patch.yaml
 ```
 
-`--server-dry-run` 인자가 있을 때만 `kubectl apply --dry-run=server -k infra/kubernetes/jwt-config`를 추가 실행한다.
+`--server-dry-run` 인자가 있을 때만 `kubectl apply --dry-run=server -k infra/kubernetes/jwt-config/overlays/test`를 추가 실행한다. 선택되고 연결 가능한 cluster가 필요하며 Secret은 필요하지 않다.
 
 - [ ] **Step 3: GREEN 및 기존 JWT 회귀 확인**
+
+base ConfigMap은 배포 전 placeholder를 보존한다. `infra/kubernetes/jwt-config/overlays/test/`는 private key나 Secret 값 없이 공개 Ed25519 테스트키와 `kid=test-ed25519`로 ConfigMap을 교체하며, QA 스크립트와 선택적 server dry-run은 이 overlay를 대상으로 한다.
 
 Run:
 
@@ -163,7 +168,7 @@ qa/verify-jwt-kubernetes-config.sh
 cd backend && ./gradlew :backend:modules:identity:test :backend:services:identity:test :backend:services:message:test --tests com.example.discord.messageservice.BearerTokenVerifierTest :backend:services:websocket:test --tests com.example.discord.websocketservice.BearerTokenVerifierTest :backend:services:community:test --tests com.example.discord.communityservice.BearerTokenVerifierTest
 ```
 
-Expected: 모두 성공. `--server-dry-run`은 선택된 cluster와 운영 Secret이 있을 때만 실행한다.
+Expected: 모두 성공. `--server-dry-run`은 선택되고 연결 가능한 cluster가 있을 때만 실행하며 test overlay만 apply하고 Secret은 필요하지 않다.
 
 - [ ] **Step 4: 운영 문서 최종화**
 

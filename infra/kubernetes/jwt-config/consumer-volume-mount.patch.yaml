@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: consumer-service
+          volumeMounts:
+            - name: discord-jwt-public-config
+              mountPath: /etc/discord-config
+              readOnly: true
+      volumes:
+        - name: discord-jwt-public-config
+          configMap:
+            name: discord-jwt-public-config
