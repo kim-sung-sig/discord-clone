@@ -109,6 +109,12 @@ If the external Vault cannot be written, report the intended wiki update explici
 
 ## Report Document Policy
 
+## Documentation Language Policy
+
+- 사용자를 위한 문서, 계획, 명세, 작업 백로그 및 리뷰 본문은 기본적으로 한국어로 작성한다.
+- 코드 식별자, 파일 경로, 명령, 표준·프로토콜의 고유명사는 정확성을 위해 원문 영어를 유지할 수 있다.
+- 사용자가 다른 언어를 명시적으로 요청한 경우에만 이 기본값을 바꾼다.
+
 When creating user-facing reports from now on:
 
 - Write the report body in Korean.

@@ -1,6 +1,7 @@
 .gradle/
 build/
 **/build/
+**/bin/
 
 node_modules/
 .nuxt/
@@ -22,8 +23,10 @@ qa/artifacts/
 .serena/
 .claude/*.local.md
 .codex/config.toml
+.codex/*.local.md
+.codex/skills/java-principal-review/
+.codex/skills/java-write-implementation/
 .idea/
 .playwright-mcp/
 output/
 security-contract-outside-artifacts/
-**/bin/
