@@ -14,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
+@Profile("legacy-auth")
 @RequestMapping("/api")
 class AuthController {
     private static final String REFRESH_COOKIE = "dc_refresh";
@@ -256,6 +258,7 @@ class AuthController {
 }
 
 @RestControllerAdvice(assignableTypes = AuthController.class)
+@Profile("!production & !admin-cli")
 class AuthControllerAdvice {
     @ExceptionHandler(LoginLockedException.class)
     ResponseEntity<AuthController.ErrorResponse> loginLocked(LoginLockedException exception) {

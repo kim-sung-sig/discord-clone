@@ -10,6 +10,7 @@ tasks.jar {
 }
 
 dependencies {
+    implementation(project(":backend:modules:identity"))
     implementation(project(":backend:modules:thread"))
     implementation(project(":backend:shared:common"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")

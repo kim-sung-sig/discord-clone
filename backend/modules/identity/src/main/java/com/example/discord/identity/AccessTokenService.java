@@ -1,106 +1,48 @@
 package com.example.discord.identity;
 
-import java.nio.charset.StandardCharsets;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Claims;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.interfaces.EdECKey;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 public final class AccessTokenService {
-    private static final String HEADER = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-
-    private final byte[] secret;
-    private final Duration ttl;
-    private final Clock clock;
-
-    public AccessTokenService(String secret, Duration ttl, Clock clock) {
-        if (secret == null || secret.length() < 16) {
-            throw new IllegalArgumentException("token secret must be at least 16 characters");
-        }
-        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
-            throw new IllegalArgumentException("token ttl must be positive");
-        }
-        this.secret = secret.getBytes(StandardCharsets.UTF_8);
-        this.ttl = ttl;
-        this.clock = clock;
+    private final PrivateKey privateKey; private final Map<String, PublicKey> publicKeys; private final String kid; private final String issuer; private final String audience; private final Duration ttl; private final Clock clock;
+    public AccessTokenService(PrivateKey privateKey, String kid, String issuer, String audience, Duration ttl, Clock clock) {
+        this(privateKey, Map.of(), kid, issuer, audience, ttl, clock);
     }
-
+    public AccessTokenService(PrivateKey privateKey, Map<String, PublicKey> publicKeys, String kid, String issuer, String audience, Duration ttl, Clock clock) {
+        if (!ed25519(privateKey) || blank(kid) || blank(issuer) || blank(audience) || ttl == null || !ttl.isPositive() || clock == null) throw new IllegalArgumentException("access token configuration invalid");
+        if (publicKeys == null || publicKeys.entrySet().stream().anyMatch(e -> blank(e.getKey()) || !ed25519(e.getValue()))) throw new IllegalArgumentException("access token configuration invalid");
+        this.privateKey=privateKey; this.publicKeys=Map.copyOf(publicKeys); this.kid=kid; this.issuer=issuer; this.audience=audience; this.ttl=ttl; this.clock=clock;
+    }
+    public AccessTokenService(Map<String, PublicKey> publicKeys, String issuer, String audience, Clock clock) {
+        if (publicKeys == null || publicKeys.isEmpty() || publicKeys.entrySet().stream().anyMatch(e -> blank(e.getKey()) || !ed25519(e.getValue())) || blank(issuer) || blank(audience) || clock == null) throw new IllegalArgumentException("access token configuration invalid");
+        this.privateKey=null; this.publicKeys=Map.copyOf(publicKeys); this.kid=null; this.issuer=issuer; this.audience=audience; this.ttl=null; this.clock=clock;
+    }
     public String issue(UUID userId) {
-        Instant issuedAt = clock.instant();
-        Instant expiresAt = issuedAt.plus(ttl);
-        String payload = "{\"sub\":\"" + userId + "\",\"iat\":" + issuedAt.getEpochSecond()
-            + ",\"exp\":" + expiresAt.getEpochSecond() + "}";
-        String unsigned = encode(HEADER) + "." + encode(payload);
-        return unsigned + "." + sign(unsigned);
+        if (privateKey == null || userId == null) throw new IllegalStateException("access token issuer unavailable");
+        Instant now=clock.instant();
+        return Jwts.builder().header().keyId(kid).and().subject(userId.toString()).issuer(issuer).audience().add(audience).and().issuedAt(Date.from(now)).expiration(Date.from(now.plus(ttl))).signWith(privateKey, Jwts.SIG.EdDSA).compact();
     }
-
     public AccessTokenClaims verify(String token) {
-        String[] parts = token == null ? new String[0] : token.split("\\.");
-        if (parts.length != 3) {
-            throw new TokenVerificationException("access token invalid");
-        }
-        String unsigned = parts[0] + "." + parts[1];
-        if (!constantTimeEquals(sign(unsigned), parts[2])) {
-            throw new TokenVerificationException("access token invalid");
-        }
-        String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-        UUID userId = UUID.fromString(extractString(payload, "sub"));
-        Instant issuedAt = Instant.ofEpochSecond(extractLong(payload, "iat"));
-        Instant expiresAt = Instant.ofEpochSecond(extractLong(payload, "exp"));
-        if (!clock.instant().isBefore(expiresAt)) {
-            throw new TokenVerificationException("access token expired");
-        }
-        return new AccessTokenClaims(userId, issuedAt, expiresAt);
-    }
-
-    private String sign(String value) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret, "HmacSHA256"));
-            return Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception ex) {
-            throw new IllegalStateException("failed to sign access token", ex);
-        }
+            Jws<Claims> jws = Jwts.parser().clock(() -> Date.from(clock.instant())).keyLocator(header -> {
+                Object keyId = header.get("kid");
+                return keyId instanceof String value && !blank(value) ? publicKeys.get(value) : null;
+            }).build().parseSignedClaims(token);
+            Claims claims=jws.getPayload();
+            if (!"EdDSA".equals(jws.getHeader().getAlgorithm()) || !issuer.equals(claims.getIssuer()) || !claims.getAudience().contains(audience) || claims.getIssuedAt()==null || claims.getExpiration()==null || !claims.getExpiration().toInstant().isAfter(clock.instant())) throw new TokenVerificationException("access token invalid");
+            return new AccessTokenClaims(UUID.fromString(claims.getSubject()), claims.getIssuedAt().toInstant(), claims.getExpiration().toInstant());
+        } catch (TokenVerificationException e) { throw e; } catch (Exception e) { throw new TokenVerificationException("access token invalid"); }
     }
-
-    private static String encode(String value) {
-        return Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static boolean constantTimeEquals(String left, String right) {
-        return java.security.MessageDigest.isEqual(
-            left.getBytes(StandardCharsets.UTF_8),
-            right.getBytes(StandardCharsets.UTF_8)
-        );
-    }
-
-    private static String extractString(String json, String key) {
-        String marker = "\"" + key + "\":\"";
-        int start = json.indexOf(marker);
-        if (start < 0) {
-            throw new TokenVerificationException("access token invalid");
-        }
-        int valueStart = start + marker.length();
-        int end = json.indexOf('"', valueStart);
-        return json.substring(valueStart, end);
-    }
-
-    private static long extractLong(String json, String key) {
-        String marker = "\"" + key + "\":";
-        int start = json.indexOf(marker);
-        if (start < 0) {
-            throw new TokenVerificationException("access token invalid");
-        }
-        int valueStart = start + marker.length();
-        int end = json.indexOf(',', valueStart);
-        if (end < 0) {
-            end = json.indexOf('}', valueStart);
-        }
-        return Long.parseLong(json.substring(valueStart, end));
-    }
+    private static boolean blank(String v) { return v == null || v.isBlank(); }
+    private static boolean ed25519(Object key) { return key instanceof EdECKey edEcKey && "Ed25519".equals(edEcKey.getParams().getName()); }
 }

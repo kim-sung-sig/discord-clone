@@ -10,6 +10,7 @@ tasks.jar {
 }
 
 dependencies {
+    implementation(project(":backend:modules:identity"))
     implementation(project(":backend:modules:channel"))
     implementation(project(":backend:modules:event"))
     implementation(project(":backend:modules:guild"))

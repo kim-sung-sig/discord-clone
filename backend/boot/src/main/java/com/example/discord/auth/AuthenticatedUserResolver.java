@@ -1,7 +1,6 @@
 package com.example.discord.auth;
 
-import com.example.discord.identity.AccessTokenService;
-import com.example.discord.identity.TokenVerificationException;
+import com.example.discord.identity.BearerTokenVerifier;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -11,11 +10,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public final class AuthenticatedUserResolver {
     private final AuthStore store;
-    private final AccessTokenService accessTokenService;
+    private final BearerTokenVerifier bearerTokenVerifier;
 
-    AuthenticatedUserResolver(AuthStore store, AccessTokenService accessTokenService) {
+    AuthenticatedUserResolver(AuthStore store, BearerTokenVerifier bearerTokenVerifier) {
         this.store = store;
-        this.accessTokenService = accessTokenService;
+        this.bearerTokenVerifier = bearerTokenVerifier;
     }
 
     public UUID requireUserId(String authorization) {
@@ -24,12 +23,12 @@ public final class AuthenticatedUserResolver {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "access token revoked");
         }
         try {
-            UUID userId = accessTokenService.verify(token).userId();
+            UUID userId = bearerTokenVerifier.requireUserId(authorization);
             if (store.findById(userId).isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "user not found");
             }
             return userId;
-        } catch (TokenVerificationException | IllegalArgumentException exception) {
+        } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "access token invalid", exception);
         }
     }

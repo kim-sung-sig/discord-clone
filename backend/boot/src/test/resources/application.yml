@@ -1,0 +1,8 @@
+discord:
+  auth:
+    jwt:
+      issuer: discord-identity
+      audience: discord-api
+      key-id: identity-2026-07
+      public-key-locations:
+        identity-2026-07: file:${user.dir}/../modules/identity/src/test/resources/identity/ed25519-public.pem
