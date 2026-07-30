@@ -22,10 +22,17 @@ secret_template="$root/infra/kubernetes/jwt-config/identity-private-key-secret.e
 identity_patch="$root/infra/kubernetes/jwt-config/identity-volume-mount.patch.yaml"
 consumer_patch="$root/infra/kubernetes/jwt-config/consumer-volume-mount.patch.yaml"
 rendered="$(mktemp)"
-trap 'rm -f "$rendered"' EXIT
+base_rendered="$(mktemp)"
+trap 'rm -f "$rendered" "$base_rendered"' EXIT
 
 kubectl kustomize "$test_overlay" >"$rendered"
+kubectl kustomize "$config_dir" >"$base_rendered"
 config_map="$rendered"
+
+if rg -q 'PRIVATE KEY|^[[:space:]]*kind:[[:space:]]+Secret|^[[:space:]]*stringData:' "$base_rendered"; then
+  printf 'base JWT configuration must not render private-key or Secret data\n' >&2
+  exit 1
+fi
 
 if ! awk '
   /^[[:space:]]*kind:[[:space:]]*/ {
