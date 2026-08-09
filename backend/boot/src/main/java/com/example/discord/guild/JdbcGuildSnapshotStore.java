@@ -1,8 +1,13 @@
 package com.example.discord.guild;
 
 import com.example.discord.channel.ChannelType;
+import com.example.discord.permission.AuthorizationAudience;
+import com.example.discord.permission.AuthorizationResourceType;
+import com.example.discord.permission.EffectivePermissionCalculator;
+import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionOverwrite;
 import com.example.discord.permission.PermissionSet;
+import com.example.discord.permission.RolePermission;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -71,15 +76,148 @@ class JdbcGuildSnapshotStore implements GuildSnapshotStore {
             try {
                 upsertGuild(connection, guild);
                 replaceGuildChildren(connection, guild);
+                long permissionVersion = nextPermissionVersion(connection, guild.id());
+                appendAuthorizationOutbox(connection, guild, permissionVersion);
+                appendAuthorizationWatermarks(connection, guild, permissionVersion);
                 connection.commit();
-            } catch (SQLException exception) {
-                connection.rollback();
-                throw exception;
+            } catch (Exception exception) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    exception.addSuppressed(rollbackFailure);
+                }
+                if (exception instanceof SQLException sqlException) {
+                    throw sqlException;
+                }
+                throw new IllegalStateException("failed to save guild snapshot", exception);
             } finally {
                 connection.setAutoCommit(true);
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to save guild snapshot", exception);
+        }
+    }
+
+    private static long nextPermissionVersion(Connection connection, UUID guildId) throws SQLException {
+        try (var statement = connection.prepareStatement("""
+            INSERT INTO guild_authorization_versions(guild_id, permission_version)
+            VALUES (?, 1)
+            ON CONFLICT (guild_id) DO UPDATE
+            SET permission_version = guild_authorization_versions.permission_version + 1,
+                updated_at = now()
+            RETURNING permission_version
+            """)) {
+            statement.setObject(1, guildId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new SQLException("failed to allocate guild authorization version");
+                }
+                return resultSet.getLong(1);
+            }
+        }
+    }
+
+    private static void appendAuthorizationOutbox(
+        Connection connection,
+        Guild guild,
+        long permissionVersion
+    ) throws SQLException {
+        Role everyone = guild.everyoneRole();
+        EffectivePermissionCalculator calculator = new EffectivePermissionCalculator();
+        UUID correlationId = UUID.randomUUID();
+        for (GuildMember member : guild.members()) {
+            List<RolePermission> rolePermissions = guild.roles().stream()
+                .filter(role -> member.roleIds().contains(role.id()) && !role.id().equals(everyone.id()))
+                .map(role -> new RolePermission(role.id(), role.permissions()))
+                .toList();
+            appendAuthorizationEvent(
+                connection,
+                guild,
+                member.userId(),
+                AuthorizationResourceType.GUILD,
+                guild.id(),
+                calculator.calculate(everyone.permissions(), rolePermissions, List.of(), everyone.id()),
+                permissionVersion,
+                correlationId
+            );
+            for (Channel channel : guild.channels()) {
+                List<PermissionOverwrite> relevantOverwrites = channel.overwrites().stream()
+                    .filter(overwrite -> member.roleIds().contains(overwrite.roleId()))
+                    .toList();
+                appendAuthorizationEvent(
+                    connection,
+                    guild,
+                    member.userId(),
+                    AuthorizationResourceType.CHANNEL,
+                    channel.id(),
+                    calculator.calculate(everyone.permissions(), rolePermissions, relevantOverwrites, everyone.id()),
+                    permissionVersion,
+                    correlationId
+                );
+            }
+        }
+    }
+
+    private static void appendAuthorizationEvent(
+        Connection connection,
+        Guild guild,
+        UUID subjectId,
+        AuthorizationResourceType resourceType,
+        UUID resourceId,
+        PermissionSet permissions,
+        long permissionVersion,
+        UUID correlationId
+    ) throws SQLException {
+        for (AuthorizationAudience audience : AuthorizationAudience.values()) {
+            if (!audienceNeedsResource(audience, resourceType)) {
+                continue;
+            }
+            try (var statement = connection.prepareStatement("""
+                INSERT INTO authorization_projection_outbox(
+                    event_id, guild_id, event_kind, subject_id, resource_type, resource_id,
+                    permission_bits, permission_version, audience, correlation_id
+                ) VALUES (?, ?, 'PROJECTION_UPDATED', ?, ?, ?, ?, ?, ?, ?)
+                """)) {
+                statement.setObject(1, UUID.randomUUID());
+                statement.setObject(2, guild.id());
+                statement.setObject(3, subjectId);
+                statement.setString(4, resourceType.name());
+                statement.setObject(5, resourceId);
+                statement.setLong(6, permissions.raw());
+                statement.setLong(7, permissionVersion);
+                statement.setString(8, audience.name());
+                statement.setObject(9, correlationId);
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    private static boolean audienceNeedsResource(
+        AuthorizationAudience audience,
+        AuthorizationResourceType resourceType
+    ) {
+        return audience == AuthorizationAudience.NOTIFICATION
+            ? resourceType == AuthorizationResourceType.GUILD
+            : resourceType == AuthorizationResourceType.CHANNEL;
+    }
+
+    private static void appendAuthorizationWatermarks(
+        Connection connection,
+        Guild guild,
+        long permissionVersion
+    ) throws SQLException {
+        for (AuthorizationAudience audience : AuthorizationAudience.values()) {
+            try (var statement = connection.prepareStatement("""
+                INSERT INTO authorization_projection_outbox(
+                    event_id, guild_id, event_kind, permission_version, audience
+                ) VALUES (?, ?, 'WATERMARK_ADVANCED', ?, ?)
+                """)) {
+                statement.setObject(1, UUID.randomUUID());
+                statement.setObject(2, guild.id());
+                statement.setLong(3, permissionVersion);
+                statement.setString(4, audience.name());
+                statement.executeUpdate();
+            }
         }
     }
 

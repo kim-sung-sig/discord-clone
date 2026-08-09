@@ -42,6 +42,12 @@ class PersistenceBootstrapTest {
             assertThat(tableExists(statement, "message_publication_outbox")).isTrue();
             assertThat(columnExists(statement, "message_publication_outbox", "claim_token")).isTrue();
             assertThat(columnExists(statement, "message_publication_outbox", "dead_lettered_at")).isTrue();
+            assertThat(tableExists(statement, "authorization_projection_outbox")).isTrue();
+            assertThat(columnExists(statement, "authorization_projection_outbox", "event_kind")).isTrue();
+            assertThat(columnExists(statement, "authorization_projection_outbox", "claim_token")).isTrue();
+            assertThat(tableExists(statement, "consumer_inbox")).isTrue();
+            assertThat(tableExists(statement, "authorization_projection")).isTrue();
+            assertThat(tableExists(statement, "authorization_watermark")).isTrue();
             assertThat(tableExists(statement, "invites")).isTrue();
         }
     }

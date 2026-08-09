@@ -1,6 +1,9 @@
 package com.example.discord.gateway;
 
 import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.permission.AuthorizationProjectionStore;
+import com.example.discord.permission.AuthorizationResourceType;
+import com.example.discord.permission.Permission;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -21,6 +24,8 @@ public final class InMemoryGatewayService {
     private final Duration heartbeatTimeout;
     private final GatewayEventBus eventBus;
     private final GatewaySessionRegistry sessionRegistry;
+    private final AuthorizationProjectionStore authorizationProjections;
+    private final boolean authorizationProjectionEnabled;
     private final List<GatewayEvent> events = new ArrayList<>();
     private final Map<String, GatewayEvent> eventsByBusEventId = new LinkedHashMap<>();
     private final List<Consumer<GatewayEvent>> listeners = new ArrayList<>();
@@ -46,11 +51,36 @@ public final class InMemoryGatewayService {
         GatewayEventBus eventBus,
         GatewaySessionRegistry sessionRegistry
     ) {
+        this(guildService, clock, heartbeatTimeout, eventBus, sessionRegistry, null, false);
+    }
+
+    public InMemoryGatewayService(
+        InMemoryGuildService guildService,
+        Clock clock,
+        Duration heartbeatTimeout,
+        GatewayEventBus eventBus,
+        GatewaySessionRegistry sessionRegistry,
+        AuthorizationProjectionStore authorizationProjections
+    ) {
+        this(guildService, clock, heartbeatTimeout, eventBus, sessionRegistry, authorizationProjections, false);
+    }
+
+    public InMemoryGatewayService(
+        InMemoryGuildService guildService,
+        Clock clock,
+        Duration heartbeatTimeout,
+        GatewayEventBus eventBus,
+        GatewaySessionRegistry sessionRegistry,
+        AuthorizationProjectionStore authorizationProjections,
+        boolean authorizationProjectionEnabled
+    ) {
         this.guildService = Objects.requireNonNull(guildService, "guildService must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.heartbeatTimeout = Objects.requireNonNull(heartbeatTimeout, "heartbeatTimeout must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
         this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry must not be null");
+        this.authorizationProjections = authorizationProjections;
+        this.authorizationProjectionEnabled = authorizationProjectionEnabled;
         this.eventBus.addEventListener(this::appendBusEvent);
     }
 
@@ -158,6 +188,10 @@ public final class InMemoryGatewayService {
             return true;
         }
         if (event.channelId() != null) {
+            if (authorizationProjectionEnabled && authorizationProjections != null) {
+                return authorizationProjections.decide(event.guildId(), userId, AuthorizationResourceType.CHANNEL,
+                    event.channelId(), Permission.VIEW_CHANNEL).allowed();
+            }
             return guildService.canViewChannel(event.guildId(), event.channelId(), userId);
         }
         return guildService.isGuildMemberOrOwner(event.guildId(), userId);
