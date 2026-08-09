@@ -7,8 +7,6 @@ import com.example.discord.permission.Permission;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,7 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-public final class InMemoryGatewayService {
+public final class InMemoryGatewayService implements GatewayCommandService {
     static final int MAX_RETAINED_EVENTS = 1_000;
 
     private final InMemoryGuildService guildService;
@@ -24,12 +22,12 @@ public final class InMemoryGatewayService {
     private final Duration heartbeatTimeout;
     private final GatewayEventBus eventBus;
     private final GatewaySessionRegistry sessionRegistry;
+    private final GatewayEventLog eventLog;
+    private final GatewaySessionCursorStore cursorStore;
     private final AuthorizationProjectionStore authorizationProjections;
     private final boolean authorizationProjectionEnabled;
-    private final List<GatewayEvent> events = new ArrayList<>();
-    private final Map<String, GatewayEvent> eventsByBusEventId = new LinkedHashMap<>();
+    private final java.util.Set<String> notifiedEventIds = new java.util.HashSet<>();
     private final List<Consumer<GatewayEvent>> listeners = new ArrayList<>();
-    private long nextSequence = 1L;
 
     public InMemoryGatewayService(InMemoryGuildService guildService, Clock clock, Duration heartbeatTimeout) {
         this(guildService, clock, heartbeatTimeout, new InMemoryGatewayEventBus(clock));
@@ -74,11 +72,37 @@ public final class InMemoryGatewayService {
         AuthorizationProjectionStore authorizationProjections,
         boolean authorizationProjectionEnabled
     ) {
+        this(
+            guildService,
+            clock,
+            heartbeatTimeout,
+            eventBus,
+            sessionRegistry,
+            authorizationProjections,
+            authorizationProjectionEnabled,
+            new InMemoryGatewayEventLog(),
+            new InMemoryGatewaySessionCursorStore()
+        );
+    }
+
+    public InMemoryGatewayService(
+        InMemoryGuildService guildService,
+        Clock clock,
+        Duration heartbeatTimeout,
+        GatewayEventBus eventBus,
+        GatewaySessionRegistry sessionRegistry,
+        AuthorizationProjectionStore authorizationProjections,
+        boolean authorizationProjectionEnabled,
+        GatewayEventLog eventLog,
+        GatewaySessionCursorStore cursorStore
+    ) {
         this.guildService = Objects.requireNonNull(guildService, "guildService must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.heartbeatTimeout = Objects.requireNonNull(heartbeatTimeout, "heartbeatTimeout must not be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus must not be null");
         this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry must not be null");
+        this.eventLog = Objects.requireNonNull(eventLog, "eventLog must not be null");
+        this.cursorStore = Objects.requireNonNull(cursorStore, "cursorStore must not be null");
         this.authorizationProjections = authorizationProjections;
         this.authorizationProjectionEnabled = authorizationProjectionEnabled;
         this.eventBus.addEventListener(this::appendBusEvent);
@@ -100,6 +124,9 @@ public final class InMemoryGatewayService {
             ready.sequence()
         );
         sessionRegistry.save(session);
+        cursorStore.create(new GatewaySessionCursor(
+            session.id(), userId, 0L, 0L, 0L, 1L, "in-memory", clock.instant().plus(heartbeatTimeout), clock.instant()
+        ));
         registerSubscriptions(session);
         ready = ready.withPayload(ready.payloadPlus("sessionId", session.id().toString()));
         return new GatewayIdentifyResult(session, ready);
@@ -146,9 +173,54 @@ public final class InMemoryGatewayService {
         return deliverable;
     }
 
+    public synchronized GatewaySessionCursor acknowledge(UUID sessionId, UUID userId, long sequence) {
+        GatewaySessionCursor current = sessionCursor(sessionId, userId);
+        return acknowledge(sessionId, userId, current.deliveryEpoch(), current.ownerInstanceId(), sequence);
+    }
+
+    public synchronized GatewaySessionCursor acknowledge(
+        UUID sessionId,
+        UUID userId,
+        long deliveryEpoch,
+        String ownerInstanceId,
+        long sequence
+    ) {
+        requireOwnedSession(sessionId, userId);
+        return cursorStore.acknowledge(sessionId, userId, deliveryEpoch, ownerInstanceId, sequence);
+    }
+
+    public synchronized GatewaySessionCursor sessionCursor(UUID sessionId, UUID userId) {
+        requireOwnedSession(sessionId, userId);
+        return cursorStore.find(sessionId, userId)
+            .orElseThrow(() -> new GatewaySessionNotFoundException("gateway session cursor not found"));
+    }
+
     public synchronized GatewayResumeResult resume(UUID sessionId, UUID userId, long lastSequence) {
         GatewaySession session = requireOwnedSession(sessionId, userId);
+        if (lastSequence > 0L && lastSequence < Math.max(0L, eventLog.oldestSequence() - 1L)) {
+            throw new GatewayResyncRequiredException("gateway event retention no longer covers requested sequence");
+        }
         registerSubscriptions(session);
+        if (cursorStore.find(sessionId, userId).isEmpty()) {
+            cursorStore.create(new GatewaySessionCursor(
+                sessionId,
+                userId,
+                session.lastDeliveredSequence(),
+                session.lastDeliveredSequence(),
+                session.lastDeliveredSequence(),
+                1L,
+                "in-memory",
+                clock.instant().plus(heartbeatTimeout),
+                clock.instant()
+            ));
+        }
+        cursorStore.replaceEpoch(
+            sessionId,
+            userId,
+            "in-memory",
+            clock.instant().plus(heartbeatTimeout),
+            clock.instant()
+        );
         GatewayEvent resumed = controlEvent("RESUMED", Map.of("sessionId", session.id().toString()));
         List<GatewayEvent> deliverable = deliverableEvents(session, lastSequence);
         GatewaySession updated = updateLastDelivered(session, deliverable);
@@ -160,16 +232,13 @@ public final class InMemoryGatewayService {
     }
 
     private GatewayEvent controlEvent(String type, Map<String, Object> payload) {
-        synchronizeSequenceFloor();
-        return new GatewayEvent(nextSequence++, type, null, null, payload, clock.instant());
+        return new GatewayEvent(eventLog.allocateSequence(), type, null, null, payload, clock.instant());
     }
 
     private List<GatewayEvent> deliverableEvents(GatewaySession session, long afterSequence) {
         long lowerBound = Math.max(afterSequence, session.lastDeliveredSequence());
-        return events.stream()
-            .filter(event -> event.sequence() > lowerBound)
+        return eventLog.after(lowerBound, MAX_RETAINED_EVENTS).stream()
             .filter(event -> canDeliver(session.userId(), event))
-            .sorted(Comparator.comparingLong(GatewayEvent::sequence))
             .toList();
     }
 
@@ -180,6 +249,14 @@ public final class InMemoryGatewayService {
             .orElse(session.lastDeliveredSequence());
         GatewaySession updated = session.withLastDeliveredSequence(lastSequence);
         sessionRegistry.save(updated);
+        if (!delivered.isEmpty()) {
+            GatewaySessionCursor cursor = cursorStore.find(session.id(), session.userId())
+                .orElseThrow(() -> new GatewaySessionNotFoundException("gateway session cursor not found"));
+            cursorStore.markDelivered(
+                session.id(), session.userId(), cursor.deliveryEpoch(), cursor.ownerInstanceId(),
+                lastSequence, clock.instant()
+            );
+        }
         return updated;
     }
 
@@ -206,47 +283,23 @@ public final class InMemoryGatewayService {
     }
 
     private synchronized GatewayEvent appendBusEvent(GatewayBusEvent busEvent) {
-        GatewayEvent existing = eventsByBusEventId.get(busEvent.eventId());
-        if (existing != null) {
-            return existing;
-        }
         if (busEvent.channelId() != null && !guildService.channelBelongsToGuild(busEvent.guildId(), busEvent.channelId())) {
             throw new IllegalArgumentException("channel does not belong to guild");
         }
-        synchronizeSequenceFloor();
-        GatewayEvent event = new GatewayEvent(
-            nextSequence++,
-            busEvent.eventId(),
-            busEvent.type(),
-            busEvent.guildId(),
-            busEvent.channelId(),
-            busEvent.payload(),
-            busEvent.createdAt()
-        );
-        events.add(event);
-        eventsByBusEventId.put(busEvent.eventId(), event);
-        evictOldEvents();
-        for (Consumer<GatewayEvent> listener : List.copyOf(listeners)) {
-            listener.accept(event);
-        }
-        return event;
-    }
-
-    private void evictOldEvents() {
-        while (events.size() > MAX_RETAINED_EVENTS) {
-            GatewayEvent evicted = events.remove(0);
-            if (evicted.busEventId() != null) {
-                eventsByBusEventId.remove(evicted.busEventId());
-            }
-        }
-    }
-
-    private void synchronizeSequenceFloor() {
         long highestSessionSequence = sessionRegistry.sessions().stream()
             .mapToLong(GatewaySession::lastDeliveredSequence)
             .max()
             .orElse(0L);
-        nextSequence = Math.max(nextSequence, highestSessionSequence + 1L);
+        while (eventLog.latestSequence() < highestSessionSequence) {
+            eventLog.allocateSequence();
+        }
+        GatewayEvent event = eventLog.append(busEvent);
+        if (notifiedEventIds.add(busEvent.eventId())) {
+            for (Consumer<GatewayEvent> listener : List.copyOf(listeners)) {
+                listener.accept(event);
+            }
+        }
+        return event;
     }
 
     private GatewaySession requireOwnedSession(UUID sessionId, UUID userId) {

@@ -1,6 +1,7 @@
 package com.example.discord.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.discord.channel.ChannelType;
 import com.example.discord.guild.Channel;
@@ -373,6 +374,42 @@ class InMemoryGatewayServiceTest {
 
         List<GatewayEvent> delivered = node.poll(identified.session().id(), ownerId, 0L);
         assertThat(delivered).extracting(GatewayEvent::busEventId).containsExactly(published.busEventId());
+    }
+
+    @Test
+    void durableCursorRejectsAckAheadOfSuccessfulDelivery() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "durable"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        assertThatThrownBy(() -> gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence() + 1L))
+            .isInstanceOf(GatewayAckOutOfRangeException.class);
+    }
+
+    @Test
+    void duplicateAckIsIdempotentAndResumeAdvancesDeliveryEpoch() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "durable"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        GatewaySessionCursor beforeResume = gatewayService.sessionCursor(identified.session().id(), ownerId);
+        GatewaySessionCursor acknowledged = gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence());
+        GatewaySessionCursor duplicate = gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence());
+
+        assertThat(duplicate.acknowledgedUserSequence()).isEqualTo(acknowledged.acknowledgedUserSequence());
+        assertThat(gatewayService.resume(identified.session().id(), ownerId, event.sequence()).events()).isEmpty();
+        assertThat(gatewayService.sessionCursor(identified.session().id(), ownerId).deliveryEpoch())
+            .isGreaterThan(acknowledged.deliveryEpoch());
+        assertThatThrownBy(() -> gatewayService.acknowledge(
+            identified.session().id(), ownerId, beforeResume.deliveryEpoch(), beforeResume.ownerInstanceId(), event.sequence()))
+            .isInstanceOf(GatewayStaleDeliveryEpochException.class);
     }
 
     private void denyEveryoneView(Guild guild, Channel channel) {

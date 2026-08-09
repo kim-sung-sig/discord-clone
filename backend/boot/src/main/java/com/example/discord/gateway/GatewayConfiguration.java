@@ -25,12 +25,26 @@ class GatewayConfiguration {
     }
 
     @Bean
+    @Profile("!postgres")
+    GatewayEventLog gatewayEventLog() {
+        return new InMemoryGatewayEventLog();
+    }
+
+    @Bean
+    @Profile("!postgres")
+    GatewaySessionCursorStore gatewaySessionCursorStore() {
+        return new InMemoryGatewaySessionCursorStore();
+    }
+
+    @Bean
     InMemoryGatewayService gatewayService(
         InMemoryGuildService guildService,
         Clock authClock,
         @Value("${discord.gateway.heartbeat-timeout-ms:30000}") long heartbeatTimeoutMillis,
         GatewayEventBus gatewayEventBus,
         GatewaySessionRegistry gatewaySessionRegistry,
+        GatewayEventLog gatewayEventLog,
+        GatewaySessionCursorStore gatewaySessionCursorStore,
         ObjectProvider<AuthorizationProjectionStore> authorizationProjections,
         @Value("${discord.authz.projection-enabled:false}") boolean projectionEnabled
     ) {
@@ -41,7 +55,9 @@ class GatewayConfiguration {
             gatewayEventBus,
             gatewaySessionRegistry,
             authorizationProjections.getIfAvailable(),
-            projectionEnabled
+            projectionEnabled,
+            gatewayEventLog,
+            gatewaySessionCursorStore
         );
     }
 }
