@@ -9,6 +9,12 @@ import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.guild.Role;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
+import com.example.discord.permission.AuthzProjectionUpdated;
+import com.example.discord.permission.AuthorizationDecision;
+import com.example.discord.permission.AuthorizationProjection;
+import com.example.discord.permission.AuthorizationProjectionStore;
+import com.example.discord.permission.AuthorizationResourceType;
+import com.example.discord.permission.AuthorizationWatermarkAdvanced;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -340,6 +346,21 @@ class InMemoryGatewayServiceTest {
     }
 
     @Test
+    void localAuthorizationProjectionOverridesSourceGuildForWebsocketDelivery() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        Channel channel = guildService.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        ProjectionStore projections = new ProjectionStore(false);
+        InMemoryGatewayService node = new InMemoryGatewayService(
+            guildService, clock, Duration.ofSeconds(30), new InMemoryGatewayEventBus(clock),
+            new InMemoryGatewaySessionRegistry(), projections, true);
+        GatewayIdentifyResult identified = node.identify(ownerId);
+        node.publish("MESSAGE_CREATE", guild.id(), channel.id(), Map.of("content", "must not leak"));
+
+        assertThat(node.poll(identified.session().id(), ownerId, 0L)).isEmpty();
+    }
+
+    @Test
     void busRedeliveryDoesNotAppendDuplicateGatewayEvents() {
         InMemoryGatewayEventBus eventBus = new InMemoryGatewayEventBus(clock);
         InMemoryGatewayService node = new InMemoryGatewayService(guildService, clock, Duration.ofSeconds(30), eventBus);
@@ -362,6 +383,19 @@ class InMemoryGatewayServiceTest {
             PermissionSet.empty(),
             PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
         );
+    }
+
+    private static final class ProjectionStore implements AuthorizationProjectionStore {
+        private final boolean allowed;
+
+        private ProjectionStore(boolean allowed) { this.allowed = allowed; }
+
+        public boolean apply(AuthzProjectionUpdated event) { return true; }
+        public boolean advanceWatermark(AuthorizationWatermarkAdvanced event) { return true; }
+        public AuthorizationDecision decide(UUID guildId, UUID subjectId, AuthorizationResourceType resourceType,
+                                            UUID resourceId, Permission permission) {
+            return allowed ? AuthorizationDecision.allow() : AuthorizationDecision.deny(AuthorizationDecision.Reason.PERMISSION_DENIED);
+        }
     }
 
     private static final class RecordingGatewayEventBus implements GatewayEventBus {

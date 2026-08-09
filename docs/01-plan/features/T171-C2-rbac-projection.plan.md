@@ -48,6 +48,7 @@ Consumer group: `authz-projection-{service}`
 ```json
 {
   "schema": "authz.projection.v1",
+  "kind": "PROJECTION_UPDATED|WATERMARK_ADVANCED",
   "eventId": "UUID",
   "guildId": "UUID",
   "subjectId": "UUID",
@@ -65,11 +66,15 @@ Consumer group: `authz-projection-{service}`
 - `eventId`는 producer 생성 후 모든 retry/DLQ/consumer inbox에 동일하게 보존한다.
 - `permissionVersion`은 guild별 단조 증가이며, consumer는 기존 version보다 작거나 같은 payload를 no-op 처리한다.
 - producer는 audience별 topic에 해당 서비스가 필요한 subject/resource 행만 기록한다. 다른 서비스의 권한 행을 공용 topic으로 fanout하지 않는다.
+- `MESSAGE`, `WEBSOCKET`, `GATEWAY` audience에는 `CHANNEL` 행만, `NOTIFICATION` audience에는 `GUILD` 행만 기록한다. consumer는 envelope의 audience가 자기 topic과 다르면 mutation 없이 reject한다.
+- `kind=PROJECTION_UPDATED`일 때만 `subjectId`, `resourceType`, `resourceId`, `permissionBits`를 채운다. `kind=WATERMARK_ADVANCED`는 해당 네 필드를 null로 두고 `guildId`, `permissionVersion`, `audience`만 전달한다.
 - `permissionBits`는 `EffectivePermissionCalculator`의 결과이며 role/overwrite 원본을 consumer에 재계산시키지 않는다.
+- channel overwrite는 각 member의 roleIds와 교집합인 항목만 계산에 포함한다. role 전용 allow/deny가 다른 member projection으로 누출되어서는 안 된다.
+- relay는 `(guildId,audience)` partition별 미발행 predecessor가 없을 때만 claim한다. 같은 `permissionVersion`에서는 모든 `PROJECTION_UPDATED` ACK 후 `WATERMARK_ADVANCED`를 claim하므로 watermark가 projection보다 먼저 Kafka에 기록되지 않는다.
 - unknown schema, malformed UUID, negative version, hash/size 오류는 mutation 없이 metadata-only DLQ로 보낸다. DLQ metadata의 subject/resource는 truncated SHA-256으로 마스킹하고 raw event/token/body는 보관하지 않는다. 보존 기간은 7일이다.
 - `AuthzProjectionRemoved`는 동일 envelope에 `permissionBits=0`과 증가한 version을 사용한다. 별도 삭제 의미를 만들지 않는다.
 
-`AuthzGuildWatermarkAdvanced`는 같은 audience topic의 guild partition 마지막에 발행된다. `subjectId/resourceId` 없이 `guildId`와 `permissionVersion`만 담으며, consumer가 `authorization_watermark`를 갱신한다. projection row의 version이 watermark보다 낮거나 watermark가 없으면 요청을 deny한다. 이 watermark가 request-time stale 판정의 유일한 source다.
+`AuthorizationWatermarkAdvanced`는 같은 audience topic의 guild partition 마지막에 발행된다. `subjectId/resourceId` 없이 `guildId`, `permissionVersion`, `audience`만 담으며, consumer가 `authorization_watermark`를 갱신한다. projection row의 version이 watermark보다 낮거나 watermark가 없으면 요청을 deny한다. 이 watermark가 request-time stale 판정의 유일한 source다.
 
 ### Local projection schema
 
@@ -104,7 +109,7 @@ authorization_watermark(
 | Community boot | Guild mutation 후 projection event를 outbox에 append | `PersistentGuildService`가 before/after diff를 만들고 `JdbcGuildSnapshotStore.save(guild, changes)`가 source row, guild version, outbox를 같은 JDBC transaction으로 commit |
 | Shared event adapter | Kafka serializer, ACK timeout, topic/key/header | C0 eventId/ACK 계약 재사용 |
 | Service consumers | inbox dedup + conditional projection upsert | message와 websocket을 첫 consumer로 선택 |
-| Protected read/mutation path | local projection `can()` 호출 | channel visibility 또는 message send 한 경로부터 교체 |
+| Protected read/mutation path | local projection `can()` 호출 | C2의 실제 보호 경로는 현재 business endpoint가 존재하는 boot의 Message publish/read와 Gateway WebSocket delivery다. 독립 `services/message`, `services/websocket` 애플리케이션은 현재 shell이므로 이번 범위에서는 projection consumer/store만 제공하고 가상 endpoint를 만들지 않는다. |
 
 ## Tier And Layer Responsibilities
 
@@ -165,14 +170,16 @@ flowchart TD
 
 - `backend/modules/permission/src/main/java/.../AuthzProjectionUpdated.java`: immutable event contract and validation.
 - `backend/modules/permission/src/main/java/.../AuthorizationDecision.java`: allow/deny/stale semantics.
-- `backend/boot/src/main/resources/db/migration/V17__authorization_outbox.sql`: source outbox와 guild watermark/version additive schema.
+- `backend/boot/src/main/resources/db/migration/V16__authorization_projection_outbox.sql`: source outbox와 guild watermark/version additive schema. 현재 boot migration 최신 번호가 V15이므로 이 task의 첫 additive migration은 V16으로 고정한다.
 - `backend/boot/src/main/java/com/example/discord/guild/GuildSnapshotStore.java`: `save(guild, changes)` transaction API를 추가한다.
 - `backend/boot/src/main/java/com/example/discord/guild/JdbcGuildSnapshotStore.java`: source snapshot, version increment, audience별 outbox insert를 같은 JDBC connection에서 commit한다.
 - `backend/boot/src/main/java/com/example/discord/guild/PersistentGuildService.java`: mutation 전 snapshot과 후 snapshot diff를 계산해 store에 전달한다.
 - `backend/services/message/build.gradle.kts`, `backend/services/websocket/build.gradle.kts`: Kafka/JDBC projection 의존성과 service-owned migration 경계를 명시한다.
 - `backend/services/message/src/main/resources/db/migration/V1__authorization_projection.sql`, `backend/services/websocket/src/main/resources/db/migration/V1__authorization_projection.sql`: projection/inbox/watermark schema.
-- `backend/services/message/src/main/java/...`: message audience consumer and protected path adapter.
-- `backend/services/websocket/src/main/java/...`: websocket audience consumer and protected path adapter.
+- `backend/services/message/src/main/java/...`: message audience consumer/store. 독립 앱에 business endpoint가 생길 때 같은 local `can()` adapter를 연결한다.
+- `backend/services/websocket/src/main/java/...`: websocket audience consumer/store. 독립 앱에 business endpoint가 생길 때 같은 local `can()` adapter를 연결한다.
+- `backend/boot/src/main/java/.../authorization`: bounded outbox claim/publish relay, boot projection consumer/store.
+- `backend/modules/gateway/.../InMemoryGatewayService`: Gateway/WebSocket delivery 시 local projection을 우선하는 authorization port.
 - `backend/boot/src/test/java/...`: source version/order/outbox atomicity tests.
 - `backend/services/message/src/test/java/...`, `backend/services/websocket/src/test/java/...`: duplicate, stale/missing watermark, deny/allow tests.
 - `docs/03-analysis/T171-C2-rbac-projection-review.md`: independent spec/quality review evidence.
@@ -181,16 +188,19 @@ flowchart TD
 
 1. Add framework-free event/decision records and validation tests.
 2. Add additive source/service schemas and repository tests for outbox, inbox, watermark, conditional version upsert.
-3. Make `JdbcGuildSnapshotStore.save(guild, changes)` atomically persist Guild rows, guild `permissionVersion`, audience events, and watermark event in one JDBC transaction; rollback must leave all four unchanged.
-4. Implement message consumer, then websocket consumer; each has own group and DB transaction.
-5. Replace one protected path with local `can()` and fail-closed stale handling.
-6. Run duplicate/out-of-order/replay/failure drills and record evidence.
+3. Make `JdbcGuildSnapshotStore.save(guild)` atomically persist Guild rows, guild `permissionVersion`, audience projection rows, and audience watermark rows in one JDBC transaction; injected child-row failure must leave all four unchanged.
+4. Publish claimed outbox rows to `discord.authz.{audience}.v1` with bounded Kafka ACK timeout; mark published only after ACK and retry failed rows with the same eventId.
+5. Implement message consumer, then websocket consumer; each has own group, inbox, conditional upsert, and DB transaction. Boot also consumes MESSAGE/GATEWAY audiences for the existing message and gateway delivery paths.
+6. Replace boot Message publish/read guards and boot Gateway/WebSocket event delivery filtering with local `can()` and fail-closed stale handling. `discord.authz.projection-enabled=false`에서는 기존 `InMemoryGuildService` 판정을 유지하고, `true`에서만 projection을 강제한다.
+7. Run duplicate/out-of-order/replay/failure drills and record evidence.
 
 ## Verification Gates
 
 - Focused: permission module tests; boot Guild/outbox transaction tests; message/websocket consumer tests.
 - Contract: event schema fixture, eventId preservation, key/version ordering, no secret/body DLQ assertion.
 - Runtime: Kafka unavailable, duplicate delivery, out-of-order version, projection DB unavailable, stale deny, rollback flag.
+- Rollout: `discord.authz.projection-enabled` 기본값은 `false`; Kafka/DB projection freshness와 deny 비율을 확인한 뒤 서비스 단위로 `true`로 전환한다. 장애 시 같은 설정을 `false`로 되돌려 기존 원본 판정 경로로 복귀한다.
+- Service runtime: `message`/`websocket` postgres profile은 `POSTGRES_PASSWORD` 기본값을 제공하지 않는다. 누락 시 Spring placeholder 오류로 시작을 중단하여 개발용 비밀이 production에 승격되지 않게 한다.
 - Review: plan >=85; security >=90; implementation quality >=80; P0/P1 0.
 
 ## Residual Risks

@@ -3,6 +3,9 @@ package com.example.discord.message;
 import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.permission.AuthorizationProjectionStore;
+import com.example.discord.permission.AuthorizationResourceType;
+import com.example.discord.permission.Permission;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -107,6 +110,7 @@ class MessageConfiguration {
     }
 
     @Bean
+    @Profile("!postgres")
     MessagePublishGuard messagePublishGuard(InMemoryGuildService guildService) {
         return (author, target) -> {
             if (author instanceof UserMessageAuthor user && target instanceof ChannelMessageTarget channel) {
@@ -120,11 +124,59 @@ class MessageConfiguration {
     }
 
     @Bean
+    @Profile("postgres")
+    MessagePublishGuard projectedMessagePublishGuard(
+        InMemoryGuildService guildService,
+        AuthorizationProjectionStore projections,
+        @Value("${discord.authz.projection-enabled:false}") boolean projectionEnabled
+    ) {
+        return (author, target) -> {
+            if (author instanceof UserMessageAuthor user && target instanceof ChannelMessageTarget channel) {
+                boolean allowed = projectionEnabled
+                    ? projections.decide(channel.guildId(), user.userId(), AuthorizationResourceType.CHANNEL,
+                        channel.channelId(), Permission.VIEW_CHANNEL).allowed()
+                        && projections.decide(channel.guildId(), user.userId(), AuthorizationResourceType.CHANNEL,
+                            channel.channelId(), Permission.SEND_MESSAGES).allowed()
+                    : guildService.canSendMessages(channel.guildId(), channel.channelId(), user.userId());
+                if (!allowed) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "send messages permission required");
+                }
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message author or target");
+        };
+    }
+
+    @Bean
+    @Profile("!postgres")
     ChannelMessageReadGuard channelMessageReadGuard(InMemoryGuildService guildService) {
         return query -> {
             if (query.requester() instanceof UserMessageAuthor user) {
                 ChannelMessageTarget channel = query.target();
                 if (!guildService.canViewChannel(channel.guildId(), channel.channelId(), user.userId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
+                }
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message reader");
+        };
+    }
+
+    @Bean
+    @Profile("postgres")
+    ChannelMessageReadGuard projectedChannelMessageReadGuard(
+        InMemoryGuildService guildService,
+        AuthorizationProjectionStore projections,
+        @Value("${discord.authz.projection-enabled:false}") boolean projectionEnabled
+    ) {
+        return query -> {
+            if (query.requester() instanceof UserMessageAuthor user) {
+                ChannelMessageTarget channel = query.target();
+                boolean allowed = projectionEnabled
+                    ? projections.decide(channel.guildId(), user.userId(), AuthorizationResourceType.CHANNEL,
+                        channel.channelId(), Permission.VIEW_CHANNEL).allowed()
+                    : guildService.canViewChannel(channel.guildId(), channel.channelId(), user.userId());
+                if (!allowed) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
                 }
                 return;
