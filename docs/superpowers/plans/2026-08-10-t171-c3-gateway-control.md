@@ -60,27 +60,29 @@ classDiagram
 
 ## 구현 순서
 
-### Task 1: 도메인 포트와 RED 테스트
+### Task 1: 도메인 포트와 RED 테스트 ✅
 
 - `GatewayEventLog`/`GatewaySessionCursorStore` 포트와 cursor 예외를 추가한다.
 - 기존 `InMemoryGatewayServiceTest`에 다음 RED를 추가한다: durable append duplicate idempotency, ACK upper-bound rejection, stale duplicate no-op, resume epoch increment, retention resync.
 - 실행: `./gradlew :backend:modules:gateway:test --tests com.example.discord.gateway.InMemoryGatewayServiceTest`.
+- RED evidence: 구현 전 `GatewayAckOutOfRangeException`, `GatewaySessionCursor`, `acknowledge` 미존재 컴파일 실패를 확인했다.
 
-### Task 2: 인메모리 GREEN 구현
+### Task 2: 인메모리 GREEN 구현 ✅
 
 - 기존 event list/dedup을 `InMemoryGatewayEventLog`로 이동한다.
 - session별 cursor를 `InMemoryGatewaySessionCursorStore`에 저장하고 `InMemoryGatewayService`의 poll/resume/ack 흐름에서 단조성·epoch 검사를 적용한다.
 - 기존 public 메서드(`poll(session,user,afterSequence)`, `resume(session,user,lastSequence)`)는 호환용으로 유지하되 새 cursor 경로를 사용한다.
 - Task 1 focused test와 전체 `:backend:modules:gateway:test`를 통과시킨다.
 
-### Task 3: PostgreSQL schema와 JDBC adapter
+### Task 3: PostgreSQL schema와 JDBC adapter ✅ (실행 게이트 대기)
 
 - `V17`에 `gateway_event_log`, `gateway_user_delivery`, `gateway_session_delivery`, `gateway_delivery_grant` 및 user/event/session 인덱스를 추가한다.
 - `JdbcGatewayEventLog`는 transaction 안에서 event ID/hash를 먼저 조회하고 신규일 때만 sequence를 발급한다.
 - `JdbcGatewaySessionCursorStore`는 `SELECT ... FOR UPDATE`와 조건부 UPDATE로 ACK/CAS를 단조적으로 적용한다.
 - PostgreSQL 테스트는 환경변수 gate 아래 migration 존재, duplicate/hash conflict, ACK 범위 및 cursor CHECK를 검증한다.
+- 코드·테스트 컴파일은 통과했다. 공유 DB 위험으로 `DISCORD_RUN_POSTGRES_TESTS=true` 실측은 실행하지 않았다.
 
-### Task 4: Spring wiring와 문서화
+### Task 4: Spring wiring와 문서화 ✅
 
 - `postgres` profile에서는 JDBC event log/cursor store를 bean으로 선택하고 기본 profile은 인메모리 구현을 사용한다.
 - 기존 Redis session registry는 호환 adapter로 남기되 durable cursor의 source of truth로 사용하지 않는다.
@@ -93,6 +95,8 @@ classDiagram
 - 정적: `git diff --check`, `./gradlew :backend:modules:gateway:test`.
 - PostgreSQL opt-in: `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test --tests com.example.discord.gateway.JdbcGatewayEventLogTest --tests com.example.discord.gateway.JdbcGatewaySessionCursorStoreTest --tests com.example.discord.persistence.PersistenceBootstrapTest`.
 - 완료 기준: spec/quality/security review 각각 90/100 이상, P0/P1 0, 선언한 검증 성공.
+
+현재 구현은 T171-C3의 event log/session cursor 코어 범위다. `gateway_user_delivery`의 사용자별 materialization과 one-time delivery grant 발급은 동일 schema를 사용하는 후속 transport/control task에서 활성화한다.
 
 ## 잔여 위험
 
