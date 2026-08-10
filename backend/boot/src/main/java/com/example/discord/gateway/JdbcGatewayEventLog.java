@@ -24,7 +24,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @Profile("postgres")
 @DependsOn("postgresFlyway")
-final class JdbcGatewayEventLog implements GatewayEventLog {
+class JdbcGatewayEventLog implements GatewayEventLog {
     private static final Logger log = LoggerFactory.getLogger(JdbcGatewayEventLog.class);
     private static final TypeReference<Map<String, Object>> PAYLOAD_TYPE = new TypeReference<>() {
     };

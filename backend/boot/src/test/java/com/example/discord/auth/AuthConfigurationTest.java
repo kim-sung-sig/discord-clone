@@ -34,6 +34,19 @@ class AuthConfigurationTest {
     }
 
     @Test
+    void legacyAuthProvidesAnEd25519IssuerOnlyWhenItsPrivateKeyIsConfigured() {
+        contextRunner.withPropertyValues(
+            "spring.profiles.active=legacy-auth",
+            "discord.auth.jwt.private-key-location=" + privateKeyFixture()
+        ).run(context -> {
+            assertThat(context).hasSingleBean(AccessTokenService.class);
+            AccessTokenService tokens = context.getBean(AccessTokenService.class);
+            java.util.UUID userId = java.util.UUID.randomUUID();
+            assertThat(tokens.verify(tokens.issue(userId)).userId()).isEqualTo(userId);
+        });
+    }
+
+    @Test
     void applicationImportsJwtPropertiesFromMountedConfigTree(@TempDir Path configTree) throws IOException {
         Files.createDirectories(configTree.resolve("discord/auth/jwt/public-key-locations"));
         Files.writeString(configTree.resolve("discord/auth/jwt/issuer"), "discord-identity");
@@ -58,5 +71,9 @@ class AuthConfigurationTest {
 
     private static String keyFixture() {
         return "file:" + Path.of("..", "modules", "identity", "src", "test", "resources", "identity", "ed25519-public.pem").toAbsolutePath();
+    }
+
+    private static String privateKeyFixture() {
+        return "file:" + Path.of("..", "modules", "identity", "src", "test", "resources", "identity", "ed25519-private.pem").toAbsolutePath();
     }
 }

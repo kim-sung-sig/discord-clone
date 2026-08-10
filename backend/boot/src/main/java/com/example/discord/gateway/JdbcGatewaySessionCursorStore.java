@@ -16,7 +16,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @Profile("postgres")
 @DependsOn("postgresFlyway")
-final class JdbcGatewaySessionCursorStore implements GatewaySessionCursorStore {
+class JdbcGatewaySessionCursorStore implements GatewaySessionCursorStore {
     private final DataSource dataSource;
 
     JdbcGatewaySessionCursorStore(DataSource dataSource) {

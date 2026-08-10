@@ -1,11 +1,14 @@
 package com.example.discord.auth;
 
 import com.example.discord.identity.BearerTokenVerifier;
+import com.example.discord.identity.AccessTokenService;
 import com.example.discord.identity.LoginFailureTracker;
 import com.example.discord.identity.PasswordHasher;
 import com.example.discord.identity.PemLocationReader;
 import java.security.KeyFactory;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Clock;
 import java.time.Duration;
@@ -16,6 +19,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @EnableConfigurationProperties(AuthConfiguration.JwtProperties.class)
@@ -31,6 +35,23 @@ class AuthConfiguration {
         return new BearerTokenVerifier(publicKeys(properties.publicKeyLocations()), properties.issuer(), properties.audience(), authClock);
     }
 
+    @Bean
+    @Profile("legacy-auth")
+    AccessTokenService legacyAccessTokenService(JwtProperties properties, Clock authClock) {
+        if (blank(properties.privateKeyLocation())) {
+            throw new IllegalStateException("legacy auth private key configuration invalid");
+        }
+        return new AccessTokenService(
+            privateKey(properties.privateKeyLocation()),
+            publicKeys(properties.publicKeyLocations()),
+            properties.keyId(),
+            properties.issuer(),
+            properties.audience(),
+            Duration.ofHours(1),
+            authClock
+        );
+    }
+
     private static Map<String, PublicKey> publicKeys(Map<String, String> locations) {
         try {
             Map<String, PublicKey> keys = new HashMap<>();
@@ -40,6 +61,17 @@ class AuthConfiguration {
             return Map.copyOf(keys);
         } catch (Exception exception) {
             throw new IllegalStateException("access token configuration invalid");
+        }
+    }
+
+    private static PrivateKey privateKey(String location) {
+        try {
+            byte[] encoded = Base64.getMimeDecoder().decode(
+                PemLocationReader.readPrivateKey(location).replaceAll("-----[^-]+-----|\\s", "")
+            );
+            return KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(encoded));
+        } catch (Exception exception) {
+            throw new IllegalStateException("legacy auth private key configuration invalid", exception);
         }
     }
 
@@ -71,6 +103,12 @@ class AuthConfiguration {
     }
 
     @ConfigurationProperties("discord.auth.jwt")
-    record JwtProperties(String issuer, String audience, String keyId, Map<String, String> publicKeyLocations) {
+    record JwtProperties(
+        String issuer,
+        String audience,
+        String keyId,
+        Map<String, String> publicKeyLocations,
+        String privateKeyLocation
+    ) {
     }
 }
