@@ -4,5 +4,6 @@ discord:
       issuer: discord-identity
       audience: discord-api
       key-id: identity-2026-07
+      private-key-location: file:${user.dir}/../modules/identity/src/test/resources/identity/ed25519-private.pem
       public-key-locations:
         identity-2026-07: file:${user.dir}/../modules/identity/src/test/resources/identity/ed25519-public.pem

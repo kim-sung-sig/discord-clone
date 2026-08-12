@@ -48,6 +48,10 @@ class PersistenceBootstrapTest {
             assertThat(tableExists(statement, "consumer_inbox")).isTrue();
             assertThat(tableExists(statement, "authorization_projection")).isTrue();
             assertThat(tableExists(statement, "authorization_watermark")).isTrue();
+            assertThat(tableExists(statement, "gateway_event_log")).isTrue();
+            assertThat(tableExists(statement, "gateway_user_delivery")).isTrue();
+            assertThat(tableExists(statement, "gateway_session_delivery")).isTrue();
+            assertThat(tableExists(statement, "gateway_delivery_grant")).isTrue();
             assertThat(tableExists(statement, "invites")).isTrue();
         }
     }

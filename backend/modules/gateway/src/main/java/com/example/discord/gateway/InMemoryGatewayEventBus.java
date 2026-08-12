@@ -20,7 +20,7 @@ public final class InMemoryGatewayEventBus implements GatewayEventBus {
     @Override
     public synchronized GatewayBusEvent publish(GatewayBusPublishCommand command) {
         GatewayBusEvent event = new GatewayBusEvent(
-            UUID.randomUUID().toString(),
+            command.sourceEventId() == null ? UUID.randomUUID().toString() : command.sourceEventId(),
             command.type(),
             command.guildId(),
             command.channelId(),

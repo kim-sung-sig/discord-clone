@@ -1,6 +1,7 @@
 package com.example.discord.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.discord.channel.ChannelType;
 import com.example.discord.guild.Channel;
@@ -122,6 +123,8 @@ class InMemoryGatewayServiceTest {
         GatewayIdentifyResult identified = gatewayService.identify(ownerId);
         GatewayEvent before = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "before"));
         GatewayEvent after = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "after"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+        gatewayService.acknowledge(identified.session().id(), ownerId, before.sequence());
 
         GatewayResumeResult result = gatewayService.resume(identified.session().id(), ownerId, before.sequence());
 
@@ -373,6 +376,73 @@ class InMemoryGatewayServiceTest {
 
         List<GatewayEvent> delivered = node.poll(identified.session().id(), ownerId, 0L);
         assertThat(delivered).extracting(GatewayEvent::busEventId).containsExactly(published.busEventId());
+    }
+
+    @Test
+    void durableCursorRejectsAckAheadOfSuccessfulDelivery() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "durable"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        assertThatThrownBy(() -> gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence() + 1L))
+            .isInstanceOf(GatewayAckOutOfRangeException.class);
+    }
+
+    @Test
+    void duplicateAckIsIdempotentAndResumeAdvancesDeliveryEpoch() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "durable"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        GatewaySessionCursor beforeResume = gatewayService.sessionCursor(identified.session().id(), ownerId);
+        GatewaySessionCursor acknowledged = gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence());
+        GatewaySessionCursor duplicate = gatewayService.acknowledge(
+            identified.session().id(), ownerId, event.sequence());
+
+        assertThat(duplicate.acknowledgedUserSequence()).isEqualTo(acknowledged.acknowledgedUserSequence());
+        assertThat(gatewayService.resume(identified.session().id(), ownerId, event.sequence()).events()).isEmpty();
+        assertThat(gatewayService.sessionCursor(identified.session().id(), ownerId).deliveryEpoch())
+            .isGreaterThan(acknowledged.deliveryEpoch());
+        assertThatThrownBy(() -> gatewayService.acknowledge(
+            identified.session().id(), ownerId, beforeResume.deliveryEpoch(), beforeResume.ownerInstanceId(), event.sequence()))
+            .isInstanceOf(GatewayStaleDeliveryEpochException.class);
+    }
+
+    @Test
+    void resumeReplaysDeliveredButUnacknowledgedEventsFromDurableAckCursor() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "unacknowledged"));
+
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        assertThat(gatewayService.resume(identified.session().id(), ownerId, 0L).events())
+            .extracting(GatewayEvent::sequence)
+            .containsExactly(event.sequence());
+    }
+
+    @Test
+    void publishWithSourceEventIdPreservesItAcrossGatewayLog() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        UUID sourceEventId = UUID.randomUUID();
+
+        GatewayEvent event = gatewayService.publish(
+            sourceEventId,
+            "GUILD_UPDATE",
+            guild.id(),
+            null,
+            Map.of("name", "source-id")
+        );
+
+        assertThat(event.busEventId()).isEqualTo(sourceEventId.toString());
     }
 
     private void denyEveryoneView(Guild guild, Channel channel) {

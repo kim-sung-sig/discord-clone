@@ -178,6 +178,12 @@ class InviteController {
 
 @RestControllerAdvice(assignableTypes = InviteController.class)
 class InviteControllerAdvice {
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<InviteController.ErrorResponse> responseStatus(ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+            .body(new InviteController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
+    }
+
     @ExceptionHandler(InviteNotFoundException.class)
     ResponseEntity<InviteController.ErrorResponse> notFound(InviteNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new InviteController.ErrorResponse("invite not found"));

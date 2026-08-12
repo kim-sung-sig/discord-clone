@@ -131,6 +131,23 @@ class ProductionSecretValidationTest {
     }
 
     @Test
+    void productionProfileRejectsLegacyAuthIssuer() {
+        contextRunner
+            .withPropertyValues(
+                "spring.profiles.active=production,postgres,redis,legacy-auth",
+                "discord.auth.access-token-secret=prod-auth-secret-prod-auth-secret",
+                "discord.gateway.internal-publisher-token=prod-gateway-token-prod-gateway-token",
+                "spring.datasource.url=jdbc:postgresql://postgres:5432/discord",
+                "spring.datasource.username=discord_prod",
+                "spring.datasource.password=prod-db-password-prod-db-password",
+                "spring.data.redis.host=redis",
+                "discord.trusted-proxy.cidrs=10.0.0.0/24"
+            )
+            .run(context -> assertThat(context.getStartupFailure())
+                .hasMessageContaining("production profile must not enable legacy-auth"));
+    }
+
+    @Test
     void productionMediaLiveKitProfileFailsWhenLiveKitSecretsAreMissing() {
         contextRunner
             .withPropertyValues(

@@ -311,6 +311,12 @@ class MessageController {
 
 @RestControllerAdvice(assignableTypes = MessageController.class)
 class MessageControllerAdvice {
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<MessageController.ErrorResponse> responseStatus(ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+            .body(new MessageController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<MessageController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(new MessageController.ErrorResponse("invalid request"));

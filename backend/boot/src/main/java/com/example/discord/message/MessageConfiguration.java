@@ -100,6 +100,7 @@ class MessageConfiguration {
             if (event.target() instanceof ChannelMessageTarget channel) {
                 Message message = messages.requireMessage(channel, event.messageId());
                 gatewayService.publish(
+                    event.eventId(),
                     "MESSAGE_CREATE",
                     channel.guildId(),
                     channel.channelId(),

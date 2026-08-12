@@ -274,6 +274,12 @@ class GuildController {
 
 @RestControllerAdvice(assignableTypes = GuildController.class)
 class GuildControllerAdvice {
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<GuildController.ErrorResponse> responseStatus(ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+            .body(new GuildController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<GuildController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(new GuildController.ErrorResponse("invalid request"));
