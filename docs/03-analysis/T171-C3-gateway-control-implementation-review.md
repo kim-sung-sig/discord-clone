@@ -27,6 +27,7 @@
 - Gateway event payload hash는 nested Map key를 정렬하고 List/문자열을 재귀 canonicalize해 JVM Map 순서와 무관하게 멱등성을 보장한다.
 - Kafka publish는 bounded broker ACK를 기다린 뒤에만 local listener를 호출하고, 실패/timeout 시 outbox 성공 경로로 진행하지 않는다.
 - Kafka profile 생성자는 node/topic/DLQ 설정을 `@Value`로 주입하고, retention 초과 resume은 HTTP 409 및 WebSocket `RESYNC_REQUIRED`로 매핑한다.
+- `MessageConfigurationTest`는 `MessagePublished.eventId`가 Gateway event log까지 보존되는지 직접 검증한다.
 
 ## Blueprint Alignment
 
@@ -53,6 +54,7 @@
 | `KafkaGatewayEventBusTest` (broker ACK success/failure) | PASS |
 | `InMemoryGatewayEventLogTest` (same eventId, changed timestamp, reordered nested keys) | PASS |
 | `GatewayControllerTest` + canonical hash/resync focused tests | PASS |
+| `MessageConfigurationTest` (dispatcher sourceEventId) | PASS |
 
 ## 자체 점수
 
@@ -60,7 +62,7 @@
 - 최종평가: 승인 — 90점 이상 및 P0/P1 0 충족
 - P0: 0
 - P1: 0 — Kafka 설정 주입·RESYNC_REQUIRED 매핑·canonical hash 보강 완료. Testcontainers PostgreSQL 실측은 Docker daemon unavailable로 아직 검증 불가
-- P2: 2 — user delivery/grant transport 통합과 message dispatcher 직접 focused test는 C3.1/후속 보강 범위
+- P2: 1 — Testcontainers PostgreSQL 실측은 Docker daemon 제공 환경에서 재실행 필요
 
 ## 잔여 위험 및 다음 조치
 
