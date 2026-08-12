@@ -57,6 +57,26 @@
 - Modify: `backend/boot/src/main/java/com/example/discord/message/MessageController.java`
 - Create: `docs/03-analysis/T171-C3-gateway-control-implementation-review.md`
 
+### 보강·직접 검증 추가 파일
+
+- Modify: `backend/boot/src/main/java/com/example/discord/gateway/RedisGatewayEventBus.java` (source event ID 전달)
+- Modify: `backend/boot/src/main/java/com/example/discord/message/MessageConfiguration.java` (MessagePublished event ID 전달)
+- Modify: `backend/boot/src/test/java/com/example/discord/gateway/GatewayControllerTest.java` (HTTP ACK/event ID/RESYNC 계약)
+- Create: `backend/boot/src/test/java/com/example/discord/message/MessageConfigurationTest.java` (dispatcher event ID 보존)
+- Modify: `backend/boot/src/test/java/com/example/discord/gateway/KafkaGatewayEventBusTest.java` (broker ACK 실패 경로)
+- Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayBusPublishCommand.java` (source event ID)
+- Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayCommandService.java` (durable publish contract)
+- Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayDeliveryOwnerMismatchException.java`
+- Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayEventConflictException.java`
+- Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayEventPayloadHash.java` (canonical payload identity)
+- Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayStaleDeliveryEpochException.java`
+- Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/InMemoryGatewayEventBus.java` (source event ID 전달)
+- Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/InMemoryGatewayEventLog.java`
+- Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/InMemoryGatewaySessionCursorStore.java`
+- Modify: `backend/modules/gateway/src/test/java/com/example/discord/gateway/InMemoryGatewayEventLogTest.java` (멱등성 회귀)
+- Modify: `backend/modules/gateway/src/test/java/com/example/discord/gateway/InMemoryGatewayServiceTest.java` (ACK/resume 회귀)
+- Create: `docs/03-analysis/T171-C3-gateway-control-final-quality-review.md`
+
 ## 자료 구조
 
 ```mermaid
