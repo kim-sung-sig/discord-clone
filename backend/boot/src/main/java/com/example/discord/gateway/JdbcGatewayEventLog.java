@@ -146,7 +146,14 @@ class JdbcGatewayEventLog implements GatewayEventLog {
     public long oldestSequence() {
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement(
-                 "SELECT COALESCE(MIN(event_sequence), COALESCE(MAX(event_sequence), 0) + 1) FROM gateway_event_log")) {
+                 """
+                 SELECT COALESCE(
+                     MIN(event_sequence),
+                     COALESCE((SELECT MAX(event_sequence) FROM gateway_event_log), 0) + 1
+                 )
+                 FROM gateway_event_log
+                 WHERE expires_at > now()
+                 """)) {
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getLong(1);

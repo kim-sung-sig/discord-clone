@@ -67,6 +67,18 @@ class GatewayController {
         return new HeartbeatResponse(SessionResponse.from(result.session()), EventResponse.from(result.ack()));
     }
 
+    @PostMapping("/sessions/{sessionId}/ack")
+    AckResponse acknowledge(
+        @PathVariable UUID sessionId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @Valid @RequestBody AckRequest request
+    ) {
+        UUID userId = authenticatedUserResolver.requireUserId(authorization);
+        requireRequest(request);
+        GatewaySessionCursor cursor = gatewayService.acknowledge(sessionId, userId, request.sequence());
+        return new AckResponse(cursor.acknowledgedUserSequence(), cursor.deliveryEpoch());
+    }
+
     @PostMapping("/sessions/{sessionId}/resume")
     ResumeResponse resume(
         @PathVariable UUID sessionId,
@@ -117,7 +129,8 @@ class GatewayController {
                 throw new GatewayForbiddenException("channel visibility required");
             }
         }
-        GatewayEvent event = gatewayService.publish(request.type(), request.guildId(), request.channelId(), request.payload());
+        GatewayEvent event = gatewayService.publish(
+            request.sourceEventId(), request.type(), request.guildId(), request.channelId(), request.payload());
         return ResponseEntity.status(HttpStatus.CREATED).body(EventResponse.from(event));
     }
 
@@ -152,6 +165,12 @@ class GatewayController {
     record HeartbeatResponse(SessionResponse session, EventResponse ack) {
     }
 
+    record AckRequest(@PositiveOrZero long sequence) {
+    }
+
+    record AckResponse(long acknowledgedSequence, long deliveryEpoch) {
+    }
+
     record ResumeRequest(@PositiveOrZero long lastSeq) {
     }
 
@@ -165,6 +184,7 @@ class GatewayController {
         @NotBlank String type,
         @NotNull UUID guildId,
         UUID channelId,
+        UUID sourceEventId,
         @NotNull Map<String, Object> payload
     ) {
     }
@@ -211,10 +231,19 @@ class GatewayController {
 
     record ErrorResponse(String message) {
     }
+
+    record ResyncErrorResponse(String code, String message) {
+    }
 }
 
 @RestControllerAdvice(assignableTypes = GatewayController.class)
 class GatewayControllerAdvice {
+    @ExceptionHandler(GatewayResyncRequiredException.class)
+    ResponseEntity<GatewayController.ResyncErrorResponse> resyncRequired(GatewayResyncRequiredException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new GatewayController.ResyncErrorResponse("RESYNC_REQUIRED", exception.getMessage()));
+    }
+
     @ExceptionHandler(GatewayForbiddenException.class)
     ResponseEntity<GatewayController.ErrorResponse> forbidden(GatewayForbiddenException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

@@ -51,6 +51,8 @@ final class GatewayWebSocketHandler extends TextWebSocketHandler {
         } catch (ResponseStatusException exception) {
             send(socket, Map.of("type", "ERROR", "code", "UNAUTHORIZED", "message", "authentication failed"));
             close(socket, CloseStatus.NOT_ACCEPTABLE.withReason("authentication failed"));
+        } catch (GatewayResyncRequiredException exception) {
+            send(socket, Map.of("type", "ERROR", "code", "RESYNC_REQUIRED", "message", exception.getMessage()));
         } catch (RuntimeException | IOException exception) {
             send(socket, Map.of("type", "ERROR", "code", "INVALID_PAYLOAD", "message", "invalid gateway message"));
         }
@@ -94,6 +96,9 @@ final class GatewayWebSocketHandler extends TextWebSocketHandler {
     private void heartbeat(WebSocketSession socket, Map<String, Object> body) {
         ClientSocket client = requireClient(socket);
         long lastSequence = longValue(body.get("lastSequence"), client.lastSequence());
+        if (lastSequence > 0L) {
+            gatewayService.acknowledge(client.gatewaySessionId(), client.userId(), lastSequence);
+        }
         client = client.withLastSequence(lastSequence);
         clients.put(socket.getId(), client);
         GatewayHeartbeatResult result = gatewayService.heartbeat(client.gatewaySessionId(), client.userId());

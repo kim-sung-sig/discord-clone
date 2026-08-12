@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,9 +19,11 @@ import org.springframework.stereotype.Repository;
 @DependsOn("postgresFlyway")
 class JdbcGatewaySessionCursorStore implements GatewaySessionCursorStore {
     private final DataSource dataSource;
+    private final Clock clock;
 
-    JdbcGatewaySessionCursorStore(DataSource dataSource) {
+    JdbcGatewaySessionCursorStore(DataSource dataSource, Clock clock) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     @Override
@@ -72,7 +75,7 @@ class JdbcGatewaySessionCursorStore implements GatewaySessionCursorStore {
         String ownerInstanceId,
         long sequence
     ) {
-        return update(sessionId, userId, deliveryEpoch, ownerInstanceId, Instant.now(),
+        return update(sessionId, userId, deliveryEpoch, ownerInstanceId, clock.instant(),
             cursor -> cursor.acknowledge(sequence));
     }
 

@@ -18,9 +18,13 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -39,6 +43,7 @@ final class KafkaGatewayEventBus implements GatewayEventBus {
     private final String topic;
     private final String deadLetterTopic;
     private final int deadLetterAlertThreshold;
+    private final long publishTimeoutMillis;
     private final AtomicLong deadLetterTotal = new AtomicLong();
     private final ConcurrentMap<String, AtomicLong> deadLettersByReason = new ConcurrentHashMap<>();
     private final List<Consumer<GatewayBusEvent>> listeners = new CopyOnWriteArrayList<>();
@@ -52,12 +57,27 @@ final class KafkaGatewayEventBus implements GatewayEventBus {
         @Value("${discord.kafka.topic-prefix:discord}") String topicPrefix,
         @Value("${discord.kafka.gateway-dlq-alert-threshold:1}") int deadLetterAlertThreshold
     ) {
+        this(kafka, objectMapper, meterRegistry, clock, nodeId, topicPrefix, deadLetterAlertThreshold, 5_000L);
+    }
+
+    @Autowired
+    KafkaGatewayEventBus(
+        KafkaTemplate<String, String> kafka,
+        ObjectMapper objectMapper,
+        MeterRegistry meterRegistry,
+        Clock clock,
+        @Value("${discord.gateway.node-id:${random.uuid}}") String nodeId,
+        @Value("${discord.kafka.topic-prefix:discord}") String topicPrefix,
+        @Value("${discord.kafka.gateway-dlq-alert-threshold:1}") int deadLetterAlertThreshold,
+        @Value("${discord.kafka.gateway-publish-timeout-ms:5000}") long publishTimeoutMillis
+    ) {
         this.kafka = Objects.requireNonNull(kafka, "kafka must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.nodeId = Objects.requireNonNull(nodeId, "nodeId must not be null");
         this.deadLetterAlertThreshold = Math.max(0, deadLetterAlertThreshold);
+        this.publishTimeoutMillis = Math.max(1L, publishTimeoutMillis);
         String prefix = Objects.requireNonNull(topicPrefix, "topicPrefix must not be null").trim();
         this.topic = (prefix.isEmpty() ? "discord" : prefix) + ".gateway.events";
         this.deadLetterTopic = this.topic + ".dead-letter";
@@ -66,14 +86,22 @@ final class KafkaGatewayEventBus implements GatewayEventBus {
     @Override
     public GatewayBusEvent publish(GatewayBusPublishCommand command) {
         GatewayBusEvent event = new GatewayBusEvent(
-            UUID.randomUUID().toString(),
+            command.sourceEventId() == null ? UUID.randomUUID().toString() : command.sourceEventId(),
             command.type(),
             command.guildId(),
             command.channelId(),
             command.payload(),
             clock.instant()
         );
-        kafka.send(topic, event.guildId().toString(), encode(new KafkaGatewayEnvelope(nodeId, event)));
+        try {
+            kafka.send(topic, event.guildId().toString(), encode(new KafkaGatewayEnvelope(nodeId, event)))
+                .get(publishTimeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("gateway event publish interrupted", exception);
+        } catch (ExecutionException | TimeoutException exception) {
+            throw new IllegalStateException("gateway event publish failed", exception);
+        }
         notifyListeners(event);
         return event;
     }

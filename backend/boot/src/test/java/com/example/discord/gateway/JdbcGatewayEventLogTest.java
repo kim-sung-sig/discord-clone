@@ -67,7 +67,7 @@ class JdbcGatewayEventLogTest {
     void appendWithSameEventIdReturnsTheOriginalSequence() {
         GatewayBusEvent event = new GatewayBusEvent(
             UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
-            Map.of("content", "durable"), Instant.parse("2026-08-10T00:00:00Z")
+            Map.of("content", "durable"), Instant.now()
         );
 
         GatewayEvent first = eventLog.append(event);
@@ -76,5 +76,28 @@ class JdbcGatewayEventLogTest {
         assertThat(duplicate.sequence()).isEqualTo(first.sequence());
         assertThat(eventLog.after(first.sequence() - 1L, 10)).extracting(GatewayEvent::busEventId)
             .contains(event.eventId());
+    }
+
+    @Test
+    void oldestSequenceIgnoresExpiredRows() throws Exception {
+        GatewayBusEvent expired = new GatewayBusEvent(
+            UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
+            Map.of("content", "expired"), Instant.now()
+        );
+        GatewayBusEvent live = new GatewayBusEvent(
+            UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
+            Map.of("content", "live"), Instant.now()
+        );
+
+        GatewayEvent expiredEvent = eventLog.append(expired);
+        GatewayEvent liveEvent = eventLog.append(live);
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                 "UPDATE gateway_event_log SET expires_at = now() - interval '1 minute' WHERE event_sequence = ?")) {
+            statement.setLong(1, expiredEvent.sequence());
+            statement.executeUpdate();
+        }
+
+        assertThat(eventLog.oldestSequence()).isEqualTo(liveEvent.sequence());
     }
 }

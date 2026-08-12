@@ -47,6 +47,14 @@ class AuthConfigurationTest {
     }
 
     @Test
+    void productionNeverCreatesLegacyIssuerEvenWhenLegacyProfileIsAccidentallyEnabled() {
+        contextRunner.withPropertyValues(
+            "spring.profiles.active=production,legacy-auth",
+            "discord.auth.jwt.private-key-location=" + privateKeyFixture()
+        ).run(context -> assertThat(context).doesNotHaveBean(AccessTokenService.class));
+    }
+
+    @Test
     void applicationImportsJwtPropertiesFromMountedConfigTree(@TempDir Path configTree) throws IOException {
         Files.createDirectories(configTree.resolve("discord/auth/jwt/public-key-locations"));
         Files.writeString(configTree.resolve("discord/auth/jwt/issuer"), "discord-identity");

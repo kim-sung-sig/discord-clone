@@ -36,7 +36,7 @@ class AuthConfiguration {
     }
 
     @Bean
-    @Profile("legacy-auth")
+    @Profile("legacy-auth & !production")
     AccessTokenService legacyAccessTokenService(JwtProperties properties, Clock authClock) {
         if (blank(properties.privateKeyLocation())) {
             throw new IllegalStateException("legacy auth private key configuration invalid");

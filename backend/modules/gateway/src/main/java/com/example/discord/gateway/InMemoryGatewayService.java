@@ -125,7 +125,8 @@ public final class InMemoryGatewayService implements GatewayCommandService {
         );
         sessionRegistry.save(session);
         cursorStore.create(new GatewaySessionCursor(
-            session.id(), userId, 0L, 0L, 0L, 1L, "in-memory", clock.instant().plus(heartbeatTimeout), clock.instant()
+            session.id(), userId, 0L, ready.sequence(), ready.sequence(), 1L, "in-memory",
+            clock.instant().plus(heartbeatTimeout), clock.instant()
         ));
         registerSubscriptions(session);
         ready = ready.withPayload(ready.payloadPlus("sessionId", session.id().toString()));
@@ -153,11 +154,23 @@ public final class InMemoryGatewayService implements GatewayCommandService {
     }
 
     public synchronized GatewayEvent publish(String type, UUID guildId, UUID channelId, Map<String, Object> payload) {
+        return publish(null, type, guildId, channelId, payload);
+    }
+
+    public synchronized GatewayEvent publish(
+        UUID sourceEventId,
+        String type,
+        UUID guildId,
+        UUID channelId,
+        Map<String, Object> payload
+    ) {
         Objects.requireNonNull(guildId, "guildId must not be null");
         if (channelId != null && !guildService.channelBelongsToGuild(guildId, channelId)) {
             throw new IllegalArgumentException("channel does not belong to guild");
         }
-        GatewayBusEvent busEvent = eventBus.publish(new GatewayBusPublishCommand(type, guildId, channelId, payload));
+        GatewayBusEvent busEvent = eventBus.publish(new GatewayBusPublishCommand(
+            type, guildId, channelId, payload, sourceEventId == null ? null : sourceEventId.toString()
+        ));
         return appendBusEvent(busEvent);
     }
 
@@ -168,7 +181,7 @@ public final class InMemoryGatewayService implements GatewayCommandService {
     public synchronized List<GatewayEvent> poll(UUID sessionId, UUID userId, long afterSequence) {
         GatewaySession session = requireOwnedSession(sessionId, userId);
         registerSubscriptions(session);
-        List<GatewayEvent> deliverable = deliverableEvents(session, afterSequence);
+        List<GatewayEvent> deliverable = deliverableEvents(session, afterSequence, true);
         updateLastDelivered(session, deliverable);
         return deliverable;
     }
@@ -197,23 +210,21 @@ public final class InMemoryGatewayService implements GatewayCommandService {
 
     public synchronized GatewayResumeResult resume(UUID sessionId, UUID userId, long lastSequence) {
         GatewaySession session = requireOwnedSession(sessionId, userId);
-        if (lastSequence > 0L && lastSequence < Math.max(0L, eventLog.oldestSequence() - 1L)) {
+        GatewaySessionCursor current = cursorStore.find(sessionId, userId).orElse(null);
+        if (current == null) {
+            cursorStore.create(new GatewaySessionCursor(
+                sessionId, userId, session.lastDeliveredSequence(), session.lastDeliveredSequence(),
+                session.lastDeliveredSequence(), 1L, "in-memory",
+                clock.instant().plus(heartbeatTimeout), clock.instant()
+            ));
+            current = cursorStore.find(sessionId, userId)
+                .orElseThrow(() -> new GatewaySessionNotFoundException("gateway session cursor not found"));
+        }
+        long replayFrom = current.acknowledgedUserSequence();
+        if (replayFrom > 0L && replayFrom < Math.max(0L, eventLog.oldestSequence() - 1L)) {
             throw new GatewayResyncRequiredException("gateway event retention no longer covers requested sequence");
         }
         registerSubscriptions(session);
-        if (cursorStore.find(sessionId, userId).isEmpty()) {
-            cursorStore.create(new GatewaySessionCursor(
-                sessionId,
-                userId,
-                session.lastDeliveredSequence(),
-                session.lastDeliveredSequence(),
-                session.lastDeliveredSequence(),
-                1L,
-                "in-memory",
-                clock.instant().plus(heartbeatTimeout),
-                clock.instant()
-            ));
-        }
         cursorStore.replaceEpoch(
             sessionId,
             userId,
@@ -222,7 +233,7 @@ public final class InMemoryGatewayService implements GatewayCommandService {
             clock.instant()
         );
         GatewayEvent resumed = controlEvent("RESUMED", Map.of("sessionId", session.id().toString()));
-        List<GatewayEvent> deliverable = deliverableEvents(session, lastSequence);
+        List<GatewayEvent> deliverable = deliverableEvents(session, replayFrom, false);
         GatewaySession updated = updateLastDelivered(session, deliverable);
         return new GatewayResumeResult(updated, resumed, deliverable);
     }
@@ -235,8 +246,14 @@ public final class InMemoryGatewayService implements GatewayCommandService {
         return new GatewayEvent(eventLog.allocateSequence(), type, null, null, payload, clock.instant());
     }
 
-    private List<GatewayEvent> deliverableEvents(GatewaySession session, long afterSequence) {
-        long lowerBound = Math.max(afterSequence, session.lastDeliveredSequence());
+    private List<GatewayEvent> deliverableEvents(
+        GatewaySession session,
+        long afterSequence,
+        boolean suppressAlreadyDelivered
+    ) {
+        long lowerBound = suppressAlreadyDelivered
+            ? Math.max(afterSequence, session.lastDeliveredSequence())
+            : afterSequence;
         return eventLog.after(lowerBound, MAX_RETAINED_EVENTS).stream()
             .filter(event -> canDeliver(session.userId(), event))
             .toList();

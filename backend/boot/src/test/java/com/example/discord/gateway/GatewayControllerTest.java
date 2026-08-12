@@ -3,6 +3,7 @@ package com.example.discord.gateway;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -24,6 +25,16 @@ import org.springframework.test.web.servlet.MvcResult;
 class GatewayControllerTest {
     @Autowired
     private MockMvc mockMvc;
+
+    @Test
+    void resyncRequiredIsMappedToHttpProtocolError() {
+        var response = new GatewayControllerAdvice().resyncRequired(
+            new GatewayResyncRequiredException("retention expired"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("RESYNC_REQUIRED");
+    }
 
     @Test
     void identifyReturnsReadyForAuthenticatedUserGuilds() throws Exception {
@@ -65,6 +76,16 @@ class GatewayControllerTest {
         long before = publish(owner, "GUILD_UPDATE", guildId, null, "before");
         long after = publish(owner, "GUILD_UPDATE", guildId, null, "after");
 
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", sessionId)
+                .header("Authorization", owner.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/gateway/sessions/{sessionId}/ack", sessionId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sequence\":%d}".formatted(before)))
+            .andExpect(status().isOk());
+
         mockMvc.perform(post("/api/gateway/sessions/{sessionId}/resume", sessionId)
                 .header("Authorization", owner.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -93,6 +114,73 @@ class GatewayControllerTest {
             .andExpect(jsonPath("$.events", hasSize(1)))
             .andExpect(jsonPath("$.events[0].sequence").value((int) eventSeq))
             .andExpect(jsonPath("$.events[0].payload.content").value("poll"));
+    }
+
+    @Test
+    void ackEndpointPersistsLastDeliveredSequence() throws Exception {
+        AuthSession owner = signup("gateway_ack_owner");
+        String guildId = createGuild(owner);
+        String sessionId = sessionId(identify(owner).andExpect(status().isOk()).andReturn());
+        long eventSeq = publish(owner, "GUILD_UPDATE", guildId, null, "ack");
+
+        mockMvc.perform(get("/api/gateway/sessions/{sessionId}/events", sessionId)
+                .header("Authorization", owner.bearer())
+                .param("afterSeq", "0"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/gateway/sessions/{sessionId}/ack", sessionId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sequence\":%d}".formatted(eventSeq)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.acknowledgedSequence").value((int) eventSeq));
+    }
+
+    @Test
+    void ackEndpointRejectsSequenceAheadOfDeliveredCursor() throws Exception {
+        AuthSession owner = signup("gateway_ack_range_owner");
+        String guildId = createGuild(owner);
+        String sessionId = sessionId(identify(owner).andExpect(status().isOk()).andReturn());
+        long eventSeq = publish(owner, "GUILD_UPDATE", guildId, null, "ack-range");
+
+        mockMvc.perform(post("/api/gateway/sessions/{sessionId}/ack", sessionId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sequence\":%d}".formatted(eventSeq + 1L)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publishWithSameSourceEventIdIsIdempotent() throws Exception {
+        AuthSession owner = signup("gateway_event_id_owner");
+        String guildId = createGuild(owner);
+        UUID sourceEventId = UUID.randomUUID();
+        String body = """
+            {
+              "type": "GUILD_UPDATE",
+              "guildId": "%s",
+              "sourceEventId": "%s",
+              "payload": {"content": "same"}
+            }
+            """.formatted(guildId, sourceEventId);
+
+        MvcResult first = mockMvc.perform(post("/api/gateway/events")
+                .header("Authorization", owner.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+        MvcResult retry = mockMvc.perform(post("/api/gateway/events")
+                .header("Authorization", owner.bearer())
+                .header("X-Internal-Gateway-Publisher", "test-harness")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        assertThat(JsonPath.<Number>read(retry.getResponse().getContentAsString(), "$.sequence").longValue())
+            .isEqualTo(JsonPath.<Number>read(first.getResponse().getContentAsString(), "$.sequence").longValue());
     }
 
     @Test

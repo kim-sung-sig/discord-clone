@@ -123,6 +123,8 @@ class InMemoryGatewayServiceTest {
         GatewayIdentifyResult identified = gatewayService.identify(ownerId);
         GatewayEvent before = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "before"));
         GatewayEvent after = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "after"));
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+        gatewayService.acknowledge(identified.session().id(), ownerId, before.sequence());
 
         GatewayResumeResult result = gatewayService.resume(identified.session().id(), ownerId, before.sequence());
 
@@ -410,6 +412,37 @@ class InMemoryGatewayServiceTest {
         assertThatThrownBy(() -> gatewayService.acknowledge(
             identified.session().id(), ownerId, beforeResume.deliveryEpoch(), beforeResume.ownerInstanceId(), event.sequence()))
             .isInstanceOf(GatewayStaleDeliveryEpochException.class);
+    }
+
+    @Test
+    void resumeReplaysDeliveredButUnacknowledgedEventsFromDurableAckCursor() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        GatewayIdentifyResult identified = gatewayService.identify(ownerId);
+        GatewayEvent event = gatewayService.publish("GUILD_UPDATE", guild.id(), null, Map.of("name", "unacknowledged"));
+
+        gatewayService.poll(identified.session().id(), ownerId, 0L);
+
+        assertThat(gatewayService.resume(identified.session().id(), ownerId, 0L).events())
+            .extracting(GatewayEvent::sequence)
+            .containsExactly(event.sequence());
+    }
+
+    @Test
+    void publishWithSourceEventIdPreservesItAcrossGatewayLog() {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        UUID sourceEventId = UUID.randomUUID();
+
+        GatewayEvent event = gatewayService.publish(
+            sourceEventId,
+            "GUILD_UPDATE",
+            guild.id(),
+            null,
+            Map.of("name", "source-id")
+        );
+
+        assertThat(event.busEventId()).isEqualTo(sourceEventId.toString());
     }
 
     private void denyEveryoneView(Guild guild, Channel channel) {

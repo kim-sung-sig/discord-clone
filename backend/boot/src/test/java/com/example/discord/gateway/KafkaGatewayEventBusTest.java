@@ -1,6 +1,7 @@
 package com.example.discord.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -64,6 +65,21 @@ class KafkaGatewayEventBusTest {
             .doesNotContain("must-not-leak")
             .doesNotContain("signedUrl")
             .doesNotContain("X-Amz-Signature");
+    }
+
+    @Test
+    void publishDoesNotNotifyListenersWhenKafkaBrokerAckFails() {
+        CompletableFuture failed = new CompletableFuture();
+        failed.completeExceptionally(new IllegalStateException("broker unavailable"));
+        when(kafka.send(anyString(), anyString(), anyString())).thenReturn(failed);
+        ArrayList<GatewayBusEvent> received = new ArrayList<>();
+        eventBus.addEventListener(received::add);
+
+        assertThatThrownBy(() -> eventBus.publish(new GatewayBusPublishCommand(
+            "MESSAGE_CREATE", UUID.randomUUID(), UUID.randomUUID(), Map.of("content", "safe"))))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("gateway event publish failed");
+        assertThat(received).isEmpty();
     }
 
     @Test

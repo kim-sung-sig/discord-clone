@@ -28,6 +28,9 @@ class ProductionSecretConfiguration {
         if (!activeProfiles.contains("redis")) {
             failures.add("production profile requires redis profile");
         }
+        if (activeProfiles.contains("legacy-auth")) {
+            failures.add("production profile must not enable legacy-auth");
+        }
 
         requireSecret(
             environment,

@@ -13,16 +13,17 @@
 ## 승인 게이트
 
 - Status: Approved
-- Blocking ambiguity: 없음. `V17`, `user_sequence`, `delivery_epoch`, ACK 불변식을 고정한다.
+- Blocking ambiguity: 없음. 이번 보강에서는 `gateway_session_delivery`의 cursor 값을 현재 public 호환 API의 `event_sequence`로 사용한다. 사용자별 `user_sequence` materialization과 grant 발급은 별도 C3.1 task로 분리하며, C3 완료 기준에 포함하지 않는다.
 - Non-goals: Kafka producer/consumer 교체, gateway-service 분리, mTLS/Kubernetes manifest, Redis Stream 제거는 후속 task다.
 
 ## 고정 계약
 
 1. `eventId`는 재시도에도 같은 UUID이고 `(event_id)` unique다. 같은 ID의 payload hash가 같으면 기존 row/sequence를 반환하고, hash가 다르면 `GatewayEventConflictException`으로 거부한다.
-2. `event_sequence`는 event-log 관찰용 전역 bigint이며 client ACK에 사용하지 않는다. client cursor는 사용자별 `user_sequence`다.
-3. `gateway_session_delivery`의 불변식은 `0 <= acknowledged_user_sequence <= highest_delivered_user_sequence <= highest_granted_user_sequence`다.
+   payload hash identity에는 publish timestamp를 포함하지 않으며, Kafka transport는 bounded broker ACK 성공 후에만 local delivery를 알린다.
+2. C3 현재 범위의 public HTTP/WebSocket cursor와 ACK는 durable `event_sequence`를 사용한다. `gateway_session_delivery` 컬럼명(`*_user_sequence`)은 C3.1 materialization 호환을 위해 유지하며, C3에서는 값이 event sequence와 동일하다. C3.1에서 사용자별 `gateway_user_delivery.user_sequence`를 도입할 때 API 버전을 올리고 이 매핑을 제거한다.
+3. `gateway_session_delivery`의 불변식은 `0 <= acknowledged_user_sequence <= highest_delivered_user_sequence <= highest_granted_user_sequence`다. 모든 값은 C3에서 event sequence 단위다.
 4. ACK가 현재 `highest_delivered_user_sequence`보다 크면 `GatewayAckOutOfRangeException`; 현재 값 이하의 중복 ACK는 성공 no-op이다.
-5. retention보다 오래된 replay 요청은 `GatewayResyncRequiredException`이다. visibility 재평가는 기존 `InMemoryGatewayService.canDeliver`를 재사용한다.
+5. retention보다 오래된 replay 요청은 `GatewayResyncRequiredException`이다. JDBC oldest sequence도 만료되지 않은 행만 기준으로 계산한다. visibility 재평가는 기존 `InMemoryGatewayService.canDeliver`를 재사용한다.
 6. JDBC 테스트는 `DISCORD_RUN_POSTGRES_TESTS=true`에서만 Testcontainers PostgreSQL로 실행하며, 기본 test task는 Docker·외부 PostgreSQL을 요구하지 않는다.
 
 ## 변경 파일
@@ -45,6 +46,10 @@
 - Create: `backend/boot/src/test/java/com/example/discord/gateway/JdbcGatewaySessionCursorStoreTest.java`
 - Modify: `backend/boot/build.gradle.kts` (Testcontainers PostgreSQL/JUnit Jupiter test dependencies)
 - Modify: `backend/boot/src/main/java/com/example/discord/auth/AuthConfiguration.java` (legacy-auth compatibility issuer)
+- Modify: `backend/boot/src/main/java/com/example/discord/ops/ProductionSecretConfiguration.java` (production + legacy-auth issuer rejection)
+- Modify: `backend/boot/src/main/java/com/example/discord/gateway/GatewayController.java` (durable ACK endpoint and eventId-aware publish)
+- Modify: `backend/boot/src/main/java/com/example/discord/gateway/GatewayWebSocketHandler.java` (heartbeat ACK persistence and durable resume cursor)
+- Modify: `backend/boot/src/main/java/com/example/discord/gateway/KafkaGatewayEventBus.java` (bounded broker ACK before local delivery)
 - Modify: `backend/boot/src/test/java/com/example/discord/auth/AuthConfigurationTest.java`
 - Modify: `backend/boot/src/test/resources/application.properties` and `application.yml` (test profile/key fixture)
 - Modify: `backend/boot/src/main/java/com/example/discord/guild/GuildController.java`
@@ -110,10 +115,10 @@ classDiagram
 - PostgreSQL opt-in: PowerShell에서 `$env:DISCORD_RUN_POSTGRES_TESTS='true'; ./gradlew :backend:boot:test --tests com.example.discord.gateway.JdbcGatewayEventLogTest --tests com.example.discord.gateway.JdbcGatewaySessionCursorStoreTest --no-daemon`.
 - 완료 기준: spec/quality/security review 각각 90/100 이상, P0/P1 0, 선언한 검증 성공.
 
-현재 구현은 T171-C3의 event log/session cursor 코어 범위다. `gateway_user_delivery`의 사용자별 materialization과 one-time delivery grant 발급은 동일 schema를 사용하는 후속 transport/control task에서 활성화한다.
+현재 구현은 T171-C3의 event log/session cursor 코어 범위다. C3는 public cursor를 event sequence로 고정하며 `gateway_user_delivery`의 사용자별 materialization과 one-time delivery grant 발급은 C3.1 후속 task에서 활성화한다. C3.1은 API 버전 변경과 별도 review를 요구한다.
 
 ## 잔여 위험
 
 - Kafka 원본 event handoff와 gateway-service 분리는 T206/T207에서 별도로 구현한다.
-- 현재 public controller의 `afterSeq` 계약은 호환 기간 동안 남고, transport 내부 API 전환 때 제거한다.
+- 현재 public controller의 `afterSeq`/`lastSeq`는 event sequence cursor로 유지한다. ACK는 HTTP `/sessions/{sessionId}/ack`와 WebSocket heartbeat 양쪽에서 동일 cursor store에 기록한다. transport 내부 API 전환 때 C3.1 user sequence로 교체한다.
 - PostgreSQL 실측은 Docker/CI 환경에서만 수행되며 로컬 기본 테스트는 Docker·DB 없이 skip/pass해야 한다.
