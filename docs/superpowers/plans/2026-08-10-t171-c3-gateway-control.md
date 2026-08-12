@@ -64,6 +64,8 @@
 - Modify: `backend/boot/src/test/java/com/example/discord/gateway/GatewayControllerTest.java` (HTTP ACK/event ID/RESYNC 계약)
 - Create: `backend/boot/src/test/java/com/example/discord/message/MessageConfigurationTest.java` (dispatcher event ID 보존)
 - Modify: `backend/boot/src/test/java/com/example/discord/gateway/KafkaGatewayEventBusTest.java` (broker ACK 실패 경로)
+- Modify: `backend/boot/src/test/java/com/example/discord/ops/ProductionSecretValidationTest.java` (production legacy-auth 차단)
+- Modify: `backend/boot/src/test/resources/application.yml` (test profile fixture)
 - Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayBusPublishCommand.java` (source event ID)
 - Modify: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayCommandService.java` (durable publish contract)
 - Create: `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayDeliveryOwnerMismatchException.java`
@@ -76,6 +78,7 @@
 - Modify: `backend/modules/gateway/src/test/java/com/example/discord/gateway/InMemoryGatewayEventLogTest.java` (멱등성 회귀)
 - Modify: `backend/modules/gateway/src/test/java/com/example/discord/gateway/InMemoryGatewayServiceTest.java` (ACK/resume 회귀)
 - Create: `docs/03-analysis/T171-C3-gateway-control-final-quality-review.md`
+- Modify: `docs/superpowers/plans/2026-08-10-t171-c3-gateway-control.md` (merge inventory reconciliation)
 
 ## 자료 구조
 
