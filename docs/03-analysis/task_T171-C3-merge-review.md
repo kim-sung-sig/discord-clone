@@ -4,15 +4,15 @@
 
 - task branch: `task_T171-C3-gateway-control`
 - base SHA: `origin/main` = `ff7004568213f0654bbfc1bd1d6351e5564d86cc`
-- reviewed content SHA: `773a8bd0a61a6a9dc89313c9e2d1a83c99038ed5`
-- merge-review artifact는 reviewed content SHA의 자식 커밋으로 생성한다.
+- reviewed content SHA: `2a29ac8dd501c73ee7e75f710b9928597aedf10b`
+- 현재 artifact 수정 커밋은 reviewed content SHA의 자식 커밋으로 생성한다.
 
 ## 승인 증거
 
 - 승인 plan: `docs/superpowers/plans/2026-08-10-t171-c3-gateway-control.md`
-- spec review: 93/100, P0 0, P1 0
-- quality review: 93/100, P0 0, P1 0
-- security review: 100/100, P0 0, P1 0
+- spec review: preset `Principal Java Review / plan-contract alignment`, target SHA `2a29ac8dd501c73ee7e75f710b9928597aedf10b`, 93/100, P0 0, P1 0, P2 2, acceptance `APPROVE`
+- quality review: preset `Principal Java Review / implementation-quality gate`, target SHA `2a29ac8dd501c73ee7e75f710b9928597aedf10b`, 93/100, P0 0, P1 0, P2 1, acceptance `APPROVE`
+- security review: preset `Gateway security regression review`, target SHA `2a29ac8dd501c73ee7e75f710b9928597aedf10b`, 100/100, P0 0, P1 0, P2 0, acceptance `APPROVE`
 - 평균: 95.3/100
 - `./gradlew test --no-daemon`: PASS
 - `./gradlew :backend:boot:check :backend:modules:gateway:check --no-daemon`: PASS
@@ -22,13 +22,15 @@
 
 ## 변경 파일 대조
 
-다음 명령의 결과가 plan의 `변경 파일` 및 `보강·직접 검증 추가 파일` 목록과 일치한다.
+다음 명령의 결과가 plan의 `변경 파일` 및 `보강·직접 검증 추가 파일` 목록과 일치한다. 계획 자체(`docs/superpowers/plans/2026-08-10-t171-c3-gateway-control.md`)와 검증 파일(`ProductionSecretValidationTest.java`, `application.yml`)도 명시적으로 포함했다.
 
 ```text
-git diff --name-only origin/main...773a8bd0a61a6a9dc89313c9e2d1a83c99038ed5
+git diff --name-only origin/main...2a29ac8dd501c73ee7e75f710b9928597aedf10b
 ```
 
-plan 목록에 없는 task 파일은 없으며, merge-review artifact 자체는 이 대조에서 제외한다.
+plan 목록에 없는 task 파일은 없으며, merge-review artifact 자체는 이 대조에서 제외한다. `git diff --name-only 2a29ac8dd501c73ee7e75f710b9928597aedf10b..HEAD`는 최종 artifact 파일 하나만 반환해야 한다.
+
+검증 명령은 모두 reviewed content SHA `2a29ac8dd501c73ee7e75f710b9928597aedf10b`의 코드·문서 상태를 대상으로 한다.
 
 ## 잔여 위험
 
