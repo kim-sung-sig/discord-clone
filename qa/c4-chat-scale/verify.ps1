@@ -23,8 +23,11 @@ if(@($rows | Where-Object {$_.phase -notin $expectedPhases -or $_.operation -not
 if(@($rows | ForEach-Object { "$($_.variant)/$($_.phase)/$($_.operation)" } | Sort-Object -Unique).Count -ne $rows.Count){$decision='REJECT';$reasons+='NOT_RUN:duplicate phase or operation evidence'}
 if([int]$runMeta.durationMinutes -lt 40){$decision='REJECT';$reasons+='NOT_RUN:40-minute run required'}
 $planFiles=Get-ChildItem (Join-Path $dir 'plans') -File -ErrorAction SilentlyContinue
-$pruning=($planFiles | ForEach-Object {Get-Content $_ -Raw}) -match 'Partition Pruning|Index Cond'
-if(-not $pruning){$decision='REJECT';$reasons+='pruning evidence missing'}
+$expectedPlans=@(); foreach($variantName in @('baseline','date_range','date_hash')) { foreach($op in @('write','history','search')) { $expectedPlans += "$variantName-$op.txt" } }
+$missingPlans=@($expectedPlans | Where-Object { -not (Test-Path (Join-Path $dir "plans/$_")) })
+$badPlans=@($planFiles | Where-Object { (Get-Content $_ -Raw) -notmatch 'Partition Pruning|Index Cond' })
+$pruning=($missingPlans.Count -eq 0 -and $badPlans.Count -eq 0)
+if(-not $pruning){$decision='REJECT';$reasons+='pruning evidence missing or incomplete'}
 $lagRows=Get-Content (Join-Path $dir 'replica-lag.tsv') | Where-Object {$_ -notmatch '^utc'}
 $lag=@();foreach($line in $lagRows){$f=$line -split "`t";if($f.Count -lt 4){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag row';continue};[double]$x=0;if(-not [double]::TryParse($f[3],[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$x)){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag sample';continue};$lag+=$x*1000}
 $lagP95=if($lag.Count){[double](($lag|Sort-Object)[[math]::Max(0,[math]::Ceiling(.95*$lag.Count)-1)])}else{0}
