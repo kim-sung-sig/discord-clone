@@ -12,10 +12,11 @@ $runMeta=Get-Content (Join-Path $dir 'run.json') -Raw | ConvertFrom-Json
 if ($runMeta.PSObject.Properties.Name -match '(?i)password|secret|dsn|token|body') { throw 'run.json contains sensitive fields' }
 $rows=Import-Csv (Join-Path $dir 'latency.tsv') -Delimiter "`t"
 $reasons=@(); $decision='ACCEPT'
-foreach($r in $rows){foreach($n in @('count','error_count','error_rate','p50_ms','p95_ms','p99_ms','max_ms')){[double]$v=0;if(-not [double]::TryParse($r.$n,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$v)){throw "invalid numeric field $n"}};if([double]$r.error_rate -ge .01 -or [double]$r.p99_ms -ge 500){$decision='REJECT';$reasons+="threshold:$($r.variant)/$($r.operation)"}}
+foreach($r in $rows){foreach($n in @('count','error_count','error_rate','p50_ms','p95_ms','p99_ms','max_ms')){[double]$v=0;if(-not [double]::TryParse($r.$n,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$v) -or [double]::IsNaN($v) -or [double]::IsInfinity($v) -or $v -lt 0){throw "invalid numeric field $n"}};if([double]$r.error_rate -ge .01 -or [double]$r.p99_ms -ge 500){$decision='REJECT';$reasons+="threshold:$($r.variant)/$($r.operation)"}}
 if($rows.Count -eq 0){$decision='REJECT';$reasons+='NOT_RUN:no latency rows'}
 $variants=@($rows.variant | Sort-Object -Unique)
-if($variants.Count -lt 3 -or (@('baseline','date_range','date_hash') | Where-Object {$_ -notin $variants}).Count){$decision='REJECT';$reasons+='NOT_RUN:all three variants are required'}
+$allowedVariants=@('baseline','date_range','date_hash')
+if($variants.Count -ne 3 -or (@($allowedVariants | Where-Object {$_ -notin $variants}).Count) -or (@($variants | Where-Object {$_ -notin $allowedVariants}).Count)){$decision='REJECT';$reasons+='NOT_RUN:all three variants are required and no unknown variants allowed'}
 $expectedRows=12 * [math]::Max(1,$variants.Count)
 if($rows.Count -ne $expectedRows){$decision='REJECT';$reasons+="NOT_RUN:expected $expectedRows latency rows"}
 $expectedPhases=@('ramp','steady','hot-room','recovery'); $expectedOperations=@('write','history','search')

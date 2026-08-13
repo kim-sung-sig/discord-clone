@@ -124,7 +124,7 @@ Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate
 foreach ($snippet in @('decision.json','pruning evidence missing or incomplete','artifact path must be under qa/artifacts/c4-chat-scale','C4_CHAT_SCALE_VERIFY_PASS')) {
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
 }
-foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required','sensitive fields')) {
+foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required and no unknown variants allowed','sensitive fields','IsNaN','IsInfinity')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }
 foreach ($snippet in @('replica lag samples missing','invalid cursor gap evidence','expected $expectedRows latency rows')) {
