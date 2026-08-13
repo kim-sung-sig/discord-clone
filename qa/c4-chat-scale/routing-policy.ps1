@@ -33,3 +33,30 @@ function Get-ShardId {
 
     return [int] ($hash % [uint32] $ShardCount)
 }
+
+function Get-ReadRoute {
+    [CmdletBinding()]
+    param(
+        [ValidateSet('write','read-after-write','history','search')]
+        [string] $RequestType,
+        [double] $LagSeconds
+    )
+
+    if ([double]::IsNaN($LagSeconds) -or [double]::IsInfinity($LagSeconds) -or $LagSeconds -lt 0) {
+        throw [ArgumentException]::new('LagSeconds must be finite and non-negative.', 'LagSeconds')
+    }
+
+    if ($RequestType -in @('write', 'read-after-write')) {
+        return [pscustomobject]@{ target = 'primary'; fallback_reason = ''; warning = '' }
+    }
+
+    if ($LagSeconds -gt 30) {
+        return [pscustomobject]@{ target = 'primary'; fallback_reason = 'replica_lag_gt_30s'; warning = 'history_page_limited' }
+    }
+
+    if ($LagSeconds -gt 2) {
+        return [pscustomobject]@{ target = 'primary'; fallback_reason = 'replica_lag_gt_2s'; warning = '' }
+    }
+
+    return [pscustomobject]@{ target = 'replica'; fallback_reason = ''; warning = '' }
+}

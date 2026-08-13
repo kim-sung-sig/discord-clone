@@ -21,7 +21,9 @@ $runId = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $artifactDir = Join-Path $root $runId
 $plansDir = Join-Path $artifactDir 'plans'
 $composeLog = Join-Path $artifactDir 'logs/compose.log'
+$routingPath = Join-Path $artifactDir 'routing.tsv'
 $composeArgs = @('-f', $composeFile)
+. (Join-Path $PSScriptRoot 'routing-policy.ps1')
 
 function Invoke-Compose([string[]]$Arguments) {
     & docker compose @composeArgs @Arguments
@@ -55,6 +57,56 @@ function Start-StatsSampler([string]$table, [string]$operation, [string]$phase) 
     }
 }
 
+function Get-ReplicaLagSeconds {
+    $value = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -c "SELECT CASE WHEN pg_last_wal_receive_lsn() IS DISTINCT FROM pg_last_wal_replay_lsn() THEN COALESCE(EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())), 0) ELSE 0 END;" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "replica lag probe failed: $($value -join ' ')" }
+    [double]$lag = 0
+    if (-not [double]::TryParse(($value | Select-Object -Last 1), [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$lag)) { throw "replica lag probe was not numeric: $($value -join ' ')" }
+    return $lag
+}
+
+function Add-RoutingEvidence([string]$Scenario, [string]$RequestType, [double]$LagSeconds, $Route, [int]$StaleReadCount) {
+    if ([double]::IsNaN($LagSeconds) -or [double]::IsInfinity($LagSeconds) -or $LagSeconds -lt 0) { throw 'routing drill produced invalid lag' }
+    @($Scenario, $RequestType, ([math]::Round($LagSeconds, 3)), $Route.target, $Route.fallback_reason, $StaleReadCount, $Route.warning) -join "`t" | Add-Content $routingPath
+}
+
+function Invoke-RoutingDrill {
+    $marker = "routing-$runId"
+    $sequence = 900000000 + [math]::Abs($Seed % 100000)
+    $insert = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -v ON_ERROR_STOP=1 -c "INSERT INTO messages_baseline (chat_room_id,event_date,sequence,content,idempotency_key) VALUES ('routing-room', DATE '2026-01-01', $sequence, 'routing drill', '$marker');" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "routing drill write failed: $($insert -join ' ')" }
+
+    $primaryCount = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -c "SELECT count(*) FROM messages_baseline WHERE idempotency_key = '$marker';" 2>&1
+    if ($LASTEXITCODE -ne 0 -or ($primaryCount | Select-Object -Last 1) -ne '1') { throw 'routing drill primary read-after-write failed' }
+    Add-RoutingEvidence 'write' 'write' 0 (Get-ReadRoute -RequestType write -LagSeconds 0) 0
+    Add-RoutingEvidence 'read-after-write' 'read-after-write' 0 (Get-ReadRoute -RequestType read-after-write -LagSeconds 0) 0
+
+    $healthyLag = Get-ReplicaLagSeconds
+    $healthyRoute = Get-ReadRoute -RequestType history -LagSeconds $healthyLag
+    if ($healthyRoute.target -ne 'replica') { throw "healthy replica route unavailable at lag=$healthyLag" }
+    $replicaCount = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -c "SELECT count(*) FROM messages_baseline WHERE idempotency_key = '$marker';" 2>&1
+    $stale = if (($replicaCount | Select-Object -Last 1) -eq '1') { 0 } else { 1 }
+    if ($stale -ne 0) { throw 'healthy replica history read was stale' }
+    Add-RoutingEvidence 'history' 'history' $healthyLag $healthyRoute $stale
+
+    try {
+        $pause = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -c 'SELECT pg_wal_replay_pause();' 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "replica pause failed: $($pause -join ' ')" }
+        & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -v ON_ERROR_STOP=1 -c "INSERT INTO messages_baseline (chat_room_id,event_date,sequence,content,idempotency_key) SELECT 'routing-room', DATE '2026-01-01', $sequence + g, 'routing lag drill', '$marker-lag-' || g FROM generate_series(1,20000) g ON CONFLICT DO NOTHING;" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'routing lag write failed' }
+        Start-Sleep -Seconds 3
+        $fallbackLag = Get-ReplicaLagSeconds
+        $fallbackRoute = Get-ReadRoute -RequestType history -LagSeconds $fallbackLag
+        if ($fallbackLag -le 2 -or $fallbackRoute.target -ne 'primary' -or $fallbackRoute.fallback_reason -ne 'replica_lag_gt_2s') { throw "replica fallback threshold was not exercised: lag=$fallbackLag" }
+        Add-RoutingEvidence 'history-fallback' 'history' $fallbackLag $fallbackRoute 0
+    } finally {
+        & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -c 'SELECT pg_wal_replay_resume();' 2>&1 | Out-Null
+    }
+
+    $severeRoute = Get-ReadRoute -RequestType history -LagSeconds 30.001
+    Add-RoutingEvidence 'history-severe-policy' 'history' 30.001 $severeRoute 0
+}
+
 function Get-LatencySamples([string[]]$LogLines) {
     $samples = @()
     foreach ($line in $LogLines) {
@@ -85,6 +137,7 @@ if (-not $gitSha) { $gitSha = 'unknown' }
 "variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms" | Set-Content (Join-Path $artifactDir 'latency.tsv')
 "utc`t table`t live`t dead`t vacuum`trelation_size_bytes`tindex_size_bytes" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
 "utc`t receive_lsn`t replay_lsn`t lag_seconds" | Set-Content (Join-Path $artifactDir 'replica-lag.tsv')
+"scenario`trequest_type`tlag_seconds`tselected_target`tfallback_reason`tstale_read_count`twarning" | Set-Content $routingPath
 "variant`tduplicate_cursor_count" | Set-Content (Join-Path $artifactDir 'cursor-gaps.tsv')
 
 try {
@@ -175,6 +228,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "cursor duplicate check failed for $variantName" }
         $cursorCheck | Add-Content (Join-Path $artifactDir 'cursor-gaps.tsv')
     }
+    Invoke-RoutingDrill
 } catch {
     "run failure: $($_.Exception.Message)" | Add-Content (Join-Path $artifactDir 'logs/run.log')
     try { & docker compose @composeArgs logs --no-color primary replica 2>&1 | Set-Content $composeLog } catch { }

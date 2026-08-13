@@ -57,6 +57,7 @@ $verify = Get-Content -Path $verifyPath -Raw
 $readme = Get-Content -Path $readmePath -Raw
 
 Assert ($policy -match '(?m)^function\s+Get-ShardId\b') 'Get-ShardId function is missing'
+Assert ($policy -match '(?m)^function\s+Get-ReadRoute\b') 'Get-ReadRoute function is missing'
 Assert ($policy.Contains('[ArgumentException]')) 'ArgumentException validation is missing'
 Assert ($policy.Contains('SHA256')) 'SHA-256 hashing is missing'
 Assert ($policy.Contains('ToUInt32')) 'little-endian hash extraction is missing'
@@ -119,7 +120,7 @@ Assert ($run.Contains('IS DISTINCT FROM pg_last_wal_replay_lsn()')) 'replica lag
 Assert ($run.Contains('operationSeconds') -and $run.Contains('0.50') -and $run.Contains('0.35') -and $run.Contains('0.15')) 'run must allocate each phase by the declared operation mix'
 Assert ($run.Contains('operationUnit') -and $run.Contains('aggregateIntervalArg')) 'run must align operation durations with pgbench aggregate interval'
 Assert ($run.Contains('pg_total_relation_size') -and $run.Contains('pg_indexes_size')) 'run must record relation and index size evidence'
-foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'cursor-gaps.tsv', 'plans')) {
+foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'routing.tsv', 'cursor-gaps.tsv', 'plans')) {
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
 Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms') -or
@@ -128,6 +129,8 @@ foreach ($snippet in @('decision.json','candidate_decision','selected_variant','
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
 }
 foreach ($snippet in @('db-stats.tsv','dbStable','previousVacuumByTable','relation size or vacuum stability evidence failed','db_stability_pass')) { Assert ($verify.Contains($snippet)) "verify stability requirement is missing: $snippet" }
+foreach ($snippet in @('routing.tsv','history-fallback','replica_lag_gt_2s','history_page_limited','stale_read_count')) { Assert ($verify.Contains($snippet)) "verify routing requirement is missing: $snippet" }
+foreach ($snippet in @('hotRoomWriteQpsByVariant','hot_room_write_qps','hashLoadGate','hotWriteSeconds')) { Assert ($verify.Contains($snippet)) "verify hot-room load gate is missing: $snippet" }
 foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required and no unknown variants allowed','sensitive fields','IsNaN','IsInfinity','invalid metric ordering','expectedRate')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }
@@ -143,6 +146,7 @@ Assert (-not ($run -match '(?i)raw body|password.*run\.json|secret.*run\.json'))
 foreach ($snippet in @('-v $artifactDir:/artifacts', '--log-prefix=/artifacts/pgbench-${variant}-${phase}-${op}', 'Add-Stats', 'Start-Job', 'Stop-Job', 'pg_stat_user_tables', 'pg_stat_replication', 'Start-Sleep -Seconds 10')) {
     Assert ($run.Contains($snippet)) "run interval evidence requirement is missing: $snippet"
 }
+foreach ($snippet in @('Get-ReadRoute','routing.tsv','pg_wal_replay_pause','pg_wal_replay_resume','replica_lag_gt_2s')) { Assert ($run.Contains($snippet)) "run routing drill requirement is missing: $snippet" }
 Assert ($run.Contains('aggregateInterval = 10')) 'pgbench aggregate interval must be 10 seconds'
 foreach ($snippet in @(
     'pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1',

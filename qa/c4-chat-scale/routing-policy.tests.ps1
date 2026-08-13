@@ -50,4 +50,17 @@ foreach ($invalid in @(
     }
 }
 
+$writeRoute = Get-ReadRoute -RequestType write -LagSeconds 99
+if ($writeRoute.target -ne 'primary' -or $writeRoute.fallback_reason) { throw 'write must remain primary without fallback' }
+$rawRoute = Get-ReadRoute -RequestType read-after-write -LagSeconds 99
+if ($rawRoute.target -ne 'primary') { throw 'read-after-write must remain primary' }
+$replicaRoute = Get-ReadRoute -RequestType history -LagSeconds 0
+if ($replicaRoute.target -ne 'replica') { throw 'healthy history must use replica' }
+$fallbackRoute = Get-ReadRoute -RequestType search -LagSeconds 2.001
+if ($fallbackRoute.target -ne 'primary' -or $fallbackRoute.fallback_reason -ne 'replica_lag_gt_2s') { throw 'lag > 2s must fallback to primary' }
+$limitedRoute = Get-ReadRoute -RequestType history -LagSeconds 30.001
+if ($limitedRoute.target -ne 'primary' -or $limitedRoute.warning -ne 'history_page_limited') { throw 'lag > 30s must limit history' }
+
+try { Get-ReadRoute -RequestType history -LagSeconds -1 | Out-Null; throw 'negative lag accepted' } catch { if ($_.Exception.Message -eq 'negative lag accepted') { throw } }
+
 Write-Output 'C4_ROUTING_TEST_PASS'

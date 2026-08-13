@@ -137,7 +137,8 @@ git commit -m "test(T171-C4): add isolated postgres primary replica harness"
 2. `docker compose up -d primary replica` 후 `pg_isready`를 polling한다. timeout은 120초이며 실패 시 compose 로그를 artifact에 남기고 non-zero 종료한다.
 3. 각 variant에 대해 template seed를 primary에 한 번 적재하고 `pgbench`를 4 phase(300/900/900/300초)로 실행한다. 각 phase 총 시간은 유지하되 write/history/search를 각각 50%/35%/15% 시간 창으로 순차 실행해 operation 합계가 phase 시간을 넘지 않게 한다. 모든 phase에서 `-j 4 -c 16`을 고정하고 `--aggregate-interval=10`으로 `latency.tsv`를 만든다. 따라서 `all + 40분`은 variant당 40분, 전체 약 120분이다.
 4. 매 10초 `pg_stat_replication`, `pg_stat_user_tables`와 `pg_total_relation_size`·`pg_indexes_size`, `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` 결과를 각각 `replica-lag.tsv`, `db-stats.tsv`, `plans/<variant>-<operation>.txt`에 append한다. `db-stats.tsv`의 relation/index size는 50GB 이하, vacuum_count 비감소, live>0일 때 dead/live 10% 이하를 검증기가 모두 확인하며 누락·파싱 실패는 fail-closed 한다.
-5. `run.json`에 secret/password/DSN을 쓰지 않고, 종료 시 `docker compose down -v`를 보장한다.
+5. 모든 variant 부하가 끝나면 replica에서 `pg_wal_replay_pause()`를 호출하고 primary에 lag payload를 기록한 뒤 `routing.tsv`에 healthy history→replica, lag >2초→primary fallback, lag >30초→primary 제한 warning, write/read-after-write→primary·stale 0을 기록한다. 마지막에 `pg_wal_replay_resume()`을 `finally`로 보장한다.
+6. `run.json`에 secret/password/DSN을 쓰지 않고, 종료 시 `docker compose down -v`를 보장한다.
 
 - [ ] **Step 3: RED→GREEN 실행 검증**
 
@@ -184,7 +185,7 @@ git commit -m "feat(T171-C4): run chat scale variants and capture evidence"
 
 - [ ] **Step 3: 보고서 생성**
 
-`docs/04-report/t171-c4-chat-scale-verification.md`는 실행 SHA·명령·환경·variant별 표·결정·미실행 항목·다음 단계(운영 마이그레이션 별도)를 한국어로 기록한다. 실측값 없이 성공을 주장하지 않고 `NOT_RUN`을 사용한다.
+`docs/04-report/t171-c4-chat-scale-verification.md`는 실행 SHA·명령·환경·variant별 표·결정·routing drill 표·미실행 항목·다음 단계(운영 마이그레이션 별도)를 한국어로 기록한다. 실측값 없이 성공을 주장하지 않고 `NOT_RUN`을 사용한다.
 
 - [ ] **Step 4: GREEN 검증**
 

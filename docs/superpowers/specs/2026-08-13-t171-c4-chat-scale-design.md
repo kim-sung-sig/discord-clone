@@ -99,7 +99,7 @@ history read는 `before_cursor`와 limit 50을 사용하고 offset pagination은
 - benchmark network는 로컬 전용이며 외부 공개하지 않는다.
 - 각 run 시작 시 database/schema를 새로 만들고 종료 시 compose down으로 제거한다.
 
-Replica lag 실측은 standby에서 `pg_wal_replay_pause()`를 사용해 의도적으로 replay를 멈춘 뒤 재개한다. 이 drill은 데이터 손실을 유발하지 않으며, lag 측정과 read fallback 계약만 검증한다.
+Replica lag 실측은 standby에서 `pg_wal_replay_pause()`를 사용해 의도적으로 replay를 멈춘 뒤 재개한다. `run.ps1`이 이 drill을 자동 수행하고 `routing.tsv`에 healthy replica route, `lag > 2초` primary fallback, `lag > 30초` 제한 경고 정책 결과를 기록한다. 이 drill은 데이터 손실을 유발하지 않으며, lag 측정과 read fallback 계약만 검증한다.
 
 ## 6. read routing 계약
 
@@ -112,7 +112,7 @@ C4는 production service routing을 바로 변경하지 않고 다음 정책을 
 | history/search | replica | lag > 2초면 primary |
 | history/search, lag > 30초 | primary 제한 경로 | 신규 history page 제한 + 경고 |
 
-artifact에는 요청 시각, replica replay lag, 선택된 대상(`primary`/`replica`), fallback 이유를 남긴다. read-after-write 판정은 write transaction의 commit timestamp와 query 시작 시각으로 확인한다.
+artifact에는 요청 시각, replica replay lag, 선택된 대상(`primary`/`replica`), fallback 이유, stale read count, severe-lag warning을 `routing.tsv`에 남긴다. read-after-write는 primary에서 수행하고 stale read count가 0이어야 한다. healthy history/search는 replica에서 수행하며, lag >2초는 primary fallback, lag >30초는 primary 제한 경로와 `history_page_limited` warning을 기록한다.
 
 ## 7. 측정 항목과 증거 형식
 
@@ -122,6 +122,7 @@ artifact에는 요청 시각, replica replay lag, 선택된 대상(`primary`/`re
 - `latency.tsv`: operation, count, error, p50, p95, p99, max
 - `db-stats.tsv`: CPU, memory, WAL bytes, relation size, index size, lock wait, autovacuum state
 - `replica-lag.tsv`: sample time, replay LSN, receive LSN, lag seconds, route decision
+- `routing.tsv`: scenario, request type, lag seconds, selected target, fallback reason, stale read count, warning
 - `plans/*.txt`: `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` 결과
 - `decision.json`: variant별 판정과 근거 threshold
 
@@ -144,11 +145,11 @@ artifact에는 요청 시각, replica replay lag, 선택된 대상(`primary`/`re
 - baseline이 모든 steady/hot-room 구간에서 `write p99 < 500ms`이고 relation size·vacuum도 안정적이면 partition 도입은 보류한다. 안정성은 `db-stats.tsv`의 모든 행이 유효하고, `relation_size_bytes`·`index_size_bytes`가 각각 50GB 이하이며, **각 테이블별로** `vacuum` 값이 시간순으로 감소하지 않고, `live > 0`일 때 `dead/live <= 10%`인 경우로 고정한다. 행 누락·파싱 실패·임계 초과는 `INVALID`로 처리하며 p99만으로 `DEFER`하지 않는다.
 - baseline이 `write p99 >= 500ms` 또는 partition size 50GB 이상을 15분 지속하면 `date_range`를 후보로 올린다.
 - `date_range`가 history query pruning과 retention drop을 충족하고 baseline 대비 write/read p99가 악화되지 않으면 date partition을 권고한다.
-- `date_hash`는 `date_range`에서 hot-room write QPS 1,000 이상 또는 write p99 500ms 이상이 15분 지속되고, `date_hash`가 hot-room p99를 20% 이상 줄이면서 error/replica lag을 10% 이상 악화시키지 않을 때만 권고한다.
+- `date_hash`는 `date_range`에서 hot-room write QPS 1,000 이상 또는 write p99 500ms 이상이 15분 지속되고(`hot-room write count / 450초`로 QPS를 계산), `date_hash`가 hot-room p99를 20% 이상 줄이면서 error/replica lag을 10% 이상 악화시키지 않을 때만 권고한다. verifier가 `hot_room_write_qps`와 `hash_load_gate`를 기록·검증한다.
 
 ### 8.3 Replica 판정
 
-- steady 동안 lag p95 < 2초이고 history/search p99가 primary 대비 20% 이내면 replica read를 승인한다.
+- steady 동안 lag p95 < 2초이고 `routing.tsv`의 healthy history route가 replica를 선택하며 stale read가 0이면 replica read route 계약을 승인한다. 애플리케이션 datasource별 p99 비교는 별도 production routing task에서 수행한다.
 - lag > 2초 drill에서 primary fallback이 100% 발생하고 stale read가 0건이어야 한다.
 - lag > 30초 drill에서 history 제한과 경고가 모두 발생해야 한다.
 
@@ -196,7 +197,7 @@ C4 구현 task는 다음만 추가한다.
 ## 11. 완료 기준
 
 - 세 variant가 같은 seed로 재현된다.
-- primary/replica streaming과 lag fallback drill이 성공한다.
+- primary/replica streaming과 자동 lag fallback drill이 성공하고 `routing.tsv`의 healthy/fallback/severe 정책 행이 모두 검증된다.
 - latency, WAL, size, pruning, lag artifact가 schema대로 생성된다.
 - 판정 verifier가 acceptance threshold를 자동 평가한다.
 - 독립 spec/quality/security review 각 90점 이상, P0/P1 0
