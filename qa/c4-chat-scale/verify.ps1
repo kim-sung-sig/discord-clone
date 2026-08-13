@@ -12,7 +12,7 @@ $runMeta=Get-Content (Join-Path $dir 'run.json') -Raw | ConvertFrom-Json
 if ($runMeta.PSObject.Properties.Name -match '(?i)password|secret|dsn|token|body') { throw 'run.json contains sensitive fields' }
 $rows=Import-Csv (Join-Path $dir 'latency.tsv') -Delimiter "`t"
 $reasons=@(); $decision='ACCEPT'
-foreach($r in $rows){foreach($n in @('count','error_count','error_rate','p50_ms','p95_ms','p99_ms','max_ms')){[double]$v=0;if(-not [double]::TryParse($r.$n,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$v) -or [double]::IsNaN($v) -or [double]::IsInfinity($v) -or $v -lt 0){throw "invalid numeric field $n"}};if([double]$r.error_rate -ge .01 -or [double]$r.p99_ms -ge 500){$decision='REJECT';$reasons+="threshold:$($r.variant)/$($r.operation)"}}
+foreach($r in $rows){foreach($n in @('count','error_count','error_rate','p50_ms','p95_ms','p99_ms','max_ms')){[double]$v=0;if(-not [double]::TryParse($r.$n,[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$v) -or [double]::IsNaN($v) -or [double]::IsInfinity($v) -or $v -lt 0){throw "invalid numeric field $n"}};if([double]$r.error_count -gt [double]$r.count -or [double]$r.p50_ms -gt [double]$r.p95_ms -or [double]$r.p95_ms -gt [double]$r.p99_ms -or [double]$r.p99_ms -gt [double]$r.max_ms){$decision='REJECT';$reasons+="invalid metric ordering:$($r.variant)/$($r.operation)"};if([double]$r.error_rate -ge .01 -or [double]$r.p99_ms -ge 500){$decision='REJECT';$reasons+="threshold:$($r.variant)/$($r.operation)"}}
 if($rows.Count -eq 0){$decision='REJECT';$reasons+='NOT_RUN:no latency rows'}
 $variants=@($rows.variant | Sort-Object -Unique)
 $allowedVariants=@('baseline','date_range','date_hash')
@@ -30,7 +30,7 @@ $badPlans=@($planFiles | Where-Object { (Get-Content $_ -Raw) -notmatch 'Partiti
 $pruning=($missingPlans.Count -eq 0 -and $badPlans.Count -eq 0)
 if(-not $pruning){$decision='REJECT';$reasons+='pruning evidence missing or incomplete'}
 $lagRows=Get-Content (Join-Path $dir 'replica-lag.tsv') | Where-Object {$_ -notmatch '^utc'}
-$lag=@();foreach($line in $lagRows){$f=$line -split "`t";if($f.Count -lt 4){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag row';continue};[double]$x=0;if(-not [double]::TryParse($f[3],[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$x)){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag sample';continue};$lag+=$x*1000}
+$lag=@();foreach($line in $lagRows){$f=$line -split "`t";if($f.Count -lt 4){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag row';continue};[double]$x=0;if(-not [double]::TryParse($f[3],[Globalization.NumberStyles]::Float,[Globalization.CultureInfo]::InvariantCulture,[ref]$x) -or [double]::IsNaN($x) -or [double]::IsInfinity($x) -or $x -lt 0){$decision='REJECT';$reasons+='NOT_RUN:invalid replica lag sample';continue};$lag+=$x*1000}
 $lagP95=if($lag.Count){[double](($lag|Sort-Object)[[math]::Max(0,[math]::Ceiling(.95*$lag.Count)-1)])}else{0}
 if($lag.Count -eq 0){$decision='REJECT';$reasons+='NOT_RUN:replica lag samples missing'}
 if($lagP95 -ge 2000){$decision='REJECT';$reasons+='replica lag p95 >= 2s'}
