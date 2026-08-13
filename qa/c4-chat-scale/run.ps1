@@ -109,12 +109,13 @@ try {
         foreach ($phase in @('ramp','steady','hot-room','recovery')) {
             $seconds = $phaseSeconds[(@('ramp','steady','hot-room','recovery').IndexOf($phase))]
             # Keep each phase at its declared duration; operation windows follow the 50/35/15 mix.
+            $operationUnit = if ($seconds -lt 10) { 1 } else { 10 }
             $operationSeconds = [ordered]@{
-                write = [math]::Max(1, [math]::Round($seconds * 0.50))
-                history = [math]::Max(1, [math]::Round($seconds * 0.35))
-                search = [math]::Max(1, [math]::Round($seconds * 0.15))
+                write = [math]::Max($operationUnit, [math]::Round(($seconds * 0.50) / $operationUnit) * $operationUnit)
+                history = [math]::Max($operationUnit, [math]::Round(($seconds * 0.35) / $operationUnit) * $operationUnit)
+                search = [math]::Max($operationUnit, [math]::Round(($seconds * 0.15) / $operationUnit) * $operationUnit)
             }
-            $operationSeconds.search = [math]::Max(1, $operationSeconds.search + $seconds - (($operationSeconds.Values | Measure-Object -Sum).Sum))
+            $operationSeconds.search = [math]::Max($operationUnit, $operationSeconds.search + $seconds - (($operationSeconds.Values | Measure-Object -Sum).Sum))
             foreach ($operation in @(@('write','write.sql'), @('history','history.sql'), @('search','search.sql'))) {
                 $opName = $operation[0]; $sqlName = $operation[1]
                 $operationDuration = [int]$operationSeconds[$opName]
