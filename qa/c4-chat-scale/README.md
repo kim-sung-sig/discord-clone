@@ -7,6 +7,12 @@ pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1
 pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant baseline -DurationMinutes 1
 ```
 
+```powershell
+pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1
+pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant all -DurationMinutes 40
+pwsh -NoProfile -File qa/c4-chat-scale/verify.ps1 -ArtifactDir qa/artifacts/c4-chat-scale/<run-id>
+```
+
 표준 실행은 `-Variant all -DurationMinutes 40`이며 PostgreSQL 16 primary(15442)와 replica(15443)를 Docker Compose로 기동한다. 기본 seed는 1714이고, 40분 실행은 ramp 5분·steady 15분·hot-room 15분·recovery 5분으로 구성된다. 모든 단계는 `pgbench -j 4 -c 16 --aggregate-interval=10`을 사용한다.
 
 로컬 Docker 메모리 편차를 줄이기 위해 Compose는 `shared_buffers=32MB`, `max_connections=32`, `work_mem=1MB`를 고정한다. 이는 운영 PostgreSQL 설정이 아닌 통제된 벤치마크 설정이다.

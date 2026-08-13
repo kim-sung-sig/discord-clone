@@ -51,6 +51,7 @@ $write = Get-Content -Path $writePath -Raw
 $history = Get-Content -Path $historyPath -Raw
 $search = Get-Content -Path $searchPath -Raw
 $run = Get-Content -Path $runPath -Raw
+$readme = Get-Content -Path $readmePath -Raw
 
 Assert ($policy -match '(?m)^function\s+Get-ShardId\b') 'Get-ShardId function is missing'
 Assert ($policy.Contains('[ArgumentException]')) 'ArgumentException validation is missing'
@@ -116,6 +117,17 @@ foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.
 }
 Assert ($run -match '(?i)secret|password|dsn') 'run must explicitly guard secret output'
 Assert (-not ($run -match '(?i)raw body|password.*run\.json|secret.*run\.json')) 'run must not write secrets or raw bodies'
+foreach ($snippet in @('-v $artifactDir:/artifacts', '--log-prefix=/artifacts/pgbench-${variant}-${phase}-${op}', 'Add-Stats', 'Start-Job', 'Stop-Job', 'pg_stat_user_tables', 'pg_stat_replication', 'Start-Sleep -Seconds 10')) {
+    Assert ($run.Contains($snippet)) "run interval evidence requirement is missing: $snippet"
+}
+Assert ($run.Contains('aggregateInterval = 10')) 'pgbench aggregate interval must be 10 seconds'
+foreach ($snippet in @(
+    'pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1',
+    'pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant all -DurationMinutes 40',
+    'pwsh -NoProfile -File qa/c4-chat-scale/verify.ps1 -ArtifactDir qa/artifacts/c4-chat-scale/<run-id>'
+)) {
+    Assert ($readme.Contains($snippet)) "README required command is missing: $snippet"
+}
 
 $testOutput = & pwsh -NoProfile -File $testsPath 2>&1
 Assert ($LASTEXITCODE -eq 0) "Routing behavior test failed: $($testOutput -join [Environment]::NewLine)"

@@ -30,12 +30,29 @@ function Invoke-Compose([string[]]$Arguments) {
 # docker compose up -d primary replica
 
 function Add-Stats([string]$table) {
-    try {
-        $stats = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>$null
-        if ($LASTEXITCODE -eq 0) { $stats | Add-Content (Join-Path $artifactDir 'db-stats.tsv') }
-        $lag = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()));" 2>$null
-        if ($LASTEXITCODE -eq 0) { $lag | Add-Content (Join-Path $artifactDir 'replica-lag.tsv') }
-    } catch { }
+    $stats = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "initial pg_stat_user_tables sample failed: $($stats -join ' ')" }
+    $stats | Add-Content (Join-Path $artifactDir 'db-stats.tsv')
+    $lag = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()));" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "initial pg_stat_replication sample failed: $($lag -join ' ')" }
+    $lag | Add-Content (Join-Path $artifactDir 'replica-lag.tsv')
+}
+
+function Start-StatsSampler([string]$table, [string]$operation, [string]$phase) {
+    $dbStatsPath = Join-Path $artifactDir 'db-stats.tsv'
+    $replicaStatsPath = Join-Path $artifactDir 'replica-lag.tsv'
+    Start-Job -ArgumentList $composeFile, $table, $dbStatsPath, $replicaStatsPath -ScriptBlock {
+        param($composeFile, $table, $dbStatsPath, $replicaStatsPath)
+        while ($true) {
+            $stats = & docker compose -f $composeFile exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
+            if ($LASTEXITCODE -ne 0) { throw "pg_stat_user_tables sampler failed: $($stats -join ' ')" }
+            $stats | Add-Content $dbStatsPath
+            $replica = & docker compose -f $composeFile exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()));" 2>&1
+            if ($LASTEXITCODE -ne 0) { throw "pg_stat_replication sampler failed: $($replica -join ' ')" }
+            $replica | Add-Content $replicaStatsPath
+            Start-Sleep -Seconds 10
+        }
+    }
 }
 
 New-Item -ItemType Directory -Force -Path $plansDir, (Split-Path $composeLog) | Out-Null
@@ -70,11 +87,33 @@ try {
             $seconds = $phaseSeconds[(@('ramp','steady','hot-room','recovery').IndexOf($phase))]
             foreach ($operation in @(@('write','write.sql'), @('history','history.sql'), @('search','search.sql'))) {
                 $opName = $operation[0]; $sqlName = $operation[1]
-                $aggregateInterval = [math]::Min(10, $seconds)
-                $output = & docker compose @composeArgs run --rm --no-deps -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateInterval" -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
-                if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
-                "${variantName}:${opName}`t$phase`t$($output -join ' ')" | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                $aggregateInterval = 10
+                $aggregateIntervalArg = [math]::Min($aggregateInterval, $seconds)
+                $artifactMount = "$artifactDir`:/artifacts"
+                # pgbench interval evidence is mounted from the Windows host into the container.
+                # Docker argument form: -v $artifactDir:/artifacts
+                $logPrefix = "/artifacts/pgbench-${variantName}-${phase}-${opName}"
+                # Required log prefix shape: --log-prefix=/artifacts/pgbench-${variant}-${phase}-${op}
                 Add-Stats $table
+                $sampler = Start-StatsSampler $table $opName $phase
+                try {
+                    $output = & docker compose @composeArgs run --rm --no-deps -v $artifactMount -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateIntervalArg" "--log-prefix=$logPrefix" -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
+                    if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
+                    "${variantName}:${opName}`t$phase`t$($output -join ' ')" | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                    $logFiles = Get-ChildItem -Path $artifactDir -Filter "pgbench-$variantName-$phase-$opName*" -File -ErrorAction SilentlyContinue
+                    foreach ($logFile in $logFiles) {
+                        "${variantName}:${opName}`t$phase`tfile:$($logFile.Name)" | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                        Get-Content $logFile.FullName | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                    }
+                } finally {
+                    $samplerState = $sampler.State
+                    Stop-Job $sampler -ErrorAction SilentlyContinue
+                    $samplerOutput = Receive-Job $sampler -ErrorAction SilentlyContinue 2>&1
+                    Remove-Job $sampler -Force -ErrorAction SilentlyContinue
+                    if ($samplerState -eq 'Failed' -or ($samplerOutput | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })) {
+                        throw "stats sampler failed for ${variantName}/${phase}/${opName}: $($samplerOutput -join ' ')"
+                    }
+                }
             }
             foreach ($operation in @('write','history','search')) {
                 $planPath = Join-Path $plansDir "$variantName-$operation.txt"
