@@ -16,8 +16,11 @@ foreach($r in $rows){foreach($n in @('count','error_count','error_rate','p50_ms'
 if($rows.Count -eq 0){$decision='REJECT';$reasons+='NOT_RUN:no latency rows'}
 $variants=@($rows.variant | Sort-Object -Unique)
 if($variants.Count -lt 3 -or (@('baseline','date_range','date_hash') | Where-Object {$_ -notin $variants}).Count){$decision='REJECT';$reasons+='NOT_RUN:all three variants are required'}
-$expectedRows=12
+$expectedRows=12 * [math]::Max(1,$variants.Count)
 if($rows.Count -ne $expectedRows){$decision='REJECT';$reasons+="NOT_RUN:expected $expectedRows latency rows"}
+$expectedPhases=@('ramp','steady','hot-room','recovery'); $expectedOperations=@('write','history','search')
+if(@($rows | Where-Object {$_.phase -notin $expectedPhases -or $_.operation -notin $expectedOperations} | Select-Object -First 1).Count){$decision='REJECT';$reasons+='NOT_RUN:invalid phase or operation evidence'}
+if(@($rows | ForEach-Object { "$($_.variant)/$($_.phase)/$($_.operation)" } | Sort-Object -Unique).Count -ne $rows.Count){$decision='REJECT';$reasons+='NOT_RUN:duplicate phase or operation evidence'}
 if([int]$runMeta.durationMinutes -lt 40){$decision='REJECT';$reasons+='NOT_RUN:40-minute run required'}
 $planFiles=Get-ChildItem (Join-Path $dir 'plans') -File -ErrorAction SilentlyContinue
 $pruning=($planFiles | ForEach-Object {Get-Content $_ -Raw}) -match 'Partition Pruning|Index Cond'
