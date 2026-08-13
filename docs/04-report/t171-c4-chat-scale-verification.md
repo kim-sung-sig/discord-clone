@@ -16,7 +16,7 @@
 | date_range | 531.052ms | hot-room/write | 기준 초과 |
 | date_hash | 241.187ms | recovery/write | 기준 이내 |
 
-전체 후보의 raw 최대 p99에는 baseline/date_range의 threshold 초과가 있지만, verifier는 설계된 후보 선택 규칙으로 판정한다. `date_range`는 동일 phase·operation 비교에서 baseline 대비 악화된 구간이 있어 탈락했고, `date_hash`는 동일 `hot-room/write` p99를 date_range 531.052ms에서 219.092ms로 58.74% 개선하면서 오류율 0%, replica lag p95 9.358ms를 유지했다. 최종 결정은 `ACCEPT`, 후보 결정은 `ADOPT`, 선택 variant는 `date_hash`다. 운영 적용은 별도 마이그레이션 계획과 승인 후 진행한다.
+전체 후보의 raw 최대 p99에는 baseline/date_range의 recovery 또는 hot-room 초과가 있지만, partition 채택 기준은 baseline의 steady·hot-room write p99다. baseline은 steady 381.989ms, hot-room 471.758ms로 모두 500ms 미만이므로 최종 결정은 `ACCEPT`, 후보 결정은 `DEFER`, 선택 variant는 `baseline`이다. date_hash의 hot-room 219.092ms 개선은 기록하되, baseline 보류 조건을 만족하므로 운영 partition으로 채택하지 않는다. recovery/write p99 543.075ms는 별도 회복성 최적화 과제로 남긴다.
 
 실행 명령:
 
