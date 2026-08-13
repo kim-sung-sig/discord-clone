@@ -127,7 +127,7 @@ Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate
 foreach ($snippet in @('decision.json','candidate_decision','selected_variant','variant_hot_write_p99_ms','steady_hot_write_p99_ms','hot_room_write_p99_ms','rangeNoWorse','pruning evidence missing or incomplete','artifact path must be under qa/artifacts/c4-chat-scale','C4_CHAT_SCALE_VERIFY_PASS')) {
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
 }
-foreach ($snippet in @('db-stats.tsv','dbStable','relation size or vacuum stability evidence failed','db_stability_pass')) { Assert ($verify.Contains($snippet)) "verify stability requirement is missing: $snippet" }
+foreach ($snippet in @('db-stats.tsv','dbStable','previousVacuumByTable','relation size or vacuum stability evidence failed','db_stability_pass')) { Assert ($verify.Contains($snippet)) "verify stability requirement is missing: $snippet" }
 foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required and no unknown variants allowed','sensitive fields','IsNaN','IsInfinity','invalid metric ordering','expectedRate')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }
