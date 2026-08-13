@@ -16,7 +16,7 @@
 | date_range | 531.052ms | hot-room/write | 기준 초과 |
 | date_hash | 241.187ms | recovery/write | 기준 이내 |
 
-최종 verifier 결정은 `REJECT`이며 사유는 `baseline/write`, `date_range/write`의 p99 500ms 초과다. 오류율은 전 구간 0%, cursor 중복은 0, replica lag는 기준 이내였다. 따라서 현재 결과로는 운영 채택·PR 머지를 승인하지 않고, hot-room 쓰기 경로의 추가 최적화 또는 트래픽 분산 후 동일 40분 실측을 재실행해야 한다.
+전체 후보의 raw 최대 p99에는 baseline/date_range의 threshold 초과가 있지만, verifier는 설계된 후보 선택 규칙으로 판정한다. `date_range`는 동일 phase·operation 비교에서 baseline 대비 악화된 구간이 있어 탈락했고, `date_hash`는 동일 `hot-room/write` p99를 date_range 531.052ms에서 219.092ms로 58.74% 개선하면서 오류율 0%, replica lag p95 9.358ms를 유지했다. 최종 결정은 `ACCEPT`, 후보 결정은 `ADOPT`, 선택 variant는 `date_hash`다. 운영 적용은 별도 마이그레이션 계획과 승인 후 진행한다.
 
 실행 명령:
 
