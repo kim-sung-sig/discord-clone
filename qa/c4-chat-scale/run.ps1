@@ -85,6 +85,7 @@ if (-not $gitSha) { $gitSha = 'unknown' }
 "variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms" | Set-Content (Join-Path $artifactDir 'latency.tsv')
 "utc`t table`t live`t dead`t vacuum" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
 "utc`t receive_lsn`t replay_lsn`t lag_seconds" | Set-Content (Join-Path $artifactDir 'replica-lag.tsv')
+"variant`tduplicate_cursor_count" | Set-Content (Join-Path $artifactDir 'cursor-gaps.tsv')
 
 try {
     Invoke-Compose @('up', '-d', 'primary', 'replica')
@@ -160,6 +161,9 @@ try {
                 & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -c "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) SELECT count(*) FROM $table WHERE chat_room_id = 'room-1' AND event_date >= DATE '2026-01-01';" 2>&1 | Add-Content $planPath
             }
         }
+        $cursorCheck = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT '$variantName', count(*) FROM (SELECT chat_room_id, sequence, event_date FROM $table GROUP BY chat_room_id, sequence, event_date HAVING count(*) > 1) duplicate_cursors;" 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "cursor duplicate check failed for $variantName" }
+        $cursorCheck | Add-Content (Join-Path $artifactDir 'cursor-gaps.tsv')
     }
 } catch {
     "run failure: $($_.Exception.Message)" | Add-Content (Join-Path $artifactDir 'logs/run.log')

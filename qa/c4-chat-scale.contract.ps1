@@ -115,13 +115,16 @@ Assert ($run.Contains('--no-deps') -and $run.Contains(' -l -j 4 ')) 'run pgbench
 Assert ($run.Contains('PGPASSWORD=dev_only_password')) 'run pgbench connection password must be explicit runtime-only value'
 Assert ($run.Contains('pg_isready') -and $run.Contains('120')) 'run must poll pg_isready with 120 second timeout'
 Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
-foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'plans')) {
+foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'cursor-gaps.tsv', 'plans')) {
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
 Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms') -or
     $run.Contains('variant\tphase\toperation\tcount\terror_count\terror_rate\tp50_ms\tp95_ms\tp99_ms\tmax_ms')) 'latency.tsv percentile header is missing'
 foreach ($snippet in @('decision.json','pruning evidence missing','artifact path must be under qa/artifacts/c4-chat-scale','C4_CHAT_SCALE_VERIFY_PASS')) {
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
+}
+foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required','sensitive fields')) {
+    Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }
 foreach ($snippet in @('function Get-LatencySamples', 'function Get-Percentile', 'number of transactions actually processed', 'number of failed transactions', 'Ceiling', 'p50_ms', 'p95_ms', 'p99_ms', 'max_ms')) {
     Assert ($run.Contains($snippet)) "latency percentile helper requirement is missing: $snippet"
