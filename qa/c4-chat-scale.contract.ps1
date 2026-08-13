@@ -127,6 +127,9 @@ foreach ($snippet in @('decision.json','pruning evidence missing','artifact path
 foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required','sensitive fields')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }
+foreach ($snippet in @('replica lag samples missing','invalid cursor gap evidence','expected $expectedRows latency rows')) {
+    Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
+}
 foreach ($snippet in @('function Get-LatencySamples', 'function Get-Percentile', 'number of transactions actually processed', 'number of failed transactions', 'Ceiling', 'p50_ms', 'p95_ms', 'p99_ms', 'max_ms')) {
     Assert ($run.Contains($snippet)) "latency percentile helper requirement is missing: $snippet"
 }
