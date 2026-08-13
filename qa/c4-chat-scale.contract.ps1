@@ -107,6 +107,8 @@ Assert ($run -match '(?m)\$DurationMinutes\s*=\s*40') 'run default duration must
 Assert ($run -match '(?m)\$Seed\s*=\s*1714') 'run default seed must be 1714'
 foreach ($table in $allowedTables) { Assert ($run.Contains($table)) "run table allowlist is missing: $table" }
 Assert ($run.Contains('up -d primary replica')) 'run must start primary and replica'
+Assert ($run.Contains('--no-deps') -and $run.Contains(' -l -j 4 ')) 'run pgbench must log transactions and avoid dependency recreation'
+Assert ($run.Contains('PGPASSWORD=dev_only_password')) 'run pgbench connection password must be explicit runtime-only value'
 Assert ($run.Contains('pg_isready') -and $run.Contains('120')) 'run must poll pg_isready with 120 second timeout'
 Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
 foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'plans')) {

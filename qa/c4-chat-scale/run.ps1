@@ -70,7 +70,9 @@ try {
             $seconds = $phaseSeconds[(@('ramp','steady','hot-room','recovery').IndexOf($phase))]
             foreach ($operation in @(@('write','write.sql'), @('history','history.sql'), @('search','search.sql'))) {
                 $opName = $operation[0]; $sqlName = $operation[1]
-                $output = & docker compose @composeArgs run --rm pgbench -n -j 4 -c 16 --aggregate-interval=10 -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
+                $aggregateInterval = [math]::Min(10, $seconds)
+                $output = & docker compose @composeArgs run --rm --no-deps -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateInterval" -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
+                if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
                 "${variantName}:${opName}`t$phase`t$($output -join ' ')" | Add-Content (Join-Path $artifactDir 'latency.tsv')
                 Add-Stats $table
             }
