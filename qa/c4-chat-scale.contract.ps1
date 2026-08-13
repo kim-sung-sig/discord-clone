@@ -115,6 +115,12 @@ Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
 foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'plans')) {
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
+Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms') -or
+    $run.Contains('variant\tphase\toperation\tcount\terror_count\terror_rate\tp50_ms\tp95_ms\tp99_ms\tmax_ms')) 'latency.tsv percentile header is missing'
+foreach ($snippet in @('function Get-LatencySamples', 'function Get-Percentile', 'number of transactions actually processed', 'number of failed transactions', 'Ceiling', 'p50_ms', 'p95_ms', 'p99_ms', 'max_ms')) {
+    Assert ($run.Contains($snippet)) "latency percentile helper requirement is missing: $snippet"
+}
+Assert ($run -match '(?i)latency.*sample|sample.*latency') 'run must fail closed when latency samples are unavailable'
 Assert ($run -match '(?i)secret|password|dsn') 'run must explicitly guard secret output'
 Assert (-not ($run -match '(?i)raw body|password.*run\.json|secret.*run\.json')) 'run must not write secrets or raw bodies'
 foreach ($snippet in @('-v $artifactDir:/artifacts', '--log-prefix=/artifacts/pgbench-${variant}-${phase}-${op}', 'Add-Stats', 'Start-Job', 'Stop-Job', 'pg_stat_user_tables', 'pg_stat_replication', 'Start-Sleep -Seconds 10')) {

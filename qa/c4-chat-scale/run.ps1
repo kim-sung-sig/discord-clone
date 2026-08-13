@@ -55,12 +55,34 @@ function Start-StatsSampler([string]$table, [string]$operation, [string]$phase) 
     }
 }
 
+function Get-LatencySamples([string[]]$LogLines) {
+    $samples = @()
+    foreach ($line in $LogLines) {
+        $fields = $line -split '\s+'
+        if ($fields.Count -lt 5) { continue }
+        foreach ($field in $fields[3..($fields.Count - 1)]) {
+            $value = 0.0
+            if ([double]::TryParse($field, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$value) -and $value -ge 0) {
+                $samples += $value
+                break
+            }
+        }
+    }
+    return $samples
+}
+
+function Get-Percentile([double[]]$Values, [double]$Percent) {
+    $sorted = @($Values | Sort-Object)
+    $index = [math]::Ceiling(($Percent / 100) * $sorted.Count) - 1
+    return [math]::Round([double]$sorted[[math]::Max(0, $index)], 3)
+}
+
 New-Item -ItemType Directory -Force -Path $plansDir, (Split-Path $composeLog) | Out-Null
 $gitSha = (& git rev-parse HEAD 2>$null | Select-Object -First 1)
 if (-not $gitSha) { $gitSha = 'unknown' }
 @{ variant = $Variant; seed = $Seed; durationMinutes = $DurationMinutes; utc = [DateTime]::UtcNow.ToString('o'); gitSha = $gitSha } |
     ConvertTo-Json -Compress | Set-Content (Join-Path $artifactDir 'run.json')
-"operation`tphase`toutput" | Set-Content (Join-Path $artifactDir 'latency.tsv')
+"variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms" | Set-Content (Join-Path $artifactDir 'latency.tsv')
 "utc`t table`t live`t dead`t vacuum" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
 "utc`t receive_lsn`t replay_lsn`t lag_seconds" | Set-Content (Join-Path $artifactDir 'replica-lag.tsv')
 
@@ -99,12 +121,21 @@ try {
                 try {
                     $output = & docker compose @composeArgs run --rm --no-deps -v $artifactMount -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateIntervalArg" "--log-prefix=$logPrefix" -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
-                    "${variantName}:${opName}`t$phase`t$($output -join ' ')" | Add-Content (Join-Path $artifactDir 'latency.tsv')
                     $logFiles = Get-ChildItem -Path $artifactDir -Filter "pgbench-$variantName-$phase-$opName*" -File -ErrorAction SilentlyContinue
-                    foreach ($logFile in $logFiles) {
-                        "${variantName}:${opName}`t$phase`tfile:$($logFile.Name)" | Add-Content (Join-Path $artifactDir 'latency.tsv')
-                        Get-Content $logFile.FullName | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                    $logLines = @($logFiles | ForEach-Object { Get-Content $_.FullName })
+                    $samples = @(Get-LatencySamples $logLines)
+                    if ($samples.Count -eq 0) { throw "latency samples unavailable for ${variantName}/${phase}/${opName}" }
+                    $processed = 0L; $failed = 0L
+                    foreach ($line in $output) {
+                        if ($line -match 'number of transactions actually processed:\s*(\d+)') { $processed = [int64]$Matches[1] }
+                        if ($line -match 'number of failed transactions:\s*(\d+)') { $failed = [int64]$Matches[1] }
                     }
+                    if ($processed -le 0) { $processed = $samples.Count }
+                    $rate = if ($processed -gt 0) { [math]::Round($failed / $processed, 6) } else { 0 }
+                    $row = @($variantName, $phase, $opName, $processed, $failed, $rate, (Get-Percentile $samples 50), (Get-Percentile $samples 95), (Get-Percentile $samples 99), (Get-Percentile $samples 100)) -join "`t"
+                    $row | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                    $output | Set-Content (Join-Path $artifactDir "logs/pgbench-${variantName}-${phase}-${opName}.stdout.log")
+                    foreach ($logFile in $logFiles) { Copy-Item $logFile.FullName (Join-Path $artifactDir "logs/$($logFile.Name)") -Force }
                 } finally {
                     $samplerState = $sampler.State
                     Stop-Job $sampler -ErrorAction SilentlyContinue
