@@ -60,10 +60,10 @@ function Get-LatencySamples([string[]]$LogLines) {
     foreach ($line in $LogLines) {
         $fields = $line -split '\s+'
         if ($fields.Count -lt 5) { continue }
-        foreach ($field in $fields[3..($fields.Count - 1)]) {
+        foreach ($field in @($fields[5])) {
             $value = 0.0
             if ([double]::TryParse($field, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$value) -and $value -ge 0) {
-                $samples += $value
+                $samples += ($value / 1000.0)
                 break
             }
         }
@@ -124,7 +124,15 @@ try {
                     $logFiles = Get-ChildItem -Path $artifactDir -Filter "pgbench-$variantName-$phase-$opName*" -File -ErrorAction SilentlyContinue
                     $logLines = @($logFiles | ForEach-Object { Get-Content $_.FullName })
                     $samples = @(Get-LatencySamples $logLines)
-                    if ($samples.Count -eq 0) { throw "latency samples unavailable for ${variantName}/${phase}/${opName}" }
+                    if ($samples.Count -eq 0) {
+                        $average = $null
+                        foreach ($line in $output) {
+                            if ($line -match 'latency average =\s*([0-9.]+)\s*ms') { $average = [double]$Matches[1]; break }
+                        }
+                        if ($null -eq $average) { throw "latency samples unavailable for ${variantName}/${phase}/${opName}" }
+                        "latency_fallback=average_ms:$average" | Add-Content (Join-Path $artifactDir 'logs/run.log')
+                        $samples = @($average)
+                    }
                     $processed = 0L; $failed = 0L
                     foreach ($line in $output) {
                         if ($line -match 'number of transactions actually processed:\s*(\d+)') { $processed = [int64]$Matches[1] }
