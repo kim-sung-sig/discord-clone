@@ -13,6 +13,7 @@ $writePath = Join-Path $pgbenchDir 'write.sql'
 $historyPath = Join-Path $pgbenchDir 'history.sql'
 $searchPath = Join-Path $pgbenchDir 'search.sql'
 $runPath = Join-Path $routingDir 'run.ps1'
+$verifyPath = Join-Path $routingDir 'verify.ps1'
 $readmePath = Join-Path $routingDir 'README.md'
 $allowedTables = @('messages_baseline', 'messages_date_range', 'messages_date_hash')
 
@@ -29,6 +30,7 @@ Assert (Test-Path $schemaPath) 'init/001-schema.sql is missing'
 Assert (Test-Path $replicaEntrypointPath) 'replica-entrypoint.sh is missing'
 Assert (Test-Path $replicationInitPath) 'init/000-replication.sh is missing'
 Assert (Test-Path $runPath) 'run.ps1 is missing'
+Assert (Test-Path $verifyPath) 'verify.ps1 is missing'
 Assert (Test-Path $readmePath) 'README.md is missing'
 foreach ($path in @($writePath, $historyPath, $searchPath)) {
     Assert (Test-Path $path) "pgbench script is missing: $path"
@@ -51,6 +53,7 @@ $write = Get-Content -Path $writePath -Raw
 $history = Get-Content -Path $historyPath -Raw
 $search = Get-Content -Path $searchPath -Raw
 $run = Get-Content -Path $runPath -Raw
+$verify = Get-Content -Path $verifyPath -Raw
 $readme = Get-Content -Path $readmePath -Raw
 
 Assert ($policy -match '(?m)^function\s+Get-ShardId\b') 'Get-ShardId function is missing'
@@ -117,6 +120,9 @@ foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.
 }
 Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms') -or
     $run.Contains('variant\tphase\toperation\tcount\terror_count\terror_rate\tp50_ms\tp95_ms\tp99_ms\tmax_ms')) 'latency.tsv percentile header is missing'
+foreach ($snippet in @('decision.json','pruning evidence missing','artifact path must be under qa/artifacts/c4-chat-scale','C4_CHAT_SCALE_VERIFY_PASS')) {
+    Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
+}
 foreach ($snippet in @('function Get-LatencySamples', 'function Get-Percentile', 'number of transactions actually processed', 'number of failed transactions', 'Ceiling', 'p50_ms', 'p95_ms', 'p99_ms', 'max_ms')) {
     Assert ($run.Contains($snippet)) "latency percentile helper requirement is missing: $snippet"
 }
