@@ -211,3 +211,10 @@ git commit -m "test(T171-C4): verify chat scale evidence and decision gates"
 - 최종 명령: `pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1`, `docker compose -f qa/c4-chat-scale/docker-compose.yml config`, fixture verifier, 가능한 경우 `run.ps1 -Variant all -DurationMinutes 40`, `git diff --check`.
 - Docker 미실행 또는 40분 실측 미완료는 구현 실패가 아니라 `NOT_RUN` 증거로 남기되, 운영 shard 채택 결론은 내리지 않는다.
 - 산출물 디렉터리와 비밀은 커밋하지 않는다. 브랜치 `task_T171-C4-chat-scale`에서만 커밋하며, 최종 독립 리뷰가 90점 이상이고 P0/P1=0일 때에만 push/PR/merge 검토를 요청한다.
+
+## 실행 완료 기록(2026-08-14)
+
+- 정적 계약: `pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1` → `C4_CHAT_SCALE_CONTRACT_PASS`.
+- 최종 실측: `qa/artifacts/c4-chat-scale/20260813-165819-087`, `all + 40분`, 3 variant × 4 phase × 3 operation = 36행, plan 9개, cursor gap 0, replica lag p95 9.245ms, db-stats 474개 샘플.
+- 실제 검증: `pwsh -NoProfile -File qa/c4-chat-scale/verify.ps1 -ArtifactDir qa/artifacts/c4-chat-scale/20260813-165819-087` → `C4_CHAT_SCALE_VERIFY_PASS`, `decision=ACCEPT`, `candidate_decision=DEFER`, `selected_variant=baseline`.
+- 독립 리뷰: reviewed revision `4767d6f`, 9.5/10, P0=0/P1=0, 승인 가능. 잔여 P2는 실행기가 생성하는 table 값 allowlist 검증이며 운영 채택을 막지 않는다.
