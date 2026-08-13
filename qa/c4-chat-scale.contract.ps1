@@ -130,7 +130,7 @@ foreach ($snippet in @('decision.json','candidate_decision','selected_variant','
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
 }
 foreach ($snippet in @('db-stats.tsv','dbStable','previousVacuumByTable','relation size or vacuum stability evidence failed','db_stability_pass')) { Assert ($verify.Contains($snippet)) "verify stability requirement is missing: $snippet" }
-foreach ($snippet in @('routing.tsv','history-fallback','replica_lag_gt_2s','history_page_limited','stale_read_count')) { Assert ($verify.Contains($snippet)) "verify routing requirement is missing: $snippet" }
+foreach ($snippet in @('routing.tsv','history-fallback','replica_lag_gt_2s','history_page_limited','stale_read_count','$actual.lag_seconds -le 2','$actual.lag_seconds -le 30')) { Assert ($verify.Contains($snippet)) "verify routing requirement is missing: $snippet" }
 foreach ($snippet in @('hotRoomWriteQpsByVariant','hot_room_write_qps','hashLoadGate','hotWriteSeconds')) { Assert ($verify.Contains($snippet)) "verify hot-room load gate is missing: $snippet" }
 foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required and no unknown variants allowed','sensitive fields','IsNaN','IsInfinity','invalid metric ordering','expectedRate')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
