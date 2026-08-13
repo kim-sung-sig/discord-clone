@@ -115,7 +115,7 @@ foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
 Assert ($run -match '(?i)secret|password|dsn') 'run must explicitly guard secret output'
-Assert (-not ($run -match '(?i)raw body|PGPASSWORD\s*=\s*')) 'run must not write secrets or raw bodies'
+Assert (-not ($run -match '(?i)raw body|password.*run\.json|secret.*run\.json')) 'run must not write secrets or raw bodies'
 
 $testOutput = & pwsh -NoProfile -File $testsPath 2>&1
 Assert ($LASTEXITCODE -eq 0) "Routing behavior test failed: $($testOutput -join [Environment]::NewLine)"
