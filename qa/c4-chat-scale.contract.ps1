@@ -12,6 +12,8 @@ $pgbenchDir = Join-Path $routingDir 'pgbench'
 $writePath = Join-Path $pgbenchDir 'write.sql'
 $historyPath = Join-Path $pgbenchDir 'history.sql'
 $searchPath = Join-Path $pgbenchDir 'search.sql'
+$runPath = Join-Path $routingDir 'run.ps1'
+$readmePath = Join-Path $routingDir 'README.md'
 $allowedTables = @('messages_baseline', 'messages_date_range', 'messages_date_hash')
 
 function Assert($condition, $message) {
@@ -26,11 +28,13 @@ Assert (Test-Path $composePath) 'docker-compose.yml is missing'
 Assert (Test-Path $schemaPath) 'init/001-schema.sql is missing'
 Assert (Test-Path $replicaEntrypointPath) 'replica-entrypoint.sh is missing'
 Assert (Test-Path $replicationInitPath) 'init/000-replication.sh is missing'
+Assert (Test-Path $runPath) 'run.ps1 is missing'
+Assert (Test-Path $readmePath) 'README.md is missing'
 foreach ($path in @($writePath, $historyPath, $searchPath)) {
     Assert (Test-Path $path) "pgbench script is missing: $path"
 }
 
-foreach ($path in @($policyPath, $testsPath, $PSCommandPath)) {
+foreach ($path in @($policyPath, $testsPath, $runPath, $PSCommandPath)) {
     $tokens = $null
     $errors = $null
     [System.Management.Automation.Language.Parser]::ParseFile($path, [ref] $tokens, [ref] $errors) | Out-Null
@@ -46,6 +50,7 @@ $schema = Get-Content -Path $schemaPath -Raw
 $write = Get-Content -Path $writePath -Raw
 $history = Get-Content -Path $historyPath -Raw
 $search = Get-Content -Path $searchPath -Raw
+$run = Get-Content -Path $runPath -Raw
 
 Assert ($policy -match '(?m)^function\s+Get-ShardId\b') 'Get-ShardId function is missing'
 Assert ($policy.Contains('[ArgumentException]')) 'ArgumentException validation is missing'
@@ -56,6 +61,9 @@ Assert ($tests.Contains('RED') -or $tests.Contains('routing-policy.ps1')) 'RED t
 
 foreach ($snippet in @('primary:', 'replica:', 'pgbench:', 'postgres:16-alpine', '15442:5432', '15443:5432', 'wal_level=replica', 'replica-entrypoint.sh', 'pg_wal_replay_pause', 'profiles:', 'load', 'entrypoint: [pgbench]', '-Dtable=messages_baseline', 'c4-chat-scale-replica-data:/var/lib/postgresql/data')) {
     Assert ($compose.Contains($snippet)) "compose required snippet is missing: $snippet"
+}
+foreach ($snippet in @('shared_buffers=32MB', 'max_connections=32', 'work_mem=1MB')) {
+    Assert ($compose.Contains($snippet)) "compose controlled benchmark setting is missing: $snippet"
 }
 Assert ($compose -match '(?ms)replica:.*entrypoint:\s*\[/bin/sh,\s*/usr/local/bin/replica-entrypoint\.sh\]') 'replica must use the bootstrap entrypoint'
 Assert (-not $compose.Contains('REPLICA_BASEBACKUP_COMMAND')) 'replica bootstrap must not be an environment-only command'
@@ -92,6 +100,20 @@ Assert ($history -match '(?i)sequence\s*>\s*:cursor') 'history SQL must use orde
 Assert ($history -match '(?i)chat_room_id') 'history SQL must constrain chat room'
 Assert ($search -match '(?i)chat_room_id') 'search SQL must constrain chat room'
 Assert ($search -match '(?i)event_date') 'search SQL must constrain event date'
+
+Assert ($run -match '(?m)\[ValidateSet\(\x27baseline\x27,\x27date_range\x27,\x27date_hash\x27,\x27all\x27\)\]') 'run Variant ValidateSet is missing'
+Assert ($run -match '(?m)\[ValidateRange\(1,') 'run DurationMinutes validation is missing'
+Assert ($run -match '(?m)\$DurationMinutes\s*=\s*40') 'run default duration must be 40 minutes'
+Assert ($run -match '(?m)\$Seed\s*=\s*1714') 'run default seed must be 1714'
+foreach ($table in $allowedTables) { Assert ($run.Contains($table)) "run table allowlist is missing: $table" }
+Assert ($run.Contains('up -d primary replica')) 'run must start primary and replica'
+Assert ($run.Contains('pg_isready') -and $run.Contains('120')) 'run must poll pg_isready with 120 second timeout'
+Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
+foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'plans')) {
+    Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
+}
+Assert ($run -match '(?i)secret|password|dsn') 'run must explicitly guard secret output'
+Assert (-not ($run -match '(?i)raw body|PGPASSWORD\s*=\s*')) 'run must not write secrets or raw bodies'
 
 $testOutput = & pwsh -NoProfile -File $testsPath 2>&1
 Assert ($LASTEXITCODE -eq 0) "Routing behavior test failed: $($testOutput -join [Environment]::NewLine)"

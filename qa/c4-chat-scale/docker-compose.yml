@@ -15,6 +15,12 @@ services:
       - max_wal_senders=10
       - -c
       - max_replication_slots=1
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=32
+      - -c
+      - work_mem=1MB
     volumes:
       - ./init:/docker-entrypoint-initdb.d:ro
     ports:
@@ -37,7 +43,7 @@ services:
       REPLICATION_PASSWORD: dev_replication_password
       REPLICA_LAG_DRILL: SELECT pg_wal_replay_pause();
     entrypoint: [/bin/sh, /usr/local/bin/replica-entrypoint.sh]
-    command: [postgres, -c, hot_standby=on]
+    command: [postgres, -c, hot_standby=on, -c, shared_buffers=32MB, -c, max_connections=32, -c, work_mem=1MB]
     volumes:
       - ./replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
       - c4-chat-scale-replica-data:/var/lib/postgresql/data

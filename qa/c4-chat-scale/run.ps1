@@ -1,0 +1,92 @@
+param(
+    [ValidateSet('baseline','date_range','date_hash','all')]
+    [string]$Variant = 'all',
+    [ValidateRange(1, 1440)]
+    [int]$DurationMinutes = 40,
+    [int]$Seed = 1714,
+    [string]$ArtifactRoot = (Join-Path $PSScriptRoot '../../qa/artifacts/c4-chat-scale')
+)
+
+$ErrorActionPreference = 'Stop'
+# run.json deliberately contains no secrets, password, DSN, token, or raw message body.
+$composeFile = Join-Path $PSScriptRoot 'docker-compose.yml'
+$tables = @{
+    baseline = 'messages_baseline'
+    date_range = 'messages_date_range'
+    date_hash = 'messages_date_hash'
+}
+$variants = if ($Variant -eq 'all') { @('baseline', 'date_range', 'date_hash') } else { @($Variant) }
+$root = [IO.Path]::GetFullPath($ArtifactRoot)
+$runId = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
+$artifactDir = Join-Path $root $runId
+$plansDir = Join-Path $artifactDir 'plans'
+$composeLog = Join-Path $artifactDir 'logs/compose.log'
+$composeArgs = @('-f', $composeFile)
+
+function Invoke-Compose([string[]]$Arguments) {
+    & docker compose @composeArgs @Arguments
+    if ($LASTEXITCODE -ne 0) { throw "docker compose failed ($LASTEXITCODE): $($Arguments -join ' ')" }
+}
+# docker compose up -d primary replica
+
+function Add-Stats([string]$table) {
+    try {
+        $stats = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>$null
+        if ($LASTEXITCODE -eq 0) { $stats | Add-Content (Join-Path $artifactDir 'db-stats.tsv') }
+        $lag = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()));" 2>$null
+        if ($LASTEXITCODE -eq 0) { $lag | Add-Content (Join-Path $artifactDir 'replica-lag.tsv') }
+    } catch { }
+}
+
+New-Item -ItemType Directory -Force -Path $plansDir, (Split-Path $composeLog) | Out-Null
+$gitSha = (& git rev-parse HEAD 2>$null | Select-Object -First 1)
+if (-not $gitSha) { $gitSha = 'unknown' }
+@{ variant = $Variant; seed = $Seed; durationMinutes = $DurationMinutes; utc = [DateTime]::UtcNow.ToString('o'); gitSha = $gitSha } |
+    ConvertTo-Json -Compress | Set-Content (Join-Path $artifactDir 'run.json')
+"operation`tphase`toutput" | Set-Content (Join-Path $artifactDir 'latency.tsv')
+"utc`t table`t live`t dead`t vacuum" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
+"utc`t receive_lsn`t replay_lsn`t lag_seconds" | Set-Content (Join-Path $artifactDir 'replica-lag.tsv')
+
+try {
+    Invoke-Compose @('up', '-d', 'primary', 'replica')
+    $deadline = [DateTime]::UtcNow.AddSeconds(120)
+    do {
+        & docker compose @composeArgs exec -T primary pg_isready -U c4_user -d c4chat 2>$null | Out-Null
+        $primaryReady = ($LASTEXITCODE -eq 0)
+        & docker compose @composeArgs exec -T replica pg_isready -U c4_user -d c4chat 2>$null | Out-Null
+        $replicaReady = ($LASTEXITCODE -eq 0)
+        if ($primaryReady -and $replicaReady) { break }
+        Start-Sleep -Seconds 2
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (-not ($primaryReady -and $replicaReady)) { throw 'primary/replica readiness timeout (120s)' }
+
+    foreach ($variantName in $variants) {
+        $table = $tables[$variantName]
+        # Deterministic seed set; production tables are never touched.
+        & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -v ON_ERROR_STOP=1 -c "SELECT setseed($([math]::Abs($Seed % 1000) / 1000)); INSERT INTO $table (chat_room_id,event_date,sequence,content,idempotency_key) SELECT 'room-' || ((g - 1) % 1000 + 1), DATE '2026-01-01' + ((g - 1) % 30), g, 'benchmark message', 'seed-$Seed-' || g FROM generate_series(1,1000) g ON CONFLICT DO NOTHING;" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "seed load failed for $variantName" }
+        $phaseSeconds = if ($DurationMinutes -eq 1) { @(1,1,1,1) } else { @(300,900,900,300) }
+        foreach ($phase in @('ramp','steady','hot-room','recovery')) {
+            $seconds = $phaseSeconds[(@('ramp','steady','hot-room','recovery').IndexOf($phase))]
+            foreach ($operation in @(@('write','write.sql'), @('history','history.sql'), @('search','search.sql'))) {
+                $opName = $operation[0]; $sqlName = $operation[1]
+                $output = & docker compose @composeArgs run --rm pgbench -n -j 4 -c 16 --aggregate-interval=10 -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
+                "${variantName}:${opName}`t$phase`t$($output -join ' ')" | Add-Content (Join-Path $artifactDir 'latency.tsv')
+                Add-Stats $table
+            }
+            foreach ($operation in @('write','history','search')) {
+                $planPath = Join-Path $plansDir "$variantName-$operation.txt"
+                "EXPLAIN (ANALYZE, BUFFERS) $operation / $table" | Set-Content $planPath
+                & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -c "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) SELECT count(*) FROM $table WHERE chat_room_id = 'room-1' AND event_date >= DATE '2026-01-01';" 2>&1 | Add-Content $planPath
+            }
+        }
+    }
+} catch {
+    "run failure: $($_.Exception.Message)" | Add-Content (Join-Path $artifactDir 'logs/run.log')
+    try { & docker compose @composeArgs logs --no-color primary replica 2>&1 | Set-Content $composeLog } catch { }
+    throw
+} finally {
+    try { & docker compose @composeArgs down -v --remove-orphans 2>&1 | Add-Content (Join-Path $artifactDir 'logs/compose.log') } catch { }
+}
+
+Write-Output $artifactDir
