@@ -115,6 +115,7 @@ Assert ($run.Contains('--no-deps') -and $run.Contains(' -l -j 4 ')) 'run pgbench
 Assert ($run.Contains('PGPASSWORD=dev_only_password')) 'run pgbench connection password must be explicit runtime-only value'
 Assert ($run.Contains('pg_isready') -and $run.Contains('120')) 'run must poll pg_isready with 120 second timeout'
 Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
+Assert ($run.Contains('IS DISTINCT FROM pg_last_wal_replay_lsn()')) 'replica lag must be zero when receive and replay LSNs are equal'
 foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'cursor-gaps.tsv', 'plans')) {
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
