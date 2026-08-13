@@ -1,16 +1,12 @@
 -- C4 benchmark schema only; production messages is never modified.
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'replicator') THEN
-        CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD 'dev_replication_password';
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'replication') THEN
+        CREATE ROLE replication WITH REPLICATION LOGIN PASSWORD 'dev_replication_password';
     END IF;
 END $$;
 
-SELECT pg_create_physical_replication_slot('c4_replica_slot')
-WHERE NOT EXISTS (
-    SELECT 1 FROM pg_replication_slots WHERE slot_name = 'c4_replica_slot'
-);
-
+-- idempotency_key is unique per chat room and event date; duplicate keys are rejected by the constraint.
 CREATE TABLE messages_template (
     chat_room_id text NOT NULL,
     event_date date NOT NULL,
@@ -18,7 +14,8 @@ CREATE TABLE messages_template (
     content text NOT NULL,
     idempotency_key text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT messages_template_unique UNIQUE (chat_room_id, sequence)
+    CONSTRAINT messages_template_unique UNIQUE (chat_room_id, sequence, event_date),
+    CONSTRAINT messages_template_idempotency_unique UNIQUE (idempotency_key, event_date, chat_room_id)
 );
 
 CREATE TABLE messages_baseline (LIKE messages_template INCLUDING ALL);
@@ -29,7 +26,9 @@ CREATE TABLE messages_date_range (
     sequence bigint NOT NULL,
     content text NOT NULL,
     idempotency_key text NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT messages_date_range_unique UNIQUE (chat_room_id, sequence, event_date),
+    CONSTRAINT messages_date_range_idempotency_unique UNIQUE (idempotency_key, event_date, chat_room_id)
 ) PARTITION BY RANGE (event_date);
 
 CREATE TABLE messages_date_hash (
@@ -38,7 +37,9 @@ CREATE TABLE messages_date_hash (
     sequence bigint NOT NULL,
     content text NOT NULL,
     idempotency_key text NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT messages_date_hash_unique UNIQUE (chat_room_id, sequence, event_date),
+    CONSTRAINT messages_date_hash_idempotency_unique UNIQUE (idempotency_key, event_date, chat_room_id)
 ) PARTITION BY RANGE (event_date);
 
 DO $$
@@ -69,7 +70,3 @@ BEGIN
         END LOOP;
     END LOOP;
 END $$;
-
--- Keep the benchmark's idempotency contract explicit for every physical variant.
-CREATE UNIQUE INDEX messages_date_range_unique ON messages_date_range (chat_room_id, sequence, event_date);
-CREATE UNIQUE INDEX messages_date_hash_unique ON messages_date_hash (chat_room_id, sequence, event_date);

@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: c4chat
       POSTGRES_USER: c4_user
       POSTGRES_PASSWORD: dev_only_password
-      REPLICATION_USER: replicator
+      REPLICATION_USER: replication
       REPLICATION_PASSWORD: dev_replication_password
     command:
       - postgres
@@ -33,17 +33,14 @@ services:
       POSTGRES_USER: c4_user
       POSTGRES_PASSWORD: dev_only_password
       PGDATA: /var/lib/postgresql/data/pgdata
-      REPLICA_SLOT: c4_replica_slot
-      REPLICA_BASEBACKUP_COMMAND: pg_basebackup -h primary -U replicator -D $$PGDATA -R -S c4_replica_slot
+      REPLICATION_USER: replication
+      REPLICATION_PASSWORD: dev_replication_password
       REPLICA_LAG_DRILL: SELECT pg_wal_replay_pause();
-    command:
-      - postgres
-      - -c
-      - hot_standby=on
-      - -c
-      - primary_conninfo=host=primary port=5432 user=replicator password=dev_replication_password application_name=c4-replica
-      - -c
-      - primary_slot_name=c4_replica_slot
+    entrypoint: [/bin/sh, /usr/local/bin/replica-entrypoint.sh]
+    command: [postgres, -c, hot_standby=on]
+    volumes:
+      - ./replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+      - c4-chat-scale-replica-data:/var/lib/postgresql/data
     depends_on:
       primary:
         condition: service_healthy
@@ -69,7 +66,8 @@ services:
       primary:
         condition: service_healthy
     entrypoint: [pgbench]
-    command: [-n, -c, '4', -j, '2', -T, '60', -f, /bench/write.sql]
+    # run.ps1 overrides -Dtable with its messages_baseline/messages_date_range/messages_date_hash allowlist.
+    command: [-n, -c, '4', -j, '2', -T, '60', -Dtable=messages_baseline, -f, /bench/write.sql]
     volumes:
       - ./pgbench:/bench:ro
     networks: [c4-local]
@@ -78,3 +76,6 @@ networks:
   c4-local:
     name: c4-chat-scale-local
     internal: true
+
+volumes:
+  c4-chat-scale-replica-data:
