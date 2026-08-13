@@ -108,10 +108,18 @@ try {
         $phaseSeconds = if ($DurationMinutes -eq 1) { @(1,1,1,1) } else { @(300,900,900,300) }
         foreach ($phase in @('ramp','steady','hot-room','recovery')) {
             $seconds = $phaseSeconds[(@('ramp','steady','hot-room','recovery').IndexOf($phase))]
+            # Keep each phase at its declared duration; operation windows follow the 50/35/15 mix.
+            $operationSeconds = [ordered]@{
+                write = [math]::Max(1, [math]::Round($seconds * 0.50))
+                history = [math]::Max(1, [math]::Round($seconds * 0.35))
+                search = [math]::Max(1, [math]::Round($seconds * 0.15))
+            }
+            $operationSeconds.search = [math]::Max(1, $operationSeconds.search + $seconds - (($operationSeconds.Values | Measure-Object -Sum).Sum))
             foreach ($operation in @(@('write','write.sql'), @('history','history.sql'), @('search','search.sql'))) {
                 $opName = $operation[0]; $sqlName = $operation[1]
+                $operationDuration = [int]$operationSeconds[$opName]
                 $aggregateInterval = 10
-                $aggregateIntervalArg = [math]::Min($aggregateInterval, $seconds)
+                $aggregateIntervalArg = [math]::Min($aggregateInterval, $operationDuration)
                 $artifactMount = "$artifactDir`:/artifacts"
                 # pgbench interval evidence is mounted from the Windows host into the container.
                 # Docker argument form: -v $artifactDir:/artifacts
@@ -120,7 +128,7 @@ try {
                 Add-Stats $table
                 $sampler = Start-StatsSampler $table $opName $phase
                 try {
-                    $output = & docker compose @composeArgs run --rm --no-deps -v $artifactMount -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateIntervalArg" "--log-prefix=$logPrefix" -T $seconds "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
+                    $output = & docker compose @composeArgs run --rm --no-deps -v $artifactMount -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateIntervalArg" "--log-prefix=$logPrefix" -T $operationDuration "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
                     $logFiles = Get-ChildItem -Path $artifactDir -Filter "pgbench-$variantName-$phase-$opName*" -File -ErrorAction SilentlyContinue
                     $logLines = @($logFiles | ForEach-Object { Get-Content $_.FullName })

@@ -81,6 +81,8 @@ chat_room_id := channel_id
 - history cursor read 35%
 - read projection search 15%
 
+각 phase의 총 시간은 위의 5/15/15/5분을 유지하며 세 operation은 write 50%·history 35%·search 15%의 시간 창으로 순차 실행한다. 따라서 `-Variant all -DurationMinutes 40`은 variant 하나당 40분, 세 variant 전체 약 120분이 걸린다. 러너는 이 배분을 `operationSeconds`로 고정한다.
+
 history read는 `before_cursor`와 limit 50을 사용하고 offset pagination은 사용하지 않는다. search는 message body를 반환하지 않고 count·latency만 기록한다.
 
 실행 도구는 PostgreSQL image에 포함된 `pgbench`와 `psql`만 사용한다. 별도 Java benchmark framework나 npm dependency를 추가하지 않는다.
@@ -199,4 +201,3 @@ C4 구현 task는 다음만 추가한다.
 - 판정 verifier가 acceptance threshold를 자동 평가한다.
 - 독립 spec/quality/security review 각 90점 이상, P0/P1 0
 - Docker 실측 결과와 잔여 위험을 한국어 보고서에 기록한다.
-

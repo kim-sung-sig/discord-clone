@@ -135,7 +135,7 @@ git commit -m "test(T171-C4): add isolated postgres primary replica harness"
 
 1. `run-id = UTC yyyyMMdd-HHmmss-fff` 디렉터리를 만들고 `run.json`에 variant·seed·duration·UTC·git SHA만 기록한다.
 2. `docker compose up -d primary replica` 후 `pg_isready`를 polling한다. timeout은 120초이며 실패 시 compose 로그를 artifact에 남기고 non-zero 종료한다.
-3. 각 variant에 대해 template seed를 primary에 한 번 적재하고 `pgbench`를 4 phase(300/900/900/300초)로 실행한다. 모든 phase에서 `-j 4 -c 16`을 고정하고 `--aggregate-interval=10`으로 `latency.tsv`를 만든다.
+3. 각 variant에 대해 template seed를 primary에 한 번 적재하고 `pgbench`를 4 phase(300/900/900/300초)로 실행한다. 각 phase 총 시간은 유지하되 write/history/search를 각각 50%/35%/15% 시간 창으로 순차 실행해 operation 합계가 phase 시간을 넘지 않게 한다. 모든 phase에서 `-j 4 -c 16`을 고정하고 `--aggregate-interval=10`으로 `latency.tsv`를 만든다. 따라서 `all + 40분`은 variant당 40분, 전체 약 120분이다.
 4. 매 10초 `pg_stat_replication`, `pg_stat_user_tables`, `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` 결과를 각각 `replica-lag.tsv`, `db-stats.tsv`, `plans/<variant>-<operation>.txt`에 append한다.
 5. `run.json`에 secret/password/DSN을 쓰지 않고, 종료 시 `docker compose down -v`를 보장한다.
 
@@ -211,4 +211,3 @@ git commit -m "test(T171-C4): verify chat scale evidence and decision gates"
 - 최종 명령: `pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1`, `docker compose -f qa/c4-chat-scale/docker-compose.yml config`, fixture verifier, 가능한 경우 `run.ps1 -Variant all -DurationMinutes 40`, `git diff --check`.
 - Docker 미실행 또는 40분 실측 미완료는 구현 실패가 아니라 `NOT_RUN` 증거로 남기되, 운영 shard 채택 결론은 내리지 않는다.
 - 산출물 디렉터리와 비밀은 커밋하지 않는다. 브랜치 `task_T171-C4-chat-scale`에서만 커밋하며, 최종 독립 리뷰가 90점 이상이고 P0/P1=0일 때에만 push/PR/merge 검토를 요청한다.
-
