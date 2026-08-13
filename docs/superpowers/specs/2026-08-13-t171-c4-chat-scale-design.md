@@ -141,7 +141,7 @@ artifact에는 요청 시각, replica replay lag, 선택된 대상(`primary`/`re
 
 ### 8.2 Partition 판정
 
-- baseline이 모든 steady/hot-room 구간에서 `write p99 < 500ms`이고 relation size·vacuum도 안정적이면 partition 도입은 보류한다.
+- baseline이 모든 steady/hot-room 구간에서 `write p99 < 500ms`이고 relation size·vacuum도 안정적이면 partition 도입은 보류한다. 안정성은 `db-stats.tsv`의 모든 행이 유효하고, `relation_size_bytes`·`index_size_bytes`가 각각 50GB 이하이며, `vacuum` 값이 시간순으로 감소하지 않고, `live > 0`일 때 `dead/live <= 10%`인 경우로 고정한다. 행 누락·파싱 실패·임계 초과는 `INVALID`로 처리하며 p99만으로 `DEFER`하지 않는다.
 - baseline이 `write p99 >= 500ms` 또는 partition size 50GB 이상을 15분 지속하면 `date_range`를 후보로 올린다.
 - `date_range`가 history query pruning과 retention drop을 충족하고 baseline 대비 write/read p99가 악화되지 않으면 date partition을 권고한다.
 - `date_hash`는 `date_range`에서 hot-room write QPS 1,000 이상 또는 write p99 500ms 이상이 15분 지속되고, `date_hash`가 hot-room p99를 20% 이상 줄이면서 error/replica lag을 10% 이상 악화시키지 않을 때만 권고한다.

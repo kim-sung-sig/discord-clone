@@ -30,7 +30,7 @@ function Invoke-Compose([string[]]$Arguments) {
 # docker compose up -d primary replica
 
 function Add-Stats([string]$table) {
-    $stats = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
+    $stats = & docker compose @composeArgs exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count, pg_total_relation_size('$table'), pg_indexes_size('$table') FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "initial pg_stat_user_tables sample failed: $($stats -join ' ')" }
     $stats | Add-Content (Join-Path $artifactDir 'db-stats.tsv')
     $lag = & docker compose @composeArgs exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), CASE WHEN pg_last_wal_receive_lsn() IS DISTINCT FROM pg_last_wal_replay_lsn() THEN EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) ELSE 0 END;" 2>&1
@@ -44,7 +44,7 @@ function Start-StatsSampler([string]$table, [string]$operation, [string]$phase) 
     Start-Job -ArgumentList $composeFile, $table, $dbStatsPath, $replicaStatsPath -ScriptBlock {
         param($composeFile, $table, $dbStatsPath, $replicaStatsPath)
         while ($true) {
-            $stats = & docker compose -f $composeFile exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
+            $stats = & docker compose -f $composeFile exec -T primary psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), relname, n_live_tup, n_dead_tup, vacuum_count, pg_total_relation_size('$table'), pg_indexes_size('$table') FROM pg_stat_user_tables WHERE relname = '$table';" 2>&1
             if ($LASTEXITCODE -ne 0) { throw "pg_stat_user_tables sampler failed: $($stats -join ' ')" }
             $stats | Add-Content $dbStatsPath
             $replica = & docker compose -f $composeFile exec -T replica psql -U c4_user -d c4chat -At -F "`t" -c "SELECT now(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), CASE WHEN pg_last_wal_receive_lsn() IS DISTINCT FROM pg_last_wal_replay_lsn() THEN EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) ELSE 0 END;" 2>&1
@@ -83,7 +83,7 @@ if (-not $gitSha) { $gitSha = 'unknown' }
 @{ variant = $Variant; seed = $Seed; durationMinutes = $DurationMinutes; utc = [DateTime]::UtcNow.ToString('o'); gitSha = $gitSha } |
     ConvertTo-Json -Compress | Set-Content (Join-Path $artifactDir 'run.json')
 "variant`tphase`toperation`tcount`terror_count`terror_rate`tp50_ms`tp95_ms`tp99_ms`tmax_ms" | Set-Content (Join-Path $artifactDir 'latency.tsv')
-"utc`t table`t live`t dead`t vacuum" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
+"utc`t table`t live`t dead`t vacuum`trelation_size_bytes`tindex_size_bytes" | Set-Content (Join-Path $artifactDir 'db-stats.tsv')
 "utc`t receive_lsn`t replay_lsn`t lag_seconds" | Set-Content (Join-Path $artifactDir 'replica-lag.tsv')
 "variant`tduplicate_cursor_count" | Set-Content (Join-Path $artifactDir 'cursor-gaps.tsv')
 

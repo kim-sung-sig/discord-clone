@@ -118,6 +118,7 @@ Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
 Assert ($run.Contains('IS DISTINCT FROM pg_last_wal_replay_lsn()')) 'replica lag must be zero when receive and replay LSNs are equal'
 Assert ($run.Contains('operationSeconds') -and $run.Contains('0.50') -and $run.Contains('0.35') -and $run.Contains('0.15')) 'run must allocate each phase by the declared operation mix'
 Assert ($run.Contains('operationUnit') -and $run.Contains('aggregateIntervalArg')) 'run must align operation durations with pgbench aggregate interval'
+Assert ($run.Contains('pg_total_relation_size') -and $run.Contains('pg_indexes_size')) 'run must record relation and index size evidence'
 foreach ($artifact in @('run.json', 'latency.tsv', 'db-stats.tsv', 'replica-lag.tsv', 'cursor-gaps.tsv', 'plans')) {
     Assert ($run.Contains($artifact)) "run artifact is missing: $artifact"
 }
@@ -126,6 +127,7 @@ Assert ($run.Contains('variant`tphase`toperation`tcount`terror_count`terror_rate
 foreach ($snippet in @('decision.json','candidate_decision','selected_variant','variant_hot_write_p99_ms','steady_hot_write_p99_ms','hot_room_write_p99_ms','rangeNoWorse','pruning evidence missing or incomplete','artifact path must be under qa/artifacts/c4-chat-scale','C4_CHAT_SCALE_VERIFY_PASS')) {
     Assert ($verify.Contains($snippet)) "verify requirement is missing: $snippet"
 }
+foreach ($snippet in @('db-stats.tsv','dbStable','relation size or vacuum stability evidence failed','db_stability_pass')) { Assert ($verify.Contains($snippet)) "verify stability requirement is missing: $snippet" }
 foreach ($snippet in @('cursor-gaps.tsv','40-minute run required','all three variants are required and no unknown variants allowed','sensitive fields','IsNaN','IsInfinity','invalid metric ordering','expectedRate')) {
     Assert ($verify.Contains($snippet)) "verify fail-closed requirement is missing: $snippet"
 }

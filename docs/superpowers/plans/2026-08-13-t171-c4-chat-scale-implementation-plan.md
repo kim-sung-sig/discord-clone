@@ -136,7 +136,7 @@ git commit -m "test(T171-C4): add isolated postgres primary replica harness"
 1. `run-id = UTC yyyyMMdd-HHmmss-fff` 디렉터리를 만들고 `run.json`에 variant·seed·duration·UTC·git SHA만 기록한다.
 2. `docker compose up -d primary replica` 후 `pg_isready`를 polling한다. timeout은 120초이며 실패 시 compose 로그를 artifact에 남기고 non-zero 종료한다.
 3. 각 variant에 대해 template seed를 primary에 한 번 적재하고 `pgbench`를 4 phase(300/900/900/300초)로 실행한다. 각 phase 총 시간은 유지하되 write/history/search를 각각 50%/35%/15% 시간 창으로 순차 실행해 operation 합계가 phase 시간을 넘지 않게 한다. 모든 phase에서 `-j 4 -c 16`을 고정하고 `--aggregate-interval=10`으로 `latency.tsv`를 만든다. 따라서 `all + 40분`은 variant당 40분, 전체 약 120분이다.
-4. 매 10초 `pg_stat_replication`, `pg_stat_user_tables`, `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` 결과를 각각 `replica-lag.tsv`, `db-stats.tsv`, `plans/<variant>-<operation>.txt`에 append한다.
+4. 매 10초 `pg_stat_replication`, `pg_stat_user_tables`와 `pg_total_relation_size`·`pg_indexes_size`, `EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)` 결과를 각각 `replica-lag.tsv`, `db-stats.tsv`, `plans/<variant>-<operation>.txt`에 append한다. `db-stats.tsv`의 relation/index size는 50GB 이하, vacuum_count 비감소, live>0일 때 dead/live 10% 이하를 검증기가 모두 확인하며 누락·파싱 실패는 fail-closed 한다.
 5. `run.json`에 secret/password/DSN을 쓰지 않고, 종료 시 `docker compose down -v`를 보장한다.
 
 - [ ] **Step 3: RED→GREEN 실행 검증**
