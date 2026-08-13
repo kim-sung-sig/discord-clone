@@ -129,7 +129,8 @@ try {
                 $sampler = Start-StatsSampler $table $opName $phase
                 try {
                     $output = & docker compose @composeArgs run --rm --no-deps -v $artifactMount -e PGPASSWORD=dev_only_password pgbench -n -l -j 4 -c 16 "--aggregate-interval=$aggregateIntervalArg" "--log-prefix=$logPrefix" -T $operationDuration "-Dtable=$table" -Dseed=$Seed -f "/bench/$sqlName" 2>&1
-                    if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE)" }
+                    $output | Set-Content (Join-Path $artifactDir "logs/pgbench-${variantName}-${phase}-${opName}.stdout.log")
+                    if ($LASTEXITCODE -ne 0) { throw "pgbench $variantName/$phase/$opName failed ($LASTEXITCODE): $($output -join ' ')" }
                     $logFiles = Get-ChildItem -Path $artifactDir -Filter "pgbench-$variantName-$phase-$opName*" -File -ErrorAction SilentlyContinue
                     $logLines = @($logFiles | ForEach-Object { Get-Content $_.FullName })
                     $samples = @(Get-LatencySamples $logLines)
