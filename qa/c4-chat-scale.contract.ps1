@@ -117,6 +117,7 @@ Assert ($run.Contains('PGPASSWORD=dev_only_password')) 'run pgbench connection p
 Assert ($run.Contains('pg_isready') -and $run.Contains('120')) 'run must poll pg_isready with 120 second timeout'
 Assert ($run.Contains('down -v --remove-orphans')) 'run cleanup is missing'
 Assert ($run.Contains('IS DISTINCT FROM pg_last_wal_replay_lsn()')) 'replica lag must be zero when receive and replay LSNs are equal'
+Assert ($run.Contains('GREATEST(EXTRACT(EPOCH')) 'replica lag must clamp clock-skew negatives to zero'
 Assert ($run.Contains('operationSeconds') -and $run.Contains('0.50') -and $run.Contains('0.35') -and $run.Contains('0.15')) 'run must allocate each phase by the declared operation mix'
 Assert ($run.Contains('operationUnit') -and $run.Contains('aggregateIntervalArg')) 'run must align operation durations with pgbench aggregate interval'
 Assert ($run.Contains('pg_total_relation_size') -and $run.Contains('pg_indexes_size')) 'run must record relation and index size evidence'
