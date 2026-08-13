@@ -1,0 +1,80 @@
+services:
+  primary:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: c4chat
+      POSTGRES_USER: c4_user
+      POSTGRES_PASSWORD: dev_only_password
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: dev_replication_password
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=1
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - 127.0.0.1:15442:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U c4_user -d c4chat]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [c4-local]
+
+  replica:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: c4chat
+      POSTGRES_USER: c4_user
+      POSTGRES_PASSWORD: dev_only_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICA_SLOT: c4_replica_slot
+      REPLICA_BASEBACKUP_COMMAND: pg_basebackup -h primary -U replicator -D $$PGDATA -R -S c4_replica_slot
+      REPLICA_LAG_DRILL: SELECT pg_wal_replay_pause();
+    command:
+      - postgres
+      - -c
+      - hot_standby=on
+      - -c
+      - primary_conninfo=host=primary port=5432 user=replicator password=dev_replication_password application_name=c4-replica
+      - -c
+      - primary_slot_name=c4_replica_slot
+    depends_on:
+      primary:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:15443:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U c4_user -d c4chat]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [c4-local]
+
+  pgbench:
+    image: postgres:16-alpine
+    profiles: [load]
+    environment:
+      PGHOST: primary
+      PGPORT: 5432
+      PGDATABASE: c4chat
+      PGUSER: c4_user
+      PGPASSWORD: dev_only_password
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: [pgbench]
+    command: [-n, -c, '4', -j, '2', -T, '60', -f, /bench/write.sql]
+    volumes:
+      - ./pgbench:/bench:ro
+    networks: [c4-local]
+
+networks:
+  c4-local:
+    name: c4-chat-scale-local
+    internal: true
