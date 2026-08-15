@@ -4,7 +4,7 @@
 
 - 작업 브랜치: `task_T171-C4-chat-scale`
 - base `origin/main` / `main`: `9ea13919b15a270e10842970cdc524517fdb110a`
-- reviewed content SHA: `710a3ca6e236f94acb26c12c89d62e8be69dd832`
+- reviewed content SHA: `710a3caa4e782b42a6d7edfe9692f1c2fe6ce25d`
 - 최종 실측 실행 SHA: `fc3af9fb700d100d410669d7b718d23f479ff76d`
 - artifact: `qa/artifacts/c4-chat-scale/20260813-213400-815`
 
