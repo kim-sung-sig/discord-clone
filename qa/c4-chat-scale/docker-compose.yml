@@ -1,0 +1,87 @@
+services:
+  primary:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: c4chat
+      POSTGRES_USER: c4_user
+      POSTGRES_PASSWORD: dev_only_password
+      REPLICATION_USER: replication
+      REPLICATION_PASSWORD: dev_replication_password
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=1
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=32
+      - -c
+      - work_mem=1MB
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - 127.0.0.1:15442:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U c4_user -d c4chat]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [c4-local]
+
+  replica:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: c4chat
+      POSTGRES_USER: c4_user
+      POSTGRES_PASSWORD: dev_only_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICATION_USER: replication
+      REPLICATION_PASSWORD: dev_replication_password
+      REPLICA_LAG_DRILL: SELECT pg_wal_replay_pause();
+    entrypoint: [/bin/sh, /usr/local/bin/replica-entrypoint.sh]
+    command: [postgres, -c, hot_standby=on, -c, shared_buffers=32MB, -c, max_connections=32, -c, work_mem=1MB]
+    volumes:
+      - ./replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+      - c4-chat-scale-replica-data:/var/lib/postgresql/data
+    depends_on:
+      primary:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:15443:5432
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U c4_user -d c4chat]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [c4-local]
+
+  pgbench:
+    image: postgres:16-alpine
+    profiles: [load]
+    environment:
+      PGHOST: primary
+      PGPORT: 5432
+      PGDATABASE: c4chat
+      PGUSER: c4_user
+      PGPASSWORD: dev_only_password
+    depends_on:
+      primary:
+        condition: service_healthy
+    entrypoint: [pgbench]
+    # run.ps1 overrides -Dtable with its messages_baseline/messages_date_range/messages_date_hash allowlist.
+    command: [-n, -c, '4', -j, '2', -T, '60', -Dtable=messages_baseline, -f, /bench/write.sql]
+    volumes:
+      - ./pgbench:/bench:ro
+    networks: [c4-local]
+
+networks:
+  c4-local:
+    name: c4-chat-scale-local
+    internal: true
+
+volumes:
+  c4-chat-scale-replica-data:
