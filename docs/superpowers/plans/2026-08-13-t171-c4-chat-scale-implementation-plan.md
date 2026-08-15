@@ -58,7 +58,7 @@ Write-Output 'C4_ROUTING_TEST_PASS'
 
 - [ ] **Step 2: RED 확인**
 
-실행: `pwsh -NoProfile -File qa/c4-chat-scale/routing-policy.tests.ps1`  
+실행: `pwsh -NoProfile -File qa/c4-chat-scale/routing-policy.tests.ps1`
 기대: 파일 부재 오류로 실패한다. 이 실패가 확인되기 전에는 `routing-policy.ps1`을 만들지 않는다.
 
 - [ ] **Step 3: 최소 구현**
@@ -67,7 +67,7 @@ Write-Output 'C4_ROUTING_TEST_PASS'
 
 - [ ] **Step 4: GREEN 확인 및 계약 실행**
 
-실행: `pwsh -NoProfile -File qa/c4-chat-scale/routing-policy.tests.ps1; pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1`  
+실행: `pwsh -NoProfile -File qa/c4-chat-scale/routing-policy.tests.ps1; pwsh -NoProfile -File qa/c4-chat-scale.contract.ps1`
 기대: `C4_ROUTING_TEST_PASS`, `C4_CHAT_SCALE_CONTRACT_PASS`가 출력된다.
 
 - [ ] **Step 5: 커밋**
@@ -142,7 +142,7 @@ git commit -m "test(T171-C4): add isolated postgres primary replica harness"
 
 - [ ] **Step 3: RED→GREEN 실행 검증**
 
-RED: `pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant invalid`가 parameter validation 오류를 내야 한다.  
+RED: `pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant invalid`가 parameter validation 오류를 내야 한다.
 GREEN: `pwsh -NoProfile -File qa/c4-chat-scale/run.ps1 -Variant baseline -DurationMinutes 1` 실행 후 artifact 아래 `run.json`, `latency.tsv`, `db-stats.tsv`, `replica-lag.tsv`, `plans/`가 존재해야 한다. 네트워크가 차단되면 Docker health check 결과만 기록하고 실패 원인을 출력한다.
 
 - [ ] **Step 4: README에 재현 명령 고정**
