@@ -1,6 +1,20 @@
 spring:
   kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:29092}
+    producer:
+      acks: all
+      enable-idempotence: true
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
     consumer:
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+    listener:
+      ack-mode: record
+
+discord:
+  kafka:
+    topic-prefix: ${DISCORD_KAFKA_TOPIC_PREFIX:discord}
+    message-publish-timeout-ms: ${DISCORD_KAFKA_MESSAGE_PUBLISH_TIMEOUT_MS:5000}
