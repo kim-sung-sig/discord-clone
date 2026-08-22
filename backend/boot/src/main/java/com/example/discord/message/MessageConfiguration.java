@@ -11,6 +11,8 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -92,6 +94,7 @@ class MessageConfiguration {
     }
 
     @Bean
+    @Profile("!kafka")
     MessagePublishedDispatcher messagePublishedDispatcher(
         InMemoryGatewayService gatewayService,
         MessageLookupPort messages
@@ -146,6 +149,25 @@ class MessageConfiguration {
             }
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "unsupported message author or target");
         };
+    }
+
+    @Bean
+    @Profile("kafka")
+    MessagePublishedDispatcher kafkaMessagePublishedDispatcher(
+        KafkaTemplate<String, String> kafka,
+        ObjectMapper objectMapper,
+        MessageLookupPort messages,
+        @Value("${discord.kafka.topic-prefix:discord}") String topicPrefix,
+        @Value("${discord.kafka.message-publish-timeout-ms:5000}") long publishTimeoutMillis
+    ) {
+        return new KafkaMessagePublishedDispatcher(
+            kafka,
+            objectMapper,
+            messages,
+            Clock.systemUTC(),
+            topicPrefix,
+            publishTimeoutMillis
+        );
     }
 
     @Bean
