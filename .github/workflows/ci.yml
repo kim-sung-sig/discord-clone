@@ -102,6 +102,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p qa/artifacts/real-backend-e2e/ci
+          mkdir -p qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/public-key-locations
+          printf '%s' 'discord-identity' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/issuer
+          printf '%s' 'discord-api' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/audience
+          printf '%s' 'identity-2026-07' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/key-id
+          printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-private.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/private-key-location
+          printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-public.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/public-key-locations/identity-2026-07
           ./gradlew :backend:boot:bootRun \
             > qa/artifacts/real-backend-e2e/ci/backend-bootRun.log \
             2> qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log &
@@ -123,7 +129,8 @@ jobs:
           cat qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log || true
           exit 1
         env:
-          SPRING_PROFILES_ACTIVE: postgres
+          SPRING_PROFILES_ACTIVE: postgres,legacy-auth
+          DISCORD_JWT_CONFIG_TREE: ${{ github.workspace }}/qa/artifacts/real-backend-e2e/ci/discord-config/
           MANAGEMENT_HEALTH_REDIS_ENABLED: 'false'
           POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
           POSTGRES_USER: dev_user

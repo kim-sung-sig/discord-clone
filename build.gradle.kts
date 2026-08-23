@@ -1,7 +1,7 @@
 plugins {
     java
     checkstyle
-    id("org.springframework.boot") version "3.5.14" apply false
+    id("org.springframework.boot") version "3.5.16" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
@@ -16,7 +16,7 @@ subprojects {
 
     extra["tomcat.version"] = "10.1.55"
     extra["jackson.version"] = "2.21.4"
-    extra["netty.version"] = "4.1.135.Final"
+    extra["netty.version"] = "4.1.136.Final"
     extra["kafka.version"] = "4.2.0"
 
     java {
