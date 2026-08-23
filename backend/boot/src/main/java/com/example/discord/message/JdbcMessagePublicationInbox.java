@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("postgres")
-final class JdbcMessagePublicationInbox implements MessagePublicationInbox {
+class JdbcMessagePublicationInbox implements MessagePublicationInbox {
     private static final String CONSUMER = "gateway-message-publication";
     private final JdbcTemplate jdbc;
 
