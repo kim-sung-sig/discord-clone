@@ -35,7 +35,8 @@ MFA 완료 여부와 신뢰도는 같은 개념이 아니다. factor별 level은
 | Step-up factor | 기존 access JWT의 level을 높이기 위해 실행하는 factor. |
 | Factor level | application 설정이 `factorId`에 부여하는 양의 정수 신뢰도. |
 | Assurance level | JWT에 기록되는 현재 인증 결과의 최고 factor level. |
-| Transaction JWT | 로그인 또는 step-up 중에만 쓰는 짧은 수명의 임시 JWT. API access 권한이 없다. |
+| Auth-factor JWT | 추가 factor 인증이 필요할 때 browser가 보유하는 짧은 수명의 JWT. API access 권한이 없다. |
+| Auth-challenge JWT | 특정 factor challenge를 승인할 device가 보유하는 짧은 수명의 JWT. API access 권한이 없다. |
 
 ## 정책과 level
 
@@ -54,8 +55,6 @@ app:
       finance:
         required-factor-ids: [mock-step-up]
         required-level: 80
-    mock-device:
-      shared-key: ${MFA_MOCK_DEVICE_KEY}
 ```
 
 로그인 정책을 통과하면 `max(10, 50) = 50`의 access JWT를 발급한다. `finance`는 level 80을 요구하므로 level 50 access JWT는 거부되고 step-up을 거친 뒤 level 80 JWT를 발급한다.
@@ -72,12 +71,13 @@ POST /api/login
   -> LOGIN transaction 생성
   -> password factor 완료 기록
   -> mock-login-push challenge 생성
-  -> login transaction JWT 반환
+  -> auth-factor JWT와 auth-challenge JWT 반환
 
-Mock device approve
+Mock device가 auth-challenge JWT로 approve
   -> mock-login-push factor 완료 기록
 
 POST /api/login/transactions/{transactionId}/complete
+  auth-factor JWT 제시
   -> login.required-factor-ids 전체 완료 확인
   -> assurance_level=50 access JWT 발급
 ```
@@ -92,12 +92,13 @@ GET /api/finance/summary with access JWT(level 50)
 
 POST /api/step-up/transactions { "policyId": "finance" }
   -> STEP_UP transaction과 mock-step-up challenge 생성
-  -> step-up transaction JWT 반환
+  -> auth-factor JWT와 auth-challenge JWT 반환
 
-Mock device approve
+Mock device가 auth-challenge JWT로 approve
   -> mock-step-up factor 완료 기록
 
 POST /api/step-up/transactions/{transactionId}/complete
+  auth-factor JWT 제시
   -> policy factor 완료 확인
   -> assurance_level=max(50, 80)=80 access JWT 발급
 ```
@@ -121,19 +122,35 @@ Access JWT만 Resource Server가 API 인증에 사용한다.
 
 일반 access JWT TTL은 30분, step-up으로 발급한 access JWT TTL은 5분이다.
 
-### Transaction JWT
+### Auth-factor JWT
 
-로그인과 step-up은 별도 JWT를 사용한다.
+로그인과 step-up에서 추가 factor 인증이 필요할 때 browser에 발급한다.
 
 | Claim | 의미 |
 |---|---|
-| `typ` | `login-transaction` 또는 `step-up-transaction` |
+| `typ` | `auth-factor` |
 | `sub` | 대상 사용자 ID |
 | `transaction_id` | SQLite transaction ID |
 | `purpose` | `LOGIN` 또는 `STEP_UP` |
 | `exp` | 5분 이내의 짧은 만료 |
 
-Security 설정은 `typ=access`만 bearer access JWT로 받아들인다. transaction JWT는 challenge 조회, mock 승인, transaction 완료 API에서만 명시적으로 검증한다.
+Auth-factor JWT는 해당 transaction의 상태 조회·완료 API에서만 명시적으로 검증한다.
+
+### Auth-challenge JWT
+
+특정 challenge의 승인 권한을 인증 device에 전달한다. Mock 예제에서는 응답에 포함해 test client가 device 역할을 재현한다. 실제 push provider에서는 이 토큰을 browser 응답이 아니라 등록 device에 전달한다.
+
+| Claim | 의미 |
+|---|---|
+| `typ` | `auth-challenge` |
+| `sub` | 대상 사용자 ID |
+| `transaction_id` | SQLite transaction ID |
+| `challenge_id` | 승인 가능한 단일 challenge ID |
+| `factor_id` | 승인 대상 factor ID |
+| `purpose` | `LOGIN` 또는 `STEP_UP` |
+| `exp` | challenge와 같은 짧은 만료 |
+
+Auth-challenge JWT는 mock device 승인 API에서만 검증하며, 다른 challenge나 transaction의 승인에는 사용할 수 없다. Security 설정은 `typ=access`만 bearer access JWT로 받아들인다.
 
 ## Factor adapter SPI
 
@@ -154,21 +171,21 @@ MVP adapter:
 - `mock-login-push`: login 전용 mock push 승인 factor, level 50.
 - `mock-step-up`: step-up 전용 mock push 승인 factor, level 80.
 
-두 adapter는 Mock device endpoint에서 승인되기 전까지 `PENDING` 상태를 유지한다. Mock device endpoint는 `X-Mock-Device-Key`가 설정의 `MFA_MOCK_DEVICE_KEY`와 일치할 때만 승인한다. 이 endpoint는 예제 전용이며 실제 device proof를 대체하지 않는다. 실제 Passkey/WebAuthn adapter는 같은 SPI 안에서 public challenge와 assertion 검증을 구현한다.
+두 adapter는 Mock device endpoint에서 승인되기 전까지 `PENDING` 상태를 유지한다. Mock device endpoint는 해당 challenge에 묶인 auth-challenge JWT를 검증한 뒤에만 승인한다. 이 endpoint는 예제 전용이며 실제 device proof를 대체하지 않는다. 실제 Passkey/WebAuthn adapter는 같은 SPI 안에서 public challenge와 assertion 검증을 구현한다.
 
 ## HTTP API
 
 | API | 인증 | 결과 |
 |---|---|---|
-| `POST /api/login` | 없음 | password 검증 후 LOGIN transaction과 login transaction JWT 반환 |
-| `POST /api/login/transactions/{id}/complete` | login transaction JWT | 모든 login factor 완료 시 access JWT 반환 |
-| `POST /api/step-up/transactions` | access JWT | 정책 기반 STEP_UP transaction과 step-up transaction JWT 반환 |
-| `POST /api/step-up/transactions/{id}/complete` | step-up transaction JWT | 정책 factor 완료 시 승급 access JWT 반환 |
-| `POST /api/mock-device/challenges/{id}/approve` | `X-Mock-Device-Key` | 해당 push challenge를 승인 상태로 변경 |
+| `POST /api/login` | 없음 | password 검증 후 LOGIN transaction, auth-factor JWT, auth-challenge JWT 반환 |
+| `POST /api/login/transactions/{id}/complete` | auth-factor JWT | 모든 login factor 완료 시 access JWT 반환 |
+| `POST /api/step-up/transactions` | access JWT | 정책 기반 STEP_UP transaction, auth-factor JWT, auth-challenge JWT 반환 |
+| `POST /api/step-up/transactions/{id}/complete` | auth-factor JWT | 정책 factor 완료 시 승급 access JWT 반환 |
+| `POST /api/mock-device/challenges/{id}/approve` | auth-challenge JWT | 해당 push challenge를 승인 상태로 변경 |
 | `GET /api/profile` | access JWT | 현재 user와 assurance level 반환 |
 | `GET /api/finance/summary` | access JWT + level 80 | level 충족 시 금융 예제 데이터 반환 |
 
-`POST /api/login`과 `POST /api/step-up/transactions` 응답은 생성된 transaction ID, transaction JWT, pending challenge ID와 public payload를 함께 반환한다. browser는 mock device의 별도 승인 뒤 `complete` API를 호출한다. `/api/finance/summary`의 level 부족 응답은 `403 MFA_REQUIRED`이며 `currentLevel`, `requiredLevel`, `policyId`를 포함한다. 토큰 없음·서명 오류·만료·잘못된 token type은 `401`이다. 만료 또는 소비 완료 transaction/challenge는 `410`이다.
+`POST /api/login`과 `POST /api/step-up/transactions` 응답은 생성된 transaction ID, auth-factor JWT, auth-challenge JWT, pending challenge ID와 public payload를 함께 반환한다. browser는 mock device의 별도 승인 뒤 auth-factor JWT로 `complete` API를 호출한다. `/api/finance/summary`의 level 부족 응답은 `403 MFA_REQUIRED`이며 `currentLevel`, `requiredLevel`, `policyId`를 포함한다. 토큰 없음·서명 오류·만료·잘못된 token type은 `401`이다. 만료 또는 소비 완료 transaction/challenge는 `410`이다.
 
 ## SQLite 모델
 
@@ -212,7 +229,7 @@ transaction 완료는 한 transaction의 모든 `required_factor_ids`가 완료�
 - `AssuranceAuthorizationManager`는 path별 정책의 `requiredLevel <= assurance_level`만 판정한다.
 - CSRF는 cookie/session 인증을 사용하지 않는 JSON bearer API이므로 비활성화한다.
 - password는 Spring Security `PasswordEncoder`로 hash한다.
-- raw password, JWT, transaction JWT, mock device credential, adapter state는 로그로 남기지 않는다.
+- raw password, access/auth-factor/auth-challenge JWT, adapter state는 로그로 남기지 않는다.
 
 Spring Security 7의 MFA authority 기능은 사용하지 않는다. 이 예제의 정책은 임의 개수 factor와 숫자 level을 다루므로 `AuthorizationManager` 기반 인가가 책임 경계에 맞다.
 
@@ -221,7 +238,7 @@ Spring Security 7의 MFA authority 기능은 사용하지 않는다. 이 예제�
 단위 테스트:
 
 - level 최대값 계산, login/step-up required factor 충족 여부.
-- transaction JWT type/purpose 검증.
+- auth-factor/auth-challenge JWT type, purpose, transaction·challenge binding 검증.
 - adapter registry의 ServiceLoader/Spring Bean 등록과 중복 factor ID 거부.
 - Mock push의 pending/approve/consume 동작.
 
@@ -231,7 +248,7 @@ Spring Security 7의 MFA authority 기능은 사용하지 않는다. 이 예제�
 2. login push 승인 후 level 50 access JWT를 받는다.
 3. level 50은 `GET /api/finance/summary`에서 `403 MFA_REQUIRED`를 받는다.
 4. step-up 승인 후 level 80 access JWT로 금융 API를 호출한다.
-5. transaction/challenge 재사용, 만료, 다른 사용자의 transaction 접근, transaction JWT로 API 접근은 거부된다.
+5. transaction/challenge 재사용, 만료, 다른 사용자의 transaction 접근, auth-factor/auth-challenge JWT로 API 접근은 거부된다.
 
 검증 명령:
 
@@ -244,7 +261,7 @@ Spring Security 7의 MFA authority 기능은 사용하지 않는다. 이 예제�
 
 1. 독립 Gradle 프로젝트와 SQLite schema를 만든다.
 2. 사용자 seed, password login, JWT encoder/decoder와 access token filter를 만든다.
-3. transaction 저장소와 transaction JWT를 만든다.
+3. transaction 저장소와 auth-factor/auth-challenge JWT를 만든다.
 4. ServiceLoader/Spring Bean adapter registry와 두 mock push adapter를 만든다.
 5. login 및 step-up controller/service를 만든다.
 6. level 인가와 오류 응답을 만든다.
