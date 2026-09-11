@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":backend:modules:user"))
     implementation(project(":backend:shared:common"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.security:spring-security-crypto:6.5.10")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.security:spring-security-crypto")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 }
