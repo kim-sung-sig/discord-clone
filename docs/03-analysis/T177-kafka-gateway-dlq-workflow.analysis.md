@@ -1,3 +1,11 @@
+---
+slug: T177-kafka-gateway-dlq-workflow
+ticket: T177
+phase: analysis
+hub: "[[T177-kafka-gateway-dlq-workflow]]"
+---
+> 🧭 [[T177-kafka-gateway-dlq-workflow]] · PDCA: [[T177-kafka-gateway-dlq-workflow.plan]] → [[T177-kafka-gateway-dlq-workflow.design]] → **analysis** → [[T177-kafka-gateway-dlq-workflow.report]] → [[T177-kafka-gateway-dlq-workflow.feedback]]
+
 # T177 Kafka Gateway DLQ Workflow Analysis
 
 Date: 2026-05-21

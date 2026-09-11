@@ -1,3 +1,11 @@
+---
+slug: T22-toolchain-build-maintenance
+ticket: T22
+phase: plan
+hub: "[[T22-toolchain-build-maintenance]]"
+---
+> 🧭 [[T22-toolchain-build-maintenance]] · PDCA: **plan** → [[T22-toolchain-build-maintenance.design]] → [[T22-toolchain-build-maintenance.analysis]] → [[T22-toolchain-build-maintenance.report]] → ~~feedback~~
+
 # T22 Toolchain/Build Maintenance Plan
 
 작성일: 2026-05-15  

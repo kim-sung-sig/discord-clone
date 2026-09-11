@@ -1,3 +1,11 @@
+---
+slug: T61-redis-multi-node-gateway-fanout-smoke
+ticket: T61
+phase: feedback
+hub: "[[T61-redis-multi-node-gateway-fanout-smoke]]"
+---
+> 🧭 [[T61-redis-multi-node-gateway-fanout-smoke]] · PDCA: [[T61-redis-multi-node-gateway-fanout-smoke.plan]] → [[T61-redis-multi-node-gateway-fanout-smoke.design]] → [[T61-redis-multi-node-gateway-fanout-smoke.analysis]] → [[T61-redis-multi-node-gateway-fanout-smoke.report]] → **feedback**
+
 # T61 Redis Multi-node Gateway Fanout Smoke Feedback
 
 Date: 2026-05-21

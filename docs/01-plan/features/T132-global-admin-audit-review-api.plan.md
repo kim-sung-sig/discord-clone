@@ -1,3 +1,11 @@
+---
+slug: T132-global-admin-audit-review-api
+ticket: T132
+phase: plan
+hub: "[[T132-global-admin-audit-review-api]]"
+---
+> 🧭 [[T132-global-admin-audit-review-api]] · PDCA: **plan** → [[T132-global-admin-audit-review-api.design]] → [[T132-global-admin-audit-review-api.analysis]] → [[T132-global-admin-audit-review-api.report]] → [[T132-global-admin-audit-review-api.feedback]]
+
 # T132 Global Admin Audit Review API Plan
 
 Date: 2026-05-20

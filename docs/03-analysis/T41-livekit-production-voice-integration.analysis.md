@@ -1,3 +1,11 @@
+---
+slug: T41-livekit-production-voice-integration
+ticket: T41
+phase: analysis
+hub: "[[T41-livekit-production-voice-integration]]"
+---
+> 🧭 [[T41-livekit-production-voice-integration]] · PDCA: [[T41-livekit-production-voice-integration.plan]] → [[T41-livekit-production-voice-integration.design]] → **analysis** → [[T41-livekit-production-voice-integration.report]] → [[T41-livekit-production-voice-integration.feedback]]
+
 # T41 LiveKit Production Voice Integration Analysis
 
 작성일: 2026-05-17  

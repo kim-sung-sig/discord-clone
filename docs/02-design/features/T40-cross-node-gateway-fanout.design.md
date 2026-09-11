@@ -1,3 +1,11 @@
+---
+slug: T40-cross-node-gateway-fanout
+ticket: T40
+phase: design
+hub: "[[T40-cross-node-gateway-fanout]]"
+---
+> 🧭 [[T40-cross-node-gateway-fanout]] · PDCA: [[T40-cross-node-gateway-fanout.plan]] → **design** → [[T40-cross-node-gateway-fanout.analysis]] → [[T40-cross-node-gateway-fanout.report]] → [[T40-cross-node-gateway-fanout.feedback]]
+
 # T40 Cross-node Gateway Fanout Design
 
 작성일: 2026-05-17  

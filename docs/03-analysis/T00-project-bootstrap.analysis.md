@@ -1,3 +1,11 @@
+---
+slug: T00-project-bootstrap
+ticket: T00
+phase: analysis
+hub: "[[T00-project-bootstrap]]"
+---
+> 🧭 [[T00-project-bootstrap]] · PDCA: ~~plan~~ → ~~design~~ → **analysis** → [[T00-project-bootstrap.report]] → [[T00-project-bootstrap.feedback]]
+
 # T00 Project Bootstrap Analysis
 
 작성일: 2026-05-13  

@@ -1,3 +1,11 @@
+---
+slug: T34-session-account-security-hardening
+ticket: T34
+phase: plan
+hub: "[[T34-session-account-security-hardening]]"
+---
+> 🧭 [[T34-session-account-security-hardening]] · PDCA: **plan** → [[T34-session-account-security-hardening.design]] → ~~analysis~~ → [[T34-session-account-security-hardening.report]] → [[T34-session-account-security-hardening.feedback]]
+
 # T34 Session & Account Security Hardening Plan
 
 ## Problem

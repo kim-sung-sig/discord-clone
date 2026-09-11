@@ -1,3 +1,11 @@
+---
+slug: T148-central-redis-smoke-check
+ticket: T148
+phase: feedback
+hub: "[[T148-central-redis-smoke-check]]"
+---
+> 🧭 [[T148-central-redis-smoke-check]] · PDCA: [[T148-central-redis-smoke-check.plan]] → [[T148-central-redis-smoke-check.design]] → [[T148-central-redis-smoke-check.analysis]] → [[T148-central-redis-smoke-check.report]] → **feedback**
+
 # T148 Central Redis Smoke Check Feedback
 
 Date: 2026-05-20

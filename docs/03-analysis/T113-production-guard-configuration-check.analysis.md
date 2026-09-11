@@ -1,3 +1,11 @@
+---
+slug: T113-production-guard-configuration-check
+ticket: T113
+phase: analysis
+hub: "[[T113-production-guard-configuration-check]]"
+---
+> 🧭 [[T113-production-guard-configuration-check]] · PDCA: [[T113-production-guard-configuration-check.plan]] → [[T113-production-guard-configuration-check.design]] → **analysis** → [[T113-production-guard-configuration-check.report]] → [[T113-production-guard-configuration-check.feedback]]
+
 # T113 Production Guard Configuration Check Analysis
 
 ## Result

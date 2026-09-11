@@ -1,3 +1,11 @@
+---
+slug: T19-redis-rate-limit-store
+ticket: T19
+phase: design
+hub: "[[T19-redis-rate-limit-store]]"
+---
+> 🧭 [[T19-redis-rate-limit-store]] · PDCA: ~~plan~~ → **design** → ~~analysis~~ → ~~report~~ → ~~feedback~~
+
 # T19 Redis Rate Limit Store Design
 
 작성일: 2026-05-14  

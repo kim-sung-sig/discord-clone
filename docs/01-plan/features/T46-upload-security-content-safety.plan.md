@@ -1,3 +1,11 @@
+---
+slug: T46-upload-security-content-safety
+ticket: T46
+phase: plan
+hub: "[[T46-upload-security-content-safety]]"
+---
+> 🧭 [[T46-upload-security-content-safety]] · PDCA: **plan** → [[T46-upload-security-content-safety.design]] → [[T46-upload-security-content-safety.analysis]] → [[T46-upload-security-content-safety.report]] → [[T46-upload-security-content-safety.feedback]]
+
 # T46 Upload Security & Content Safety Plan
 
 Date: 2026-05-18

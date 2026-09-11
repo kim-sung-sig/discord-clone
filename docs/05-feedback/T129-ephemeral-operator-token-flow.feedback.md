@@ -1,3 +1,11 @@
+---
+slug: T129-ephemeral-operator-token-flow
+ticket: T129
+phase: feedback
+hub: "[[T129-ephemeral-operator-token-flow]]"
+---
+> 🧭 [[T129-ephemeral-operator-token-flow]] · PDCA: [[T129-ephemeral-operator-token-flow.plan]] → [[T129-ephemeral-operator-token-flow.design]] → [[T129-ephemeral-operator-token-flow.analysis]] → [[T129-ephemeral-operator-token-flow.report]] → **feedback**
+
 # T129 Ephemeral Operator Token Flow Feedback
 
 Date: 2026-05-21

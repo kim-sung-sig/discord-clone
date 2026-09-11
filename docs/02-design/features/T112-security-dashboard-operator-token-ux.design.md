@@ -1,3 +1,11 @@
+---
+slug: T112-security-dashboard-operator-token-ux
+ticket: T112
+phase: design
+hub: "[[T112-security-dashboard-operator-token-ux]]"
+---
+> 🧭 [[T112-security-dashboard-operator-token-ux]] · PDCA: [[T112-security-dashboard-operator-token-ux.plan]] → **design** → [[T112-security-dashboard-operator-token-ux.analysis]] → [[T112-security-dashboard-operator-token-ux.report]] → [[T112-security-dashboard-operator-token-ux.feedback]]
+
 # T112 Security Dashboard Operator Token UX Design
 
 ## UI Contract

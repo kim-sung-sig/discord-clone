@@ -1,3 +1,11 @@
+---
+slug: T144-central-runtime-resource-profiles
+ticket: T144
+phase: analysis
+hub: "[[T144-central-runtime-resource-profiles]]"
+---
+> 🧭 [[T144-central-runtime-resource-profiles]] · PDCA: [[T144-central-runtime-resource-profiles.plan]] → [[T144-central-runtime-resource-profiles.design]] → **analysis** → [[T144-central-runtime-resource-profiles.report]] → [[T144-central-runtime-resource-profiles.feedback]]
+
 # T144 Central Runtime Resource Profiles Analysis
 
 Date: 2026-05-19

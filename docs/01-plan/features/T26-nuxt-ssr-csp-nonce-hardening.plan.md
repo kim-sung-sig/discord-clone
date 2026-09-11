@@ -1,3 +1,11 @@
+---
+slug: T26-nuxt-ssr-csp-nonce-hardening
+ticket: T26
+phase: plan
+hub: "[[T26-nuxt-ssr-csp-nonce-hardening]]"
+---
+> 🧭 [[T26-nuxt-ssr-csp-nonce-hardening]] · PDCA: **plan** → [[T26-nuxt-ssr-csp-nonce-hardening.design]] → [[T26-nuxt-ssr-csp-nonce-hardening.analysis]] → [[T26-nuxt-ssr-csp-nonce-hardening.report]] → ~~feedback~~
+
 # T26 Nuxt SSR CSP Nonce Hardening Plan
 
 작성일: 2026-05-15  

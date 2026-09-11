@@ -1,3 +1,11 @@
+---
+slug: T171-C-msa-scaleout-implementation
+ticket: T171
+phase: plan
+hub: "[[T171-C-msa-scaleout-implementation]]"
+---
+> 🧭 [[T171-C-msa-scaleout-implementation]] · PDCA: **plan** → ~~design~~ → ~~analysis~~ → ~~report~~ → ~~feedback~~
+
 # T171-C 분산 런타임 구현계획
 
 > 이 문서는 task branch에서 순서대로 구현한다. 각 task는 RED → GREEN → 독립 spec/quality/security review(각 90점 이상, P0/P1 없음) → 해당 task branch push 순서를 지킨다. 구현·리뷰가 통과하지 않으면 같은 branch에서 수정 루프를 반복하며 merge하지 않는다.

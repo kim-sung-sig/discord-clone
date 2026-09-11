@@ -1,3 +1,11 @@
+---
+slug: T121-admin-cli-bootrun-smoke-test
+ticket: T121
+phase: analysis
+hub: "[[T121-admin-cli-bootrun-smoke-test]]"
+---
+> 🧭 [[T121-admin-cli-bootrun-smoke-test]] · PDCA: [[T121-admin-cli-bootrun-smoke-test.plan]] → [[T121-admin-cli-bootrun-smoke-test.design]] → **analysis** → [[T121-admin-cli-bootrun-smoke-test.report]] → [[T121-admin-cli-bootrun-smoke-test.feedback]]
+
 # T121 Admin CLI BootRun Smoke Test Analysis
 
 Date: 2026-05-19

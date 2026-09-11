@@ -1,3 +1,11 @@
+---
+slug: T99-csp-telemetry-retention-policy
+ticket: T99
+phase: feedback
+hub: "[[T99-csp-telemetry-retention-policy]]"
+---
+> 🧭 [[T99-csp-telemetry-retention-policy]] · PDCA: [[T99-csp-telemetry-retention-policy.plan]] → [[T99-csp-telemetry-retention-policy.design]] → [[T99-csp-telemetry-retention-policy.analysis]] → [[T99-csp-telemetry-retention-policy.report]] → **feedback**
+
 # T99 CSP Telemetry Retention Policy Feedback
 
 ## Improvement Tasks Captured

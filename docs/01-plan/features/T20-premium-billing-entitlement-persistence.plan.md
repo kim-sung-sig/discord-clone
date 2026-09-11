@@ -1,3 +1,11 @@
+---
+slug: T20-premium-billing-entitlement-persistence
+ticket: T20
+phase: plan
+hub: "[[T20-premium-billing-entitlement-persistence]]"
+---
+> 🧭 [[T20-premium-billing-entitlement-persistence]] · PDCA: **plan** → [[T20-premium-billing-entitlement-persistence.design]] → [[T20-premium-billing-entitlement-persistence.analysis]] → [[T20-premium-billing-entitlement-persistence.report]] → ~~feedback~~
+
 # T20 Premium Billing/Entitlement Persistence Plan
 
 작성일: 2026-05-15  

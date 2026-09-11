@@ -1,3 +1,11 @@
+---
+slug: T01-identity-user
+ticket: T01
+phase: design
+hub: "[[T01-identity-user]]"
+---
+> 🧭 [[T01-identity-user]] · PDCA: [[T01-identity-user.plan]] → **design** → [[T01-identity-user.analysis]] → [[T01-identity-user.report]] → [[T01-identity-user.feedback]]
+
 # T01 Identity/User Design
 
 작성일: 2026-05-13  

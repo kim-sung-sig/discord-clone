@@ -1,3 +1,11 @@
+---
+slug: T02C-guild-authorization-boundary
+ticket: T02C
+phase: plan
+hub: "[[T02C-guild-authorization-boundary]]"
+---
+> 🧭 [[T02C-guild-authorization-boundary]] · PDCA: **plan** → [[T02C-guild-authorization-boundary.design]] → [[T02C-guild-authorization-boundary.analysis]] → [[T02C-guild-authorization-boundary.report]] → [[T02C-guild-authorization-boundary.feedback]]
+
 # T02C Guild Authorization Boundary Plan
 
 작성일: 2026-05-13  

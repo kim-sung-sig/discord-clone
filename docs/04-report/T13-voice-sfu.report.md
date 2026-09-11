@@ -1,3 +1,11 @@
+---
+slug: T13-voice-sfu
+ticket: T13
+phase: report
+hub: "[[T13-voice-sfu]]"
+---
+> 🧭 [[T13-voice-sfu]] · PDCA: [[T13-voice-sfu.plan]] → [[T13-voice-sfu.design]] → [[T13-voice-sfu.analysis]] → **report** → [[T13-voice-sfu.feedback]]
+
 # T13 Voice/SFU Report
 
 작성일: 2026-05-14  

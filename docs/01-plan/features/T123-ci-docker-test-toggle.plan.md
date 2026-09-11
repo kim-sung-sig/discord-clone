@@ -1,3 +1,11 @@
+---
+slug: T123-ci-docker-test-toggle
+ticket: T123
+phase: plan
+hub: "[[T123-ci-docker-test-toggle]]"
+---
+> 🧭 [[T123-ci-docker-test-toggle]] · PDCA: **plan** → [[T123-ci-docker-test-toggle.design]] → [[T123-ci-docker-test-toggle.analysis]] → [[T123-ci-docker-test-toggle.report]] → [[T123-ci-docker-test-toggle.feedback]]
+
 # T123 CI Docker Test Toggle Plan
 
 Date: 2026-05-20

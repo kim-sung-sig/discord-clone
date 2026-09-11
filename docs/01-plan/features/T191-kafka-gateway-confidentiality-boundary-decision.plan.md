@@ -1,4 +1,12 @@
-﻿# T191 Kafka Gateway Confidentiality Boundary Decision Plan
+---
+slug: T191-kafka-gateway-confidentiality-boundary-decision
+ticket: T191
+phase: plan
+hub: "[[T191-kafka-gateway-confidentiality-boundary-decision]]"
+---
+> 🧭 [[T191-kafka-gateway-confidentiality-boundary-decision]] · PDCA: **plan** → [[T191-kafka-gateway-confidentiality-boundary-decision.design]] → [[T191-kafka-gateway-confidentiality-boundary-decision.analysis]] → [[T191-kafka-gateway-confidentiality-boundary-decision.report]] → [[T191-kafka-gateway-confidentiality-boundary-decision.feedback]]
+
+# T191 Kafka Gateway Confidentiality Boundary Decision Plan
 
 Created: 2026-07-11
 PDCA Phase: Plan

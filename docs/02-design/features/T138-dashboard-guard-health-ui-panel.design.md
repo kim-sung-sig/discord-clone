@@ -1,3 +1,11 @@
+---
+slug: T138-dashboard-guard-health-ui-panel
+ticket: T138
+phase: design
+hub: "[[T138-dashboard-guard-health-ui-panel]]"
+---
+> 🧭 [[T138-dashboard-guard-health-ui-panel]] · PDCA: [[T138-dashboard-guard-health-ui-panel.plan]] → **design** → [[T138-dashboard-guard-health-ui-panel.analysis]] → [[T138-dashboard-guard-health-ui-panel.report]] → [[T138-dashboard-guard-health-ui-panel.feedback]]
+
 # T138 Dashboard Guard Health UI Panel Design
 
 Date: 2026-05-20

@@ -1,3 +1,11 @@
+---
+slug: T145-remove-runtime-in-memory-persistence-defaults
+ticket: T145
+phase: design
+hub: "[[T145-remove-runtime-in-memory-persistence-defaults]]"
+---
+> 🧭 [[T145-remove-runtime-in-memory-persistence-defaults]] · PDCA: [[T145-remove-runtime-in-memory-persistence-defaults.plan]] → **design** → [[T145-remove-runtime-in-memory-persistence-defaults.analysis]] → [[T145-remove-runtime-in-memory-persistence-defaults.report]] → [[T145-remove-runtime-in-memory-persistence-defaults.feedback]]
+
 # T145 Remove Runtime In-Memory Persistence Defaults Design
 
 Date: 2026-05-20

@@ -1,3 +1,11 @@
+---
+slug: T02-guild-channel-permission
+ticket: T02
+phase: design
+hub: "[[T02-guild-channel-permission]]"
+---
+> 🧭 [[T02-guild-channel-permission]] · PDCA: [[T02-guild-channel-permission.plan]] → **design** → [[T02-guild-channel-permission.analysis]] → [[T02-guild-channel-permission.report]] → [[T02-guild-channel-permission.feedback]]
+
 # T02 Guild/Channel/Permission Design
 
 작성일: 2026-05-13  

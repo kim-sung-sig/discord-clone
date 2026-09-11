@@ -1,3 +1,11 @@
+---
+slug: T08-presence-typing-read-state
+ticket: T08
+phase: design
+hub: "[[T08-presence-typing-read-state]]"
+---
+> 🧭 [[T08-presence-typing-read-state]] · PDCA: [[T08-presence-typing-read-state.plan]] → **design** → [[T08-presence-typing-read-state.analysis]] → [[T08-presence-typing-read-state.report]] → [[T08-presence-typing-read-state.feedback]]
+
 # T08 Presence/Typing/Read State Design
 
 작성일: 2026-05-14  

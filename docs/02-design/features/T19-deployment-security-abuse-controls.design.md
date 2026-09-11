@@ -1,3 +1,11 @@
+---
+slug: T19-deployment-security-abuse-controls
+ticket: T19
+phase: design
+hub: "[[T19-deployment-security-abuse-controls]]"
+---
+> 🧭 [[T19-deployment-security-abuse-controls]] · PDCA: [[T19-deployment-security-abuse-controls.plan]] → **design** → [[T19-deployment-security-abuse-controls.analysis]] → [[T19-deployment-security-abuse-controls.report]] → ~~feedback~~
+
 # T19 Deployment Security/Abuse Controls Design
 
 작성일: 2026-05-14  

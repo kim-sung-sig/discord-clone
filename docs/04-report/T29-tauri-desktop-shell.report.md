@@ -1,3 +1,11 @@
+---
+slug: T29-tauri-desktop-shell
+ticket: T29
+phase: report
+hub: "[[T29-tauri-desktop-shell]]"
+---
+> 🧭 [[T29-tauri-desktop-shell]] · PDCA: ~~plan~~ → ~~design~~ → [[T29-tauri-desktop-shell.analysis]] → **report** → ~~feedback~~
+
 # T29 Tauri Desktop App Shell Report
 
 작성일: 2026-05-15  

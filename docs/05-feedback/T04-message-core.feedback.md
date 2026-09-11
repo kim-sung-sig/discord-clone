@@ -1,3 +1,11 @@
+---
+slug: T04-message-core
+ticket: T04
+phase: feedback
+hub: "[[T04-message-core]]"
+---
+> 🧭 [[T04-message-core]] · PDCA: [[T04-message-core.plan]] → [[T04-message-core.design]] → [[T04-message-core.analysis]] → [[T04-message-core.report]] → **feedback**
+
 # T04 Message Core Feedback
 
 작성일: 2026-05-13

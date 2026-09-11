@@ -1,3 +1,11 @@
+---
+slug: T16-persistence-postgresql
+ticket: T16
+phase: analysis
+hub: "[[T16-persistence-postgresql]]"
+---
+> 🧭 [[T16-persistence-postgresql]] · PDCA: [[T16-persistence-postgresql.plan]] → [[T16-persistence-postgresql.design]] → **analysis** → [[T16-persistence-postgresql.report]] → ~~feedback~~
+
 # T16 Persistence/PostgreSQL Migration Analysis
 
 작성일: 2026-05-14  

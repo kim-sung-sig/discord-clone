@@ -1,3 +1,11 @@
+---
+slug: T162-strict-workspace-native-npm-sbom-cleanup
+ticket: T162
+phase: design
+hub: "[[T162-strict-workspace-native-npm-sbom-cleanup]]"
+---
+> 🧭 [[T162-strict-workspace-native-npm-sbom-cleanup]] · PDCA: [[T162-strict-workspace-native-npm-sbom-cleanup.plan]] → **design** → [[T162-strict-workspace-native-npm-sbom-cleanup.analysis]] → [[T162-strict-workspace-native-npm-sbom-cleanup.report]] → [[T162-strict-workspace-native-npm-sbom-cleanup.feedback]]
+
 # T162 Strict Workspace Native NPM SBOM Cleanup Design
 
 Date: 2026-05-20

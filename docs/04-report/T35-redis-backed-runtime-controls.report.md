@@ -1,3 +1,11 @@
+---
+slug: T35-redis-backed-runtime-controls
+ticket: T35
+phase: report
+hub: "[[T35-redis-backed-runtime-controls]]"
+---
+> 🧭 [[T35-redis-backed-runtime-controls]] · PDCA: [[T35-redis-backed-runtime-controls.plan]] → [[T35-redis-backed-runtime-controls.design]] → [[T35-redis-backed-runtime-controls.analysis]] → **report** → [[T35-redis-backed-runtime-controls.feedback]]
+
 # T35 Redis-backed Runtime Controls Report
 
 작성일: 2026-05-16  

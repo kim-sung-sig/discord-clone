@@ -1,3 +1,11 @@
+---
+slug: T63-redis-gateway-dlq-policy
+ticket: T63
+phase: plan
+hub: "[[T63-redis-gateway-dlq-policy]]"
+---
+> 🧭 [[T63-redis-gateway-dlq-policy]] · PDCA: **plan** → [[T63-redis-gateway-dlq-policy.design]] → [[T63-redis-gateway-dlq-policy.analysis]] → [[T63-redis-gateway-dlq-policy.report]] → [[T63-redis-gateway-dlq-policy.feedback]]
+
 # T63 Redis Gateway DLQ Policy Plan
 
 Date: 2026-05-21

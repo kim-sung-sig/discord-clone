@@ -1,3 +1,11 @@
+---
+slug: T134-duplicate-safe-grant-audit-result
+ticket: T134
+phase: analysis
+hub: "[[T134-duplicate-safe-grant-audit-result]]"
+---
+> 🧭 [[T134-duplicate-safe-grant-audit-result]] · PDCA: [[T134-duplicate-safe-grant-audit-result.plan]] → [[T134-duplicate-safe-grant-audit-result.design]] → **analysis** → [[T134-duplicate-safe-grant-audit-result.report]] → [[T134-duplicate-safe-grant-audit-result.feedback]]
+
 # T134 Duplicate-Safe Grant Audit Result Analysis
 
 Date: 2026-05-21

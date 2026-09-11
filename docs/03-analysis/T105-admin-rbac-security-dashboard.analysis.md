@@ -1,3 +1,11 @@
+---
+slug: T105-admin-rbac-security-dashboard
+ticket: T105
+phase: analysis
+hub: "[[T105-admin-rbac-security-dashboard]]"
+---
+> 🧭 [[T105-admin-rbac-security-dashboard]] · PDCA: [[T105-admin-rbac-security-dashboard.plan]] → [[T105-admin-rbac-security-dashboard.design]] → **analysis** → [[T105-admin-rbac-security-dashboard.report]] → [[T105-admin-rbac-security-dashboard.feedback]]
+
 # T105 Admin RBAC Security Dashboard Analysis
 
 ## Result

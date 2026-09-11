@@ -1,3 +1,11 @@
+---
+slug: T136-csp-telemetry-postgres-health-metric
+ticket: T136
+phase: analysis
+hub: "[[T136-csp-telemetry-postgres-health-metric]]"
+---
+> 🧭 [[T136-csp-telemetry-postgres-health-metric]] · PDCA: [[T136-csp-telemetry-postgres-health-metric.plan]] → [[T136-csp-telemetry-postgres-health-metric.design]] → **analysis** → [[T136-csp-telemetry-postgres-health-metric.report]] → [[T136-csp-telemetry-postgres-health-metric.feedback]]
+
 # T136 CSP Telemetry Postgres Health Metric Analysis
 
 Date: 2026-05-20

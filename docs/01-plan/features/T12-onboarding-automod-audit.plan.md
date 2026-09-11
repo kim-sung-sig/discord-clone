@@ -1,3 +1,11 @@
+---
+slug: T12-onboarding-automod-audit
+ticket: T12
+phase: plan
+hub: "[[T12-onboarding-automod-audit]]"
+---
+> 🧭 [[T12-onboarding-automod-audit]] · PDCA: **plan** → [[T12-onboarding-automod-audit.design]] → [[T12-onboarding-automod-audit.analysis]] → [[T12-onboarding-automod-audit.report]] → [[T12-onboarding-automod-audit.feedback]]
+
 # T12 Onboarding/AutoMod/Audit Plan
 
 작성일: 2026-05-14  

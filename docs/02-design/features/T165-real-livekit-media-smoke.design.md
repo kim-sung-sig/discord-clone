@@ -1,3 +1,11 @@
+---
+slug: T165-real-livekit-media-smoke
+ticket: T165
+phase: design
+hub: "[[T165-real-livekit-media-smoke]]"
+---
+> 🧭 [[T165-real-livekit-media-smoke]] · PDCA: [[T165-real-livekit-media-smoke.plan]] → **design** → [[T165-real-livekit-media-smoke.analysis]] → [[T165-real-livekit-media-smoke.report]] → [[T165-real-livekit-media-smoke.feedback]]
+
 # T165 Real LiveKit Media Smoke Design
 
 Date: 2026-05-21

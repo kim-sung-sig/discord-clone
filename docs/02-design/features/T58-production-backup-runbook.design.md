@@ -1,3 +1,11 @@
+---
+slug: T58-production-backup-runbook
+ticket: T58
+phase: design
+hub: "[[T58-production-backup-runbook]]"
+---
+> 🧭 [[T58-production-backup-runbook]] · PDCA: [[T58-production-backup-runbook.plan]] → **design** → [[T58-production-backup-runbook.analysis]] → [[T58-production-backup-runbook.report]] → [[T58-production-backup-runbook.feedback]]
+
 # T58 Production Backup Runbook Design
 
 Date: 2026-05-21

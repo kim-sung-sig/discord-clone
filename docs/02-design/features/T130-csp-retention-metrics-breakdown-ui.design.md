@@ -1,3 +1,11 @@
+---
+slug: T130-csp-retention-metrics-breakdown-ui
+ticket: T130
+phase: design
+hub: "[[T130-csp-retention-metrics-breakdown-ui]]"
+---
+> 🧭 [[T130-csp-retention-metrics-breakdown-ui]] · PDCA: [[T130-csp-retention-metrics-breakdown-ui.plan]] → **design** → [[T130-csp-retention-metrics-breakdown-ui.analysis]] → [[T130-csp-retention-metrics-breakdown-ui.report]] → [[T130-csp-retention-metrics-breakdown-ui.feedback]]
+
 # T130 CSP Retention Metrics Breakdown UI Design
 
 Date: 2026-05-21

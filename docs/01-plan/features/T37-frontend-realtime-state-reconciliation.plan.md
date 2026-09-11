@@ -1,3 +1,11 @@
+---
+slug: T37-frontend-realtime-state-reconciliation
+ticket: T37
+phase: plan
+hub: "[[T37-frontend-realtime-state-reconciliation]]"
+---
+> 🧭 [[T37-frontend-realtime-state-reconciliation]] · PDCA: **plan** → [[T37-frontend-realtime-state-reconciliation.design]] → [[T37-frontend-realtime-state-reconciliation.analysis]] → [[T37-frontend-realtime-state-reconciliation.report]] → [[T37-frontend-realtime-state-reconciliation.feedback]]
+
 # T37 Frontend Realtime State Reconciliation Plan
 
 작성일: 2026-05-17  

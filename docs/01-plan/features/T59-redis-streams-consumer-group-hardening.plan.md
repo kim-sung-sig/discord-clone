@@ -1,3 +1,11 @@
+---
+slug: T59-redis-streams-consumer-group-hardening
+ticket: T59
+phase: plan
+hub: "[[T59-redis-streams-consumer-group-hardening]]"
+---
+> 🧭 [[T59-redis-streams-consumer-group-hardening]] · PDCA: **plan** → [[T59-redis-streams-consumer-group-hardening.design]] → [[T59-redis-streams-consumer-group-hardening.analysis]] → [[T59-redis-streams-consumer-group-hardening.report]] → [[T59-redis-streams-consumer-group-hardening.feedback]]
+
 # T59 Redis Streams Consumer-group Hardening Plan
 
 Date: 2026-05-21

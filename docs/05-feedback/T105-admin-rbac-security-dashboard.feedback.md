@@ -1,3 +1,11 @@
+---
+slug: T105-admin-rbac-security-dashboard
+ticket: T105
+phase: feedback
+hub: "[[T105-admin-rbac-security-dashboard]]"
+---
+> 🧭 [[T105-admin-rbac-security-dashboard]] · PDCA: [[T105-admin-rbac-security-dashboard.plan]] → [[T105-admin-rbac-security-dashboard.design]] → [[T105-admin-rbac-security-dashboard.analysis]] → [[T105-admin-rbac-security-dashboard.report]] → **feedback**
+
 # T105 Admin RBAC Security Dashboard Feedback
 
 ## Improvement Tasks Captured

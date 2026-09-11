@@ -1,3 +1,11 @@
+---
+slug: T102-redis-backed-csp-report-limiter
+ticket: T102
+phase: design
+hub: "[[T102-redis-backed-csp-report-limiter]]"
+---
+> 🧭 [[T102-redis-backed-csp-report-limiter]] · PDCA: [[T102-redis-backed-csp-report-limiter.plan]] → **design** → [[T102-redis-backed-csp-report-limiter.analysis]] → [[T102-redis-backed-csp-report-limiter.report]] → [[T102-redis-backed-csp-report-limiter.feedback]]
+
 # T102 Redis-backed CSP Report Limiter Design
 
 ## Interface

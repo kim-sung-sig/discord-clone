@@ -1,3 +1,11 @@
+---
+slug: T06-nuxt-discord-shell
+ticket: T06
+phase: report
+hub: "[[T06-nuxt-discord-shell]]"
+---
+> 🧭 [[T06-nuxt-discord-shell]] · PDCA: [[T06-nuxt-discord-shell.plan]] → [[T06-nuxt-discord-shell.design]] → [[T06-nuxt-discord-shell.analysis]] → **report** → [[T06-nuxt-discord-shell.feedback]]
+
 # T06 Nuxt Discord Shell Report
 
 작성일: 2026-05-14  

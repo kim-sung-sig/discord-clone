@@ -1,3 +1,11 @@
+---
+slug: T27-multi-platform-frontend-architecture
+ticket: T27
+phase: report
+hub: "[[T27-multi-platform-frontend-architecture]]"
+---
+> 🧭 [[T27-multi-platform-frontend-architecture]] · PDCA: [[T27-multi-platform-frontend-architecture.plan]] → [[T27-multi-platform-frontend-architecture.design]] → [[T27-multi-platform-frontend-architecture.analysis]] → **report** → ~~feedback~~
+
 # T27 Multi-Platform Frontend Architecture Report
 
 작성일: 2026-05-15  

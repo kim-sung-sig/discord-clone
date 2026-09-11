@@ -1,3 +1,11 @@
+---
+slug: T122-admin-role-runbook
+ticket: T122
+phase: report
+hub: "[[T122-admin-role-runbook]]"
+---
+> 🧭 [[T122-admin-role-runbook]] · PDCA: [[T122-admin-role-runbook.plan]] → [[T122-admin-role-runbook.design]] → [[T122-admin-role-runbook.analysis]] → **report** → [[T122-admin-role-runbook.feedback]]
+
 # T122 Admin Role Runbook Report
 
 Date: 2026-05-20

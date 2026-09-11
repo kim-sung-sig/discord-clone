@@ -1,3 +1,11 @@
+---
+slug: T118-global-admin-grant-operations-tool
+ticket: T118
+phase: plan
+hub: "[[T118-global-admin-grant-operations-tool]]"
+---
+> 🧭 [[T118-global-admin-grant-operations-tool]] · PDCA: **plan** → [[T118-global-admin-grant-operations-tool.design]] → [[T118-global-admin-grant-operations-tool.analysis]] → [[T118-global-admin-grant-operations-tool.report]] → [[T118-global-admin-grant-operations-tool.feedback]]
+
 # T118 Global Admin Grant Operations Tool Plan
 
 ## Objective

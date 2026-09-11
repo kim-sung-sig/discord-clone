@@ -1,3 +1,11 @@
+---
+slug: T23-frontend-real-api-integration-stabilization
+ticket: T23
+phase: plan
+hub: "[[T23-frontend-real-api-integration-stabilization]]"
+---
+> 🧭 [[T23-frontend-real-api-integration-stabilization]] · PDCA: **plan** → [[T23-frontend-real-api-integration-stabilization.design]] → [[T23-frontend-real-api-integration-stabilization.analysis]] → [[T23-frontend-real-api-integration-stabilization.report]] → ~~feedback~~
+
 # T23 Frontend Real API Integration Stabilization Plan
 
 작성일: 2026-05-15  

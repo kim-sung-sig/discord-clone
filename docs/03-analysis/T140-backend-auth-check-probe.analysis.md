@@ -1,3 +1,11 @@
+---
+slug: T140-backend-auth-check-probe
+ticket: T140
+phase: analysis
+hub: "[[T140-backend-auth-check-probe]]"
+---
+> 🧭 [[T140-backend-auth-check-probe]] · PDCA: [[T140-backend-auth-check-probe.plan]] → [[T140-backend-auth-check-probe.design]] → **analysis** → [[T140-backend-auth-check-probe.report]] → [[T140-backend-auth-check-probe.feedback]]
+
 # T140 Backend Auth Check Probe Analysis
 
 Date: 2026-05-21

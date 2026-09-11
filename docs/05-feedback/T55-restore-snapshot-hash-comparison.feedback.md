@@ -1,3 +1,11 @@
+---
+slug: T55-restore-snapshot-hash-comparison
+ticket: T55
+phase: feedback
+hub: "[[T55-restore-snapshot-hash-comparison]]"
+---
+> 🧭 [[T55-restore-snapshot-hash-comparison]] · PDCA: [[T55-restore-snapshot-hash-comparison.plan]] → [[T55-restore-snapshot-hash-comparison.design]] → [[T55-restore-snapshot-hash-comparison.analysis]] → [[T55-restore-snapshot-hash-comparison.report]] → **feedback**
+
 # T55 Restore Snapshot Hash Comparison Feedback
 
 Date: 2026-05-21

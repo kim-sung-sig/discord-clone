@@ -1,3 +1,11 @@
+---
+slug: T50-frontend-gateway-socket-lifecycle
+ticket: T50
+phase: design
+hub: "[[T50-frontend-gateway-socket-lifecycle]]"
+---
+> 🧭 [[T50-frontend-gateway-socket-lifecycle]] · PDCA: [[T50-frontend-gateway-socket-lifecycle.plan]] → **design** → [[T50-frontend-gateway-socket-lifecycle.analysis]] → [[T50-frontend-gateway-socket-lifecycle.report]] → [[T50-frontend-gateway-socket-lifecycle.feedback]]
+
 # T50 Frontend Gateway Socket Lifecycle Design
 
 Date: 2026-05-18

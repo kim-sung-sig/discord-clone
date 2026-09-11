@@ -1,3 +1,11 @@
+---
+slug: T114-csp-telemetry-retention-metrics
+ticket: T114
+phase: plan
+hub: "[[T114-csp-telemetry-retention-metrics]]"
+---
+> 🧭 [[T114-csp-telemetry-retention-metrics]] · PDCA: **plan** → [[T114-csp-telemetry-retention-metrics.design]] → [[T114-csp-telemetry-retention-metrics.analysis]] → [[T114-csp-telemetry-retention-metrics.report]] → [[T114-csp-telemetry-retention-metrics.feedback]]
+
 # T114 CSP Telemetry Retention Metrics Plan
 
 ## Objective

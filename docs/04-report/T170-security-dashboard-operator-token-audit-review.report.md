@@ -1,3 +1,11 @@
+---
+slug: T170-security-dashboard-operator-token-audit-review
+ticket: T170
+phase: report
+hub: "[[T170-security-dashboard-operator-token-audit-review]]"
+---
+> 🧭 [[T170-security-dashboard-operator-token-audit-review]] · PDCA: ~~plan~~ → ~~design~~ → ~~analysis~~ → **report** → ~~feedback~~
+
 # T170 Security Dashboard Operator Token Audit Review Report
 
 Date: 2026-05-31

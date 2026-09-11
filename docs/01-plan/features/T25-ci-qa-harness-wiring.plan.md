@@ -1,3 +1,11 @@
+---
+slug: T25-ci-qa-harness-wiring
+ticket: T25
+phase: plan
+hub: "[[T25-ci-qa-harness-wiring]]"
+---
+> 🧭 [[T25-ci-qa-harness-wiring]] · PDCA: **plan** → [[T25-ci-qa-harness-wiring.design]] → [[T25-ci-qa-harness-wiring.analysis]] → [[T25-ci-qa-harness-wiring.report]] → ~~feedback~~
+
 # T25 CI QA Harness Wiring Plan
 
 작성일: 2026-05-15  

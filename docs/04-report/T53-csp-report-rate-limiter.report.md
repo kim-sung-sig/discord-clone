@@ -1,3 +1,11 @@
+---
+slug: T53-csp-report-rate-limiter
+ticket: T53
+phase: report
+hub: "[[T53-csp-report-rate-limiter]]"
+---
+> 🧭 [[T53-csp-report-rate-limiter]] · PDCA: [[T53-csp-report-rate-limiter.plan]] → [[T53-csp-report-rate-limiter.design]] → [[T53-csp-report-rate-limiter.analysis]] → **report** → [[T53-csp-report-rate-limiter.feedback]]
+
 # T53 CSP Report Rate Limiter Report
 
 Date: 2026-05-18

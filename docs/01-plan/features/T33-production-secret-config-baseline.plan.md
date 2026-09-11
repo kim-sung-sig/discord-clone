@@ -1,3 +1,11 @@
+---
+slug: T33-production-secret-config-baseline
+ticket: T33
+phase: plan
+hub: "[[T33-production-secret-config-baseline]]"
+---
+> 🧭 [[T33-production-secret-config-baseline]] · PDCA: **plan** → [[T33-production-secret-config-baseline.design]] → ~~analysis~~ → [[T33-production-secret-config-baseline.report]] → [[T33-production-secret-config-baseline.feedback]]
+
 # T33 Production Secret & Config Baseline Plan
 
 ## Problem

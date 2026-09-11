@@ -1,3 +1,11 @@
+---
+slug: T18-realtime-media-gateway-broadcast
+ticket: T18
+phase: plan
+hub: "[[T18-realtime-media-gateway-broadcast]]"
+---
+> 🧭 [[T18-realtime-media-gateway-broadcast]] · PDCA: **plan** → [[T18-realtime-media-gateway-broadcast.design]] → [[T18-realtime-media-gateway-broadcast.analysis]] → [[T18-realtime-media-gateway-broadcast.report]] → ~~feedback~~
+
 # T18 Realtime Media/Gateway Broadcast Plan
 
 작성일: 2026-05-15  

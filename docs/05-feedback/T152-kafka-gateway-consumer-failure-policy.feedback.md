@@ -1,3 +1,11 @@
+---
+slug: T152-kafka-gateway-consumer-failure-policy
+ticket: T152
+phase: feedback
+hub: "[[T152-kafka-gateway-consumer-failure-policy]]"
+---
+> 🧭 [[T152-kafka-gateway-consumer-failure-policy]] · PDCA: [[T152-kafka-gateway-consumer-failure-policy.plan]] → [[T152-kafka-gateway-consumer-failure-policy.design]] → [[T152-kafka-gateway-consumer-failure-policy.analysis]] → [[T152-kafka-gateway-consumer-failure-policy.report]] → **feedback**
+
 # T152 Kafka Gateway Consumer Failure Policy Feedback
 
 Date: 2026-05-21

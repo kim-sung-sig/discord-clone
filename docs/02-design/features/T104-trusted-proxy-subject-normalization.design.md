@@ -1,3 +1,11 @@
+---
+slug: T104-trusted-proxy-subject-normalization
+ticket: T104
+phase: design
+hub: "[[T104-trusted-proxy-subject-normalization]]"
+---
+> 🧭 [[T104-trusted-proxy-subject-normalization]] · PDCA: [[T104-trusted-proxy-subject-normalization.plan]] → **design** → [[T104-trusted-proxy-subject-normalization.analysis]] → [[T104-trusted-proxy-subject-normalization.report]] → [[T104-trusted-proxy-subject-normalization.feedback]]
+
 # T104 Trusted Proxy Subject Normalization Design
 
 ## Subject Selection

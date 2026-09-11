@@ -1,3 +1,11 @@
+---
+slug: T107-csp-telemetry-trend-chart
+ticket: T107
+phase: analysis
+hub: "[[T107-csp-telemetry-trend-chart]]"
+---
+> 🧭 [[T107-csp-telemetry-trend-chart]] · PDCA: [[T107-csp-telemetry-trend-chart.plan]] → [[T107-csp-telemetry-trend-chart.design]] → **analysis** → [[T107-csp-telemetry-trend-chart.report]] → [[T107-csp-telemetry-trend-chart.feedback]]
+
 # T107 CSP Telemetry Trend Chart Analysis
 
 Date: 2026-05-21

@@ -1,3 +1,11 @@
+---
+slug: T142-admin-cli-smoke-database-isolation
+ticket: T142
+phase: report
+hub: "[[T142-admin-cli-smoke-database-isolation]]"
+---
+> 🧭 [[T142-admin-cli-smoke-database-isolation]] · PDCA: [[T142-admin-cli-smoke-database-isolation.plan]] → [[T142-admin-cli-smoke-database-isolation.design]] → [[T142-admin-cli-smoke-database-isolation.analysis]] → **report** → [[T142-admin-cli-smoke-database-isolation.feedback]]
+
 # T142 Admin CLI Smoke Database Isolation Report
 
 Date: 2026-05-21

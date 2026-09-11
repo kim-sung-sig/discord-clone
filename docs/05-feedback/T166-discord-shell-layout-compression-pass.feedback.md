@@ -1,3 +1,11 @@
+---
+slug: T166-discord-shell-layout-compression-pass
+ticket: T166
+phase: feedback
+hub: "[[T166-discord-shell-layout-compression-pass]]"
+---
+> 🧭 [[T166-discord-shell-layout-compression-pass]] · PDCA: [[T166-discord-shell-layout-compression-pass.plan]] → [[T166-discord-shell-layout-compression-pass.design]] → [[T166-discord-shell-layout-compression-pass.analysis]] → [[T166-discord-shell-layout-compression-pass.report]] → **feedback**
+
 # T166 Discord Shell Layout Compression Pass Feedback
 
 Date: 2026-05-21

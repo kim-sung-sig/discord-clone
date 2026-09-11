@@ -1,3 +1,11 @@
+---
+slug: T62-gateway-subscription-reconciliation
+ticket: T62
+phase: report
+hub: "[[T62-gateway-subscription-reconciliation]]"
+---
+> 🧭 [[T62-gateway-subscription-reconciliation]] · PDCA: [[T62-gateway-subscription-reconciliation.plan]] → [[T62-gateway-subscription-reconciliation.design]] → [[T62-gateway-subscription-reconciliation.analysis]] → **report** → [[T62-gateway-subscription-reconciliation.feedback]]
+
 # T62 Gateway Subscription Reconciliation Report
 
 Date: 2026-05-21

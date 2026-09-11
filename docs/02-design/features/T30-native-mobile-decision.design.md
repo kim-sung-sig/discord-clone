@@ -1,3 +1,11 @@
+---
+slug: T30-native-mobile-decision
+ticket: T30
+phase: design
+hub: "[[T30-native-mobile-decision]]"
+---
+> 🧭 [[T30-native-mobile-decision]] · PDCA: ~~plan~~ → **design** → [[T30-native-mobile-decision.analysis]] → [[T30-native-mobile-decision.report]] → ~~feedback~~
+
 # T30 Native Mobile Decision Design
 
 Created: 2026-05-15

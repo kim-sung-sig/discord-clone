@@ -1,3 +1,11 @@
+---
+slug: T09-attachments-storage
+ticket: T09
+phase: report
+hub: "[[T09-attachments-storage]]"
+---
+> 🧭 [[T09-attachments-storage]] · PDCA: [[T09-attachments-storage.plan]] → [[T09-attachments-storage.design]] → [[T09-attachments-storage.analysis]] → **report** → [[T09-attachments-storage.feedback]]
+
 # T09 Attachments/Storage Report
 
 작성일: 2026-05-14  

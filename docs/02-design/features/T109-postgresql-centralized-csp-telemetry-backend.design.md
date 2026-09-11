@@ -1,3 +1,11 @@
+---
+slug: T109-postgresql-centralized-csp-telemetry-backend
+ticket: T109
+phase: design
+hub: "[[T109-postgresql-centralized-csp-telemetry-backend]]"
+---
+> 🧭 [[T109-postgresql-centralized-csp-telemetry-backend]] · PDCA: [[T109-postgresql-centralized-csp-telemetry-backend.plan]] → **design** → [[T109-postgresql-centralized-csp-telemetry-backend.analysis]] → [[T109-postgresql-centralized-csp-telemetry-backend.report]] → [[T109-postgresql-centralized-csp-telemetry-backend.feedback]]
+
 # T109 PostgreSQL Centralized CSP Telemetry Backend Design
 
 Date: 2026-05-19

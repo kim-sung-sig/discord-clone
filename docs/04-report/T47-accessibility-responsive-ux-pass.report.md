@@ -1,3 +1,11 @@
+---
+slug: T47-accessibility-responsive-ux-pass
+ticket: T47
+phase: report
+hub: "[[T47-accessibility-responsive-ux-pass]]"
+---
+> 🧭 [[T47-accessibility-responsive-ux-pass]] · PDCA: [[T47-accessibility-responsive-ux-pass.plan]] → [[T47-accessibility-responsive-ux-pass.design]] → [[T47-accessibility-responsive-ux-pass.analysis]] → **report** → [[T47-accessibility-responsive-ux-pass.feedback]]
+
 # T47 Accessibility & Responsive UX Pass Report
 
 Date: 2026-05-18

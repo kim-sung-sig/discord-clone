@@ -1,3 +1,11 @@
+---
+slug: T151-kafka-gateway-docker-smoke-test
+ticket: T151
+phase: design
+hub: "[[T151-kafka-gateway-docker-smoke-test]]"
+---
+> 🧭 [[T151-kafka-gateway-docker-smoke-test]] · PDCA: [[T151-kafka-gateway-docker-smoke-test.plan]] → **design** → [[T151-kafka-gateway-docker-smoke-test.analysis]] → [[T151-kafka-gateway-docker-smoke-test.report]] → [[T151-kafka-gateway-docker-smoke-test.feedback]]
+
 # T151 Kafka Gateway Docker Smoke Test Design
 
 Date: 2026-05-20

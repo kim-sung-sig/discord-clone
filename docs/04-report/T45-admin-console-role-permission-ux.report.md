@@ -1,3 +1,11 @@
+---
+slug: T45-admin-console-role-permission-ux
+ticket: T45
+phase: report
+hub: "[[T45-admin-console-role-permission-ux]]"
+---
+> 🧭 [[T45-admin-console-role-permission-ux]] · PDCA: [[T45-admin-console-role-permission-ux.plan]] → [[T45-admin-console-role-permission-ux.design]] → [[T45-admin-console-role-permission-ux.analysis]] → **report** → [[T45-admin-console-role-permission-ux.feedback]]
+
 # T45 Admin Console & Role Permission UX Report
 
 Date: 2026-05-18

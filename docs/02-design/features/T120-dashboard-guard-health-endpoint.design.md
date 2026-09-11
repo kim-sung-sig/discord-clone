@@ -1,3 +1,11 @@
+---
+slug: T120-dashboard-guard-health-endpoint
+ticket: T120
+phase: design
+hub: "[[T120-dashboard-guard-health-endpoint]]"
+---
+> 🧭 [[T120-dashboard-guard-health-endpoint]] · PDCA: [[T120-dashboard-guard-health-endpoint.plan]] → **design** → [[T120-dashboard-guard-health-endpoint.analysis]] → [[T120-dashboard-guard-health-endpoint.report]] → [[T120-dashboard-guard-health-endpoint.feedback]]
+
 # T120 Dashboard Guard Health Endpoint Design
 
 Date: 2026-05-19

@@ -1,3 +1,11 @@
+---
+slug: T31-remote-ci-verification-release-gate
+ticket: T31
+phase: plan
+hub: "[[T31-remote-ci-verification-release-gate]]"
+---
+> 🧭 [[T31-remote-ci-verification-release-gate]] · PDCA: **plan** → [[T31-remote-ci-verification-release-gate.design]] → [[T31-remote-ci-verification-release-gate.analysis]] → [[T31-remote-ci-verification-release-gate.report]] → ~~feedback~~
+
 # T31 Remote CI Verification Release Gate Plan
 
 작성일: 2026-05-15  

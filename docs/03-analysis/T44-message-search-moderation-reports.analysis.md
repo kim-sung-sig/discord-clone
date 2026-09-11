@@ -1,3 +1,11 @@
+---
+slug: T44-message-search-moderation-reports
+ticket: T44
+phase: analysis
+hub: "[[T44-message-search-moderation-reports]]"
+---
+> 🧭 [[T44-message-search-moderation-reports]] · PDCA: [[T44-message-search-moderation-reports.plan]] → [[T44-message-search-moderation-reports.design]] → **analysis** → [[T44-message-search-moderation-reports.report]] → [[T44-message-search-moderation-reports.feedback]]
+
 # T44 Message Search & Moderation Reports Analysis
 
 Date: 2026-05-18

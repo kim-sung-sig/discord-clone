@@ -1,3 +1,11 @@
+---
+slug: T39-backup-restore-migration-drill
+ticket: T39
+phase: design
+hub: "[[T39-backup-restore-migration-drill]]"
+---
+> 🧭 [[T39-backup-restore-migration-drill]] · PDCA: [[T39-backup-restore-migration-drill.plan]] → **design** → [[T39-backup-restore-migration-drill.analysis]] → [[T39-backup-restore-migration-drill.report]] → [[T39-backup-restore-migration-drill.feedback]]
+
 # T39 Backup, Restore & Migration Drill Design
 
 작성일: 2026-05-17  

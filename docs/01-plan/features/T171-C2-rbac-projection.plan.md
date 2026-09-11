@@ -1,3 +1,11 @@
+---
+slug: T171-C2-rbac-projection
+ticket: T171-C2
+phase: plan
+hub: "[[T171-C2-rbac-projection]]"
+---
+> 🧭 [[T171-C2-rbac-projection]] · PDCA: **plan** → ~~design~~ → ~~analysis~~ → ~~report~~ → ~~feedback~~
+
 # T171-C2 RBAC Projection 계약 및 첫 구현
 
 ## Approval Gate

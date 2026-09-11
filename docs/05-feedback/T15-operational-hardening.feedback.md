@@ -1,3 +1,11 @@
+---
+slug: T15-operational-hardening
+ticket: T15
+phase: feedback
+hub: "[[T15-operational-hardening]]"
+---
+> 🧭 [[T15-operational-hardening]] · PDCA: [[T15-operational-hardening.plan]] → [[T15-operational-hardening.design]] → [[T15-operational-hardening.analysis]] → [[T15-operational-hardening.report]] → **feedback**
+
 # T15 Operational Hardening Feedback
 
 작성일: 2026-05-14  

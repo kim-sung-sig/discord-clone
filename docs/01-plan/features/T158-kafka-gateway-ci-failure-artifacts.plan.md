@@ -1,3 +1,11 @@
+---
+slug: T158-kafka-gateway-ci-failure-artifacts
+ticket: T158
+phase: plan
+hub: "[[T158-kafka-gateway-ci-failure-artifacts]]"
+---
+> 🧭 [[T158-kafka-gateway-ci-failure-artifacts]] · PDCA: **plan** → [[T158-kafka-gateway-ci-failure-artifacts.design]] → [[T158-kafka-gateway-ci-failure-artifacts.analysis]] → [[T158-kafka-gateway-ci-failure-artifacts.report]] → [[T158-kafka-gateway-ci-failure-artifacts.feedback]]
+
 # T158 Kafka Gateway CI Failure Artifacts Plan
 
 Date: 2026-05-20

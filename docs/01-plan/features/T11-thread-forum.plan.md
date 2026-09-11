@@ -1,3 +1,11 @@
+---
+slug: T11-thread-forum
+ticket: T11
+phase: plan
+hub: "[[T11-thread-forum]]"
+---
+> 🧭 [[T11-thread-forum]] · PDCA: **plan** → [[T11-thread-forum.design]] → [[T11-thread-forum.analysis]] → [[T11-thread-forum.report]] → [[T11-thread-forum.feedback]]
+
 # T11 Thread/Forum Plan
 
 작성일: 2026-05-14  

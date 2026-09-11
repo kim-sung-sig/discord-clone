@@ -1,3 +1,11 @@
+---
+slug: T178-kafka-gateway-dlq-metrics-alert
+ticket: T178
+phase: analysis
+hub: "[[T178-kafka-gateway-dlq-metrics-alert]]"
+---
+> 🧭 [[T178-kafka-gateway-dlq-metrics-alert]] · PDCA: [[T178-kafka-gateway-dlq-metrics-alert.plan]] → [[T178-kafka-gateway-dlq-metrics-alert.design]] → **analysis** → [[T178-kafka-gateway-dlq-metrics-alert.report]] → [[T178-kafka-gateway-dlq-metrics-alert.feedback]]
+
 # T178 Kafka Gateway DLQ Metrics And Alert Analysis
 
 Date: 2026-05-21

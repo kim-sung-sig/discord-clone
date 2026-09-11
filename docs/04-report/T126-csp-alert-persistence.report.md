@@ -1,3 +1,11 @@
+---
+slug: T126-csp-alert-persistence
+ticket: T126
+phase: report
+hub: "[[T126-csp-alert-persistence]]"
+---
+> 🧭 [[T126-csp-alert-persistence]] · PDCA: [[T126-csp-alert-persistence.plan]] → [[T126-csp-alert-persistence.design]] → [[T126-csp-alert-persistence.analysis]] → **report** → [[T126-csp-alert-persistence.feedback]]
+
 # T126 CSP Alert Persistence Report
 
 Date: 2026-05-20

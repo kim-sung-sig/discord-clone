@@ -1,3 +1,10 @@
+---
+slug: discord-clone-platform
+phase: plan
+hub: "[[discord-clone-platform]]"
+---
+> 🧭 [[discord-clone-platform]] · PDCA: **plan** → [[discord-clone-platform.design]] → ~~analysis~~ → ~~report~~ → ~~feedback~~
+
 # Discord Clone Platform Plan
 
 작성일: 2026-05-13  

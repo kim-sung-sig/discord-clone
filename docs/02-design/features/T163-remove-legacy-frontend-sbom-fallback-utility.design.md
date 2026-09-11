@@ -1,3 +1,11 @@
+---
+slug: T163-remove-legacy-frontend-sbom-fallback-utility
+ticket: T163
+phase: design
+hub: "[[T163-remove-legacy-frontend-sbom-fallback-utility]]"
+---
+> 🧭 [[T163-remove-legacy-frontend-sbom-fallback-utility]] · PDCA: [[T163-remove-legacy-frontend-sbom-fallback-utility.plan]] → **design** → [[T163-remove-legacy-frontend-sbom-fallback-utility.analysis]] → [[T163-remove-legacy-frontend-sbom-fallback-utility.report]] → [[T163-remove-legacy-frontend-sbom-fallback-utility.feedback]]
+
 # T163 Remove Legacy Frontend SBOM Fallback Utility Design
 
 Created: 2026-05-22

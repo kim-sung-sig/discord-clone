@@ -1,3 +1,11 @@
+---
+slug: T150-production-profile-guard-smoke-test
+ticket: T150
+phase: report
+hub: "[[T150-production-profile-guard-smoke-test]]"
+---
+> 🧭 [[T150-production-profile-guard-smoke-test]] · PDCA: [[T150-production-profile-guard-smoke-test.plan]] → [[T150-production-profile-guard-smoke-test.design]] → [[T150-production-profile-guard-smoke-test.analysis]] → **report** → [[T150-production-profile-guard-smoke-test.feedback]]
+
 # T150 Production Profile Guard Smoke Test Report
 
 Date: 2026-05-20

@@ -1,3 +1,11 @@
+---
+slug: T190-reenable-tracked-ci-operations-gates
+ticket: T190
+phase: analysis
+hub: "[[T190-reenable-tracked-ci-operations-gates]]"
+---
+> 🧭 [[T190-reenable-tracked-ci-operations-gates]] · PDCA: [[T190-reenable-tracked-ci-operations-gates.plan]] → [[T190-reenable-tracked-ci-operations-gates.design]] → **analysis** → [[T190-reenable-tracked-ci-operations-gates.report]] → [[T190-reenable-tracked-ci-operations-gates.feedback]]
+
 # T190 Re-enable Tracked CI Operations Gates Analysis
 
 Created: 2026-05-21

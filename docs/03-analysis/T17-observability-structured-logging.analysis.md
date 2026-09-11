@@ -1,3 +1,11 @@
+---
+slug: T17-observability-structured-logging
+ticket: T17
+phase: analysis
+hub: "[[T17-observability-structured-logging]]"
+---
+> 🧭 [[T17-observability-structured-logging]] · PDCA: [[T17-observability-structured-logging.plan]] → [[T17-observability-structured-logging.design]] → **analysis** → [[T17-observability-structured-logging.report]] → ~~feedback~~
+
 # T17 Observability/Structured Logging Analysis
 
 작성일: 2026-05-14  

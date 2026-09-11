@@ -1,3 +1,11 @@
+---
+slug: T157-central-redis-ci-failure-artifacts
+ticket: T157
+phase: feedback
+hub: "[[T157-central-redis-ci-failure-artifacts]]"
+---
+> 🧭 [[T157-central-redis-ci-failure-artifacts]] · PDCA: [[T157-central-redis-ci-failure-artifacts.plan]] → [[T157-central-redis-ci-failure-artifacts.design]] → [[T157-central-redis-ci-failure-artifacts.analysis]] → [[T157-central-redis-ci-failure-artifacts.report]] → **feedback**
+
 # T157 Central Redis CI Failure Artifacts Feedback
 
 Date: 2026-05-20

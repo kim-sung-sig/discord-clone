@@ -1,3 +1,11 @@
+---
+slug: T147-docker-compose-resource-topology-alignment
+ticket: T147
+phase: design
+hub: "[[T147-docker-compose-resource-topology-alignment]]"
+---
+> 🧭 [[T147-docker-compose-resource-topology-alignment]] · PDCA: [[T147-docker-compose-resource-topology-alignment.plan]] → **design** → [[T147-docker-compose-resource-topology-alignment.analysis]] → [[T147-docker-compose-resource-topology-alignment.report]] → [[T147-docker-compose-resource-topology-alignment.feedback]]
+
 # T147 Docker Compose Resource Topology Alignment Design
 
 Date: 2026-05-20

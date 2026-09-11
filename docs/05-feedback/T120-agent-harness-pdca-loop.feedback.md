@@ -1,3 +1,11 @@
+---
+slug: T120-agent-harness-pdca-loop
+ticket: T120
+phase: feedback
+hub: "[[T120-agent-harness-pdca-loop]]"
+---
+> 🧭 [[T120-agent-harness-pdca-loop]] · PDCA: [[T120-agent-harness-pdca-loop.plan]] → [[T120-agent-harness-pdca-loop.design]] → [[T120-agent-harness-pdca-loop.analysis]] → [[T120-agent-harness-pdca-loop.report]] → **feedback**
+
 # T120 Agent Harness PDCA Loop Feedback
 
 Created: 2026-05-19

@@ -1,3 +1,11 @@
+---
+slug: T60-shared-gateway-session-registry
+ticket: T60
+phase: plan
+hub: "[[T60-shared-gateway-session-registry]]"
+---
+> 🧭 [[T60-shared-gateway-session-registry]] · PDCA: **plan** → [[T60-shared-gateway-session-registry.design]] → [[T60-shared-gateway-session-registry.analysis]] → [[T60-shared-gateway-session-registry.report]] → [[T60-shared-gateway-session-registry.feedback]]
+
 # T60 Shared Gateway Session Registry And Cross-node RESUME Plan
 
 Date: 2026-05-21

@@ -1,3 +1,10 @@
+---
+slug: core-discord-feature-browser-review-2026-05-20
+phase: analysis
+hub: "[[core-discord-feature-browser-review-2026-05-20]]"
+---
+> 🧭 [[core-discord-feature-browser-review-2026-05-20]] · PDCA: ~~plan~~ → ~~design~~ → **analysis** → ~~report~~ → ~~feedback~~
+
 # Core Discord Feature Browser Review
 
 Date: 2026-05-20

@@ -1,3 +1,11 @@
+---
+slug: T42-openapi-frontend-client-contract
+ticket: T42
+phase: plan
+hub: "[[T42-openapi-frontend-client-contract]]"
+---
+> 🧭 [[T42-openapi-frontend-client-contract]] · PDCA: **plan** → [[T42-openapi-frontend-client-contract.design]] → [[T42-openapi-frontend-client-contract.analysis]] → [[T42-openapi-frontend-client-contract.report]] → [[T42-openapi-frontend-client-contract.feedback]]
+
 # T42 OpenAPI & Frontend Client Contract Plan
 
 작성일: 2026-05-17  

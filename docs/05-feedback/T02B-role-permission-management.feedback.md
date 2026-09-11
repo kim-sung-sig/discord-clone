@@ -1,3 +1,11 @@
+---
+slug: T02B-role-permission-management
+ticket: T02B
+phase: feedback
+hub: "[[T02B-role-permission-management]]"
+---
+> 🧭 [[T02B-role-permission-management]] · PDCA: [[T02B-role-permission-management.plan]] → [[T02B-role-permission-management.design]] → [[T02B-role-permission-management.analysis]] → [[T02B-role-permission-management.report]] → **feedback**
+
 # T02B Role/Permission Management Feedback
 
 작성일: 2026-05-13

@@ -1,3 +1,11 @@
+---
+slug: T03-invite
+ticket: T03
+phase: plan
+hub: "[[T03-invite]]"
+---
+> 🧭 [[T03-invite]] · PDCA: **plan** → [[T03-invite.design]] → [[T03-invite.analysis]] → [[T03-invite.report]] → [[T03-invite.feedback]]
+
 # T03 Invite Plan
 
 작성일: 2026-05-13  

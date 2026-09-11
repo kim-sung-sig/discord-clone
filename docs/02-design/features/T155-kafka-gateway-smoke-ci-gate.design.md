@@ -1,3 +1,11 @@
+---
+slug: T155-kafka-gateway-smoke-ci-gate
+ticket: T155
+phase: design
+hub: "[[T155-kafka-gateway-smoke-ci-gate]]"
+---
+> 🧭 [[T155-kafka-gateway-smoke-ci-gate]] · PDCA: [[T155-kafka-gateway-smoke-ci-gate.plan]] → **design** → [[T155-kafka-gateway-smoke-ci-gate.analysis]] → [[T155-kafka-gateway-smoke-ci-gate.report]] → [[T155-kafka-gateway-smoke-ci-gate.feedback]]
+
 # T155 Kafka Gateway Smoke CI Gate Design
 
 Date: 2026-05-20

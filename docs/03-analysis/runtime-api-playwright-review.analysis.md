@@ -1,3 +1,10 @@
+---
+slug: runtime-api-playwright-review
+phase: analysis
+hub: "[[runtime-api-playwright-review]]"
+---
+> 🧭 [[runtime-api-playwright-review]] · PDCA: ~~plan~~ → ~~design~~ → **analysis** → [[runtime-api-playwright-review.report]] → [[runtime-api-playwright-review.feedback]]
+
 # Runtime API and Playwright Review Analysis
 
 작성일: 2026-05-14  

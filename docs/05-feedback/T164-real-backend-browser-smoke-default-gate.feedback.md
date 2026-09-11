@@ -1,3 +1,11 @@
+---
+slug: T164-real-backend-browser-smoke-default-gate
+ticket: T164
+phase: feedback
+hub: "[[T164-real-backend-browser-smoke-default-gate]]"
+---
+> 🧭 [[T164-real-backend-browser-smoke-default-gate]] · PDCA: [[T164-real-backend-browser-smoke-default-gate.plan]] → [[T164-real-backend-browser-smoke-default-gate.design]] → [[T164-real-backend-browser-smoke-default-gate.analysis]] → [[T164-real-backend-browser-smoke-default-gate.report]] → **feedback**
+
 # T164 Real Backend Browser Smoke Default Gate Feedback
 
 Date: 2026-05-21

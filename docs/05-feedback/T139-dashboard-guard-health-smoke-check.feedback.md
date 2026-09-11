@@ -1,3 +1,11 @@
+---
+slug: T139-dashboard-guard-health-smoke-check
+ticket: T139
+phase: feedback
+hub: "[[T139-dashboard-guard-health-smoke-check]]"
+---
+> 🧭 [[T139-dashboard-guard-health-smoke-check]] · PDCA: [[T139-dashboard-guard-health-smoke-check.plan]] → [[T139-dashboard-guard-health-smoke-check.design]] → [[T139-dashboard-guard-health-smoke-check.analysis]] → [[T139-dashboard-guard-health-smoke-check.report]] → **feedback**
+
 # T139 Dashboard Guard Health Smoke Check Feedback
 
 Date: 2026-05-20

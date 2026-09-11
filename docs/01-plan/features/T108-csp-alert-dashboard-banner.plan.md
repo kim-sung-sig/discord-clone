@@ -1,3 +1,11 @@
+---
+slug: T108-csp-alert-dashboard-banner
+ticket: T108
+phase: plan
+hub: "[[T108-csp-alert-dashboard-banner]]"
+---
+> 🧭 [[T108-csp-alert-dashboard-banner]] · PDCA: **plan** → [[T108-csp-alert-dashboard-banner.design]] → [[T108-csp-alert-dashboard-banner.analysis]] → [[T108-csp-alert-dashboard-banner.report]] → [[T108-csp-alert-dashboard-banner.feedback]]
+
 # T108 CSP Alert Dashboard Banner Plan
 
 ## Objective

@@ -1,3 +1,11 @@
+---
+slug: T167-csp-alert-incident-lifecycle-history
+ticket: T167
+phase: report
+hub: "[[T167-csp-alert-incident-lifecycle-history]]"
+---
+> 🧭 [[T167-csp-alert-incident-lifecycle-history]] · PDCA: [[T167-csp-alert-incident-lifecycle-history.plan]] → [[T167-csp-alert-incident-lifecycle-history.design]] → [[T167-csp-alert-incident-lifecycle-history.analysis]] → **report** → [[T167-csp-alert-incident-lifecycle-history.feedback]]
+
 # T167 CSP Alert Incident Lifecycle History Report
 
 Date: 2026-05-22

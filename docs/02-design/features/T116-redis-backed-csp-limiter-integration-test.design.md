@@ -1,3 +1,11 @@
+---
+slug: T116-redis-backed-csp-limiter-integration-test
+ticket: T116
+phase: design
+hub: "[[T116-redis-backed-csp-limiter-integration-test]]"
+---
+> 🧭 [[T116-redis-backed-csp-limiter-integration-test]] · PDCA: [[T116-redis-backed-csp-limiter-integration-test.plan]] → **design** → [[T116-redis-backed-csp-limiter-integration-test.analysis]] → [[T116-redis-backed-csp-limiter-integration-test.report]] → [[T116-redis-backed-csp-limiter-integration-test.feedback]]
+
 # T116 Redis-backed CSP Limiter Integration Test Design
 
 ## Test Strategy

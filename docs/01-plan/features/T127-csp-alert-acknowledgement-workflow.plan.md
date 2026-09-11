@@ -1,3 +1,11 @@
+---
+slug: T127-csp-alert-acknowledgement-workflow
+ticket: T127
+phase: plan
+hub: "[[T127-csp-alert-acknowledgement-workflow]]"
+---
+> 🧭 [[T127-csp-alert-acknowledgement-workflow]] · PDCA: **plan** → [[T127-csp-alert-acknowledgement-workflow.design]] → [[T127-csp-alert-acknowledgement-workflow.analysis]] → [[T127-csp-alert-acknowledgement-workflow.report]] → [[T127-csp-alert-acknowledgement-workflow.feedback]]
+
 # T127 CSP Alert Acknowledgement Workflow Plan
 
 Date: 2026-05-20

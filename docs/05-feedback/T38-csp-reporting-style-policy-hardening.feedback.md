@@ -1,3 +1,11 @@
+---
+slug: T38-csp-reporting-style-policy-hardening
+ticket: T38
+phase: feedback
+hub: "[[T38-csp-reporting-style-policy-hardening]]"
+---
+> 🧭 [[T38-csp-reporting-style-policy-hardening]] · PDCA: [[T38-csp-reporting-style-policy-hardening.plan]] → [[T38-csp-reporting-style-policy-hardening.design]] → [[T38-csp-reporting-style-policy-hardening.analysis]] → [[T38-csp-reporting-style-policy-hardening.report]] → **feedback**
+
 # T38 CSP Reporting & Style Policy Hardening Feedback
 
 작성일: 2026-05-17  

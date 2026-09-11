@@ -1,3 +1,11 @@
+---
+slug: T128-csp-rate-limit-subject-diagnostics
+ticket: T128
+phase: plan
+hub: "[[T128-csp-rate-limit-subject-diagnostics]]"
+---
+> 🧭 [[T128-csp-rate-limit-subject-diagnostics]] · PDCA: **plan** → [[T128-csp-rate-limit-subject-diagnostics.design]] → [[T128-csp-rate-limit-subject-diagnostics.analysis]] → [[T128-csp-rate-limit-subject-diagnostics.report]] → [[T128-csp-rate-limit-subject-diagnostics.feedback]]
+
 # T128 CSP Rate-Limit Subject Diagnostics Plan
 
 Date: 2026-05-20

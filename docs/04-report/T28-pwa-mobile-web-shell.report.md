@@ -1,3 +1,11 @@
+---
+slug: T28-pwa-mobile-web-shell
+ticket: T28
+phase: report
+hub: "[[T28-pwa-mobile-web-shell]]"
+---
+> 🧭 [[T28-pwa-mobile-web-shell]] · PDCA: ~~plan~~ → ~~design~~ → [[T28-pwa-mobile-web-shell.analysis]] → **report** → ~~feedback~~
+
 # T28 PWA & Mobile Web Shell Report
 
 작성일: 2026-05-15  

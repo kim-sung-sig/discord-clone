@@ -1,3 +1,11 @@
+---
+slug: T43-notification-mention-inbox
+ticket: T43
+phase: feedback
+hub: "[[T43-notification-mention-inbox]]"
+---
+> 🧭 [[T43-notification-mention-inbox]] · PDCA: [[T43-notification-mention-inbox.plan]] → [[T43-notification-mention-inbox.design]] → [[T43-notification-mention-inbox.analysis]] → [[T43-notification-mention-inbox.report]] → **feedback**
+
 # T43 Notification & Mention Inbox Feedback
 
 작성일: 2026-05-18  

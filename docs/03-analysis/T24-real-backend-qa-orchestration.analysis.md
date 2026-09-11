@@ -1,3 +1,11 @@
+---
+slug: T24-real-backend-qa-orchestration
+ticket: T24
+phase: analysis
+hub: "[[T24-real-backend-qa-orchestration]]"
+---
+> 🧭 [[T24-real-backend-qa-orchestration]] · PDCA: [[T24-real-backend-qa-orchestration.plan]] → [[T24-real-backend-qa-orchestration.design]] → **analysis** → [[T24-real-backend-qa-orchestration.report]] → ~~feedback~~
+
 # T24 Real Backend QA Orchestration Analysis
 
 작성일: 2026-05-15  

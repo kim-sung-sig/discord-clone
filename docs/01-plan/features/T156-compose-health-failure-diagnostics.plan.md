@@ -1,3 +1,11 @@
+---
+slug: T156-compose-health-failure-diagnostics
+ticket: T156
+phase: plan
+hub: "[[T156-compose-health-failure-diagnostics]]"
+---
+> 🧭 [[T156-compose-health-failure-diagnostics]] · PDCA: **plan** → [[T156-compose-health-failure-diagnostics.design]] → [[T156-compose-health-failure-diagnostics.analysis]] → [[T156-compose-health-failure-diagnostics.report]] → [[T156-compose-health-failure-diagnostics.feedback]]
+
 # T156 Compose Health Failure Diagnostics Plan
 
 Date: 2026-05-20

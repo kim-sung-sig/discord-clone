@@ -1,3 +1,11 @@
+---
+slug: T111-backend-global-admin-role-contract
+ticket: T111
+phase: plan
+hub: "[[T111-backend-global-admin-role-contract]]"
+---
+> 🧭 [[T111-backend-global-admin-role-contract]] · PDCA: **plan** → [[T111-backend-global-admin-role-contract.design]] → [[T111-backend-global-admin-role-contract.analysis]] → [[T111-backend-global-admin-role-contract.report]] → [[T111-backend-global-admin-role-contract.feedback]]
+
 # T111 Backend Global Admin Role Contract Plan
 
 ## Objective

@@ -1,3 +1,11 @@
+---
+slug: T51-durable-csp-telemetry-store
+ticket: T51
+phase: design
+hub: "[[T51-durable-csp-telemetry-store]]"
+---
+> 🧭 [[T51-durable-csp-telemetry-store]] · PDCA: [[T51-durable-csp-telemetry-store.plan]] → **design** → [[T51-durable-csp-telemetry-store.analysis]] → [[T51-durable-csp-telemetry-store.report]] → [[T51-durable-csp-telemetry-store.feedback]]
+
 # T51 Durable CSP Telemetry Store Design
 
 Date: 2026-05-18

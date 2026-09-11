@@ -1,3 +1,11 @@
+---
+slug: T30-native-mobile-decision
+ticket: T30
+phase: report
+hub: "[[T30-native-mobile-decision]]"
+---
+> 🧭 [[T30-native-mobile-decision]] · PDCA: ~~plan~~ → [[T30-native-mobile-decision.design]] → [[T30-native-mobile-decision.analysis]] → **report** → ~~feedback~~
+
 # T30 Native Mobile Decision Report
 
 작성일: 2026-05-15  

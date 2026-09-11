@@ -1,3 +1,11 @@
+---
+slug: T168-privacy-reviewed-subject-distribution-summary
+ticket: T168
+phase: analysis
+hub: "[[T168-privacy-reviewed-subject-distribution-summary]]"
+---
+> 🧭 [[T168-privacy-reviewed-subject-distribution-summary]] · PDCA: [[T168-privacy-reviewed-subject-distribution-summary.plan]] → [[T168-privacy-reviewed-subject-distribution-summary.design]] → **analysis** → [[T168-privacy-reviewed-subject-distribution-summary.report]] → [[T168-privacy-reviewed-subject-distribution-summary.feedback]]
+
 # T168 Privacy-Reviewed Subject Distribution Summary Analysis
 
 Date: 2026-05-30

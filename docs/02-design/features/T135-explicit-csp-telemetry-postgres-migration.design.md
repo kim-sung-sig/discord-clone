@@ -1,3 +1,11 @@
+---
+slug: T135-explicit-csp-telemetry-postgres-migration
+ticket: T135
+phase: design
+hub: "[[T135-explicit-csp-telemetry-postgres-migration]]"
+---
+> 🧭 [[T135-explicit-csp-telemetry-postgres-migration]] · PDCA: [[T135-explicit-csp-telemetry-postgres-migration.plan]] → **design** → [[T135-explicit-csp-telemetry-postgres-migration.analysis]] → [[T135-explicit-csp-telemetry-postgres-migration.report]] → [[T135-explicit-csp-telemetry-postgres-migration.feedback]]
+
 # T135 Explicit CSP Telemetry Postgres Migration Design
 
 Date: 2026-05-20

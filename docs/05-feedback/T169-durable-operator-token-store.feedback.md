@@ -1,3 +1,11 @@
+---
+slug: T169-durable-operator-token-store
+ticket: T169
+phase: feedback
+hub: "[[T169-durable-operator-token-store]]"
+---
+> 🧭 [[T169-durable-operator-token-store]] · PDCA: [[T169-durable-operator-token-store.plan]] → [[T169-durable-operator-token-store.design]] → [[T169-durable-operator-token-store.analysis]] → [[T169-durable-operator-token-store.report]] → **feedback**
+
 # T169 Durable Operator Token Store Feedback
 
 Date: 2026-05-21

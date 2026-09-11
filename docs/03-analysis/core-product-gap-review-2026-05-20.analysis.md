@@ -1,3 +1,10 @@
+---
+slug: core-product-gap-review-2026-05-20
+phase: analysis
+hub: "[[core-product-gap-review-2026-05-20]]"
+---
+> 🧭 [[core-product-gap-review-2026-05-20]] · PDCA: ~~plan~~ → ~~design~~ → **analysis** → ~~report~~ → ~~feedback~~
+
 # Core Product Gap Review
 
 Date: 2026-05-20

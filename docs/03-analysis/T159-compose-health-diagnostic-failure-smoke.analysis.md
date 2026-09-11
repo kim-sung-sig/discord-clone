@@ -1,3 +1,11 @@
+---
+slug: T159-compose-health-diagnostic-failure-smoke
+ticket: T159
+phase: analysis
+hub: "[[T159-compose-health-diagnostic-failure-smoke]]"
+---
+> 🧭 [[T159-compose-health-diagnostic-failure-smoke]] · PDCA: [[T159-compose-health-diagnostic-failure-smoke.plan]] → [[T159-compose-health-diagnostic-failure-smoke.design]] → **analysis** → [[T159-compose-health-diagnostic-failure-smoke.report]] → [[T159-compose-health-diagnostic-failure-smoke.feedback]]
+
 # T159 Compose Health Diagnostic Failure Smoke Analysis
 
 Date: 2026-05-20

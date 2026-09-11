@@ -1,3 +1,11 @@
+---
+slug: T153-compose-health-gate-script
+ticket: T153
+phase: report
+hub: "[[T153-compose-health-gate-script]]"
+---
+> 🧭 [[T153-compose-health-gate-script]] · PDCA: [[T153-compose-health-gate-script.plan]] → [[T153-compose-health-gate-script.design]] → [[T153-compose-health-gate-script.analysis]] → **report** → [[T153-compose-health-gate-script.feedback]]
+
 # T153 Compose Health Gate Script Report
 
 Date: 2026-05-20

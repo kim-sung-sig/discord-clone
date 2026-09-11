@@ -1,3 +1,11 @@
+---
+slug: T182-gateway-session-registry-ttl
+ticket: T182
+phase: report
+hub: "[[T182-gateway-session-registry-ttl]]"
+---
+> 🧭 [[T182-gateway-session-registry-ttl]] · PDCA: [[T182-gateway-session-registry-ttl.plan]] → [[T182-gateway-session-registry-ttl.design]] → [[T182-gateway-session-registry-ttl.analysis]] → **report** → [[T182-gateway-session-registry-ttl.feedback]]
+
 # T182 Gateway Session Registry TTL Report
 
 Date: 2026-05-21

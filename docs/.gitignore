@@ -1,0 +1,5 @@
+# Obsidian: keep shared vault config (app.json, graph.json), ignore per-user state
+.obsidian/*
+!.obsidian/app.json
+!.obsidian/graph.json
+!.obsidian/community-plugins.json

@@ -1,3 +1,11 @@
+---
+slug: T161-redis-cli-secret-handling-in-qa-health-checks
+ticket: T161
+phase: design
+hub: "[[T161-redis-cli-secret-handling-in-qa-health-checks]]"
+---
+> 🧭 [[T161-redis-cli-secret-handling-in-qa-health-checks]] · PDCA: [[T161-redis-cli-secret-handling-in-qa-health-checks.plan]] → **design** → [[T161-redis-cli-secret-handling-in-qa-health-checks.analysis]] → [[T161-redis-cli-secret-handling-in-qa-health-checks.report]] → [[T161-redis-cli-secret-handling-in-qa-health-checks.feedback]]
+
 # T161 Redis CLI Secret Handling In QA Health Checks Design
 
 Date: 2026-05-20

@@ -1,3 +1,11 @@
+---
+slug: T137-csp-telemetry-sqlite-legacy-cleanup-note
+ticket: T137
+phase: plan
+hub: "[[T137-csp-telemetry-sqlite-legacy-cleanup-note]]"
+---
+> 🧭 [[T137-csp-telemetry-sqlite-legacy-cleanup-note]] · PDCA: **plan** → [[T137-csp-telemetry-sqlite-legacy-cleanup-note.design]] → [[T137-csp-telemetry-sqlite-legacy-cleanup-note.analysis]] → [[T137-csp-telemetry-sqlite-legacy-cleanup-note.report]] → [[T137-csp-telemetry-sqlite-legacy-cleanup-note.feedback]]
+
 # T137 CSP Telemetry SQLite Legacy Cleanup Note Plan
 
 Date: 2026-05-20

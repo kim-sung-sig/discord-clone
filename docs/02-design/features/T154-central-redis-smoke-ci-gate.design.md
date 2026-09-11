@@ -1,3 +1,11 @@
+---
+slug: T154-central-redis-smoke-ci-gate
+ticket: T154
+phase: design
+hub: "[[T154-central-redis-smoke-ci-gate]]"
+---
+> 🧭 [[T154-central-redis-smoke-ci-gate]] · PDCA: [[T154-central-redis-smoke-ci-gate.plan]] → **design** → [[T154-central-redis-smoke-ci-gate.analysis]] → [[T154-central-redis-smoke-ci-gate.report]] → [[T154-central-redis-smoke-ci-gate.feedback]]
+
 # T154 Central Redis Smoke CI Gate Design
 
 Date: 2026-05-20

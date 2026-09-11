@@ -1,3 +1,11 @@
+---
+slug: T14-stage-soundboard-premium
+ticket: T14
+phase: feedback
+hub: "[[T14-stage-soundboard-premium]]"
+---
+> 🧭 [[T14-stage-soundboard-premium]] · PDCA: [[T14-stage-soundboard-premium.plan]] → [[T14-stage-soundboard-premium.design]] → [[T14-stage-soundboard-premium.analysis]] → [[T14-stage-soundboard-premium.report]] → **feedback**
+
 # T14 Stage/Soundboard/Premium Skeleton Feedback
 
 작성일: 2026-05-14  

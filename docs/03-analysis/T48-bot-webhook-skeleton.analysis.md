@@ -1,3 +1,11 @@
+---
+slug: T48-bot-webhook-skeleton
+ticket: T48
+phase: analysis
+hub: "[[T48-bot-webhook-skeleton]]"
+---
+> 🧭 [[T48-bot-webhook-skeleton]] · PDCA: [[T48-bot-webhook-skeleton.plan]] → [[T48-bot-webhook-skeleton.design]] → **analysis** → [[T48-bot-webhook-skeleton.report]] → [[T48-bot-webhook-skeleton.feedback]]
+
 # T48 Bot & Webhook Skeleton Analysis
 
 Date: 2026-05-18

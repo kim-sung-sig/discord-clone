@@ -1,3 +1,11 @@
+---
+slug: T117-redis-client-lifecycle-cleanup
+ticket: T117
+phase: plan
+hub: "[[T117-redis-client-lifecycle-cleanup]]"
+---
+> 🧭 [[T117-redis-client-lifecycle-cleanup]] · PDCA: **plan** → [[T117-redis-client-lifecycle-cleanup.design]] → [[T117-redis-client-lifecycle-cleanup.analysis]] → [[T117-redis-client-lifecycle-cleanup.report]] → [[T117-redis-client-lifecycle-cleanup.feedback]]
+
 # T117 Redis Client Lifecycle Cleanup Plan
 
 ## Objective

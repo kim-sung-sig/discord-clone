@@ -1,3 +1,11 @@
+---
+slug: T141-admin-cli-bootrun-smoke-ci-gate
+ticket: T141
+phase: feedback
+hub: "[[T141-admin-cli-bootrun-smoke-ci-gate]]"
+---
+> 🧭 [[T141-admin-cli-bootrun-smoke-ci-gate]] · PDCA: [[T141-admin-cli-bootrun-smoke-ci-gate.plan]] → [[T141-admin-cli-bootrun-smoke-ci-gate.design]] → [[T141-admin-cli-bootrun-smoke-ci-gate.analysis]] → [[T141-admin-cli-bootrun-smoke-ci-gate.report]] → **feedback**
+
 # T141 Admin CLI BootRun Smoke CI Gate Feedback
 
 Date: 2026-05-20

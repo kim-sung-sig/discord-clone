@@ -1,3 +1,11 @@
+---
+slug: T05-gateway-core
+ticket: T05
+phase: report
+hub: "[[T05-gateway-core]]"
+---
+> 🧭 [[T05-gateway-core]] · PDCA: [[T05-gateway-core.plan]] → [[T05-gateway-core.design]] → [[T05-gateway-core.analysis]] → **report** → [[T05-gateway-core.feedback]]
+
 # T05 Gateway Core Report
 
 작성일: 2026-05-13  

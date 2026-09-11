@@ -1,3 +1,11 @@
+---
+slug: T49-server-events-scheduling
+ticket: T49
+phase: analysis
+hub: "[[T49-server-events-scheduling]]"
+---
+> 🧭 [[T49-server-events-scheduling]] · PDCA: [[T49-server-events-scheduling.plan]] → [[T49-server-events-scheduling.design]] → **analysis** → [[T49-server-events-scheduling.report]] → [[T49-server-events-scheduling.feedback]]
+
 # T49 Server Events & Scheduling Analysis
 
 Date: 2026-05-18

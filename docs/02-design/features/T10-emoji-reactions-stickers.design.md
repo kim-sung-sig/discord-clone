@@ -1,3 +1,11 @@
+---
+slug: T10-emoji-reactions-stickers
+ticket: T10
+phase: design
+hub: "[[T10-emoji-reactions-stickers]]"
+---
+> 🧭 [[T10-emoji-reactions-stickers]] · PDCA: [[T10-emoji-reactions-stickers.plan]] → **design** → [[T10-emoji-reactions-stickers.analysis]] → [[T10-emoji-reactions-stickers.report]] → [[T10-emoji-reactions-stickers.feedback]]
+
 # T10 Emoji/Reactions/Stickers Design
 
 작성일: 2026-05-14  

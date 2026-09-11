@@ -1,3 +1,11 @@
+---
+slug: T125-csp-rate-limit-dashboard-ui
+ticket: T125
+phase: plan
+hub: "[[T125-csp-rate-limit-dashboard-ui]]"
+---
+> 🧭 [[T125-csp-rate-limit-dashboard-ui]] · PDCA: **plan** → [[T125-csp-rate-limit-dashboard-ui.design]] → [[T125-csp-rate-limit-dashboard-ui.analysis]] → [[T125-csp-rate-limit-dashboard-ui.report]] → [[T125-csp-rate-limit-dashboard-ui.feedback]]
+
 # T125 CSP Rate-limit Dashboard UI Plan
 
 Date: 2026-05-20

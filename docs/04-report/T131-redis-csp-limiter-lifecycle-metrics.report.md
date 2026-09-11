@@ -1,3 +1,11 @@
+---
+slug: T131-redis-csp-limiter-lifecycle-metrics
+ticket: T131
+phase: report
+hub: "[[T131-redis-csp-limiter-lifecycle-metrics]]"
+---
+> 🧭 [[T131-redis-csp-limiter-lifecycle-metrics]] · PDCA: [[T131-redis-csp-limiter-lifecycle-metrics.plan]] → [[T131-redis-csp-limiter-lifecycle-metrics.design]] → [[T131-redis-csp-limiter-lifecycle-metrics.analysis]] → **report** → [[T131-redis-csp-limiter-lifecycle-metrics.feedback]]
+
 # T131 Redis CSP Limiter Lifecycle Metrics Report
 
 Date: 2026-05-21

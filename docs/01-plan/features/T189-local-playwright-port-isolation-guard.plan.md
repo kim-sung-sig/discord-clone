@@ -1,3 +1,11 @@
+---
+slug: T189-local-playwright-port-isolation-guard
+ticket: T189
+phase: plan
+hub: "[[T189-local-playwright-port-isolation-guard]]"
+---
+> 🧭 [[T189-local-playwright-port-isolation-guard]] · PDCA: **plan** → [[T189-local-playwright-port-isolation-guard.design]] → [[T189-local-playwright-port-isolation-guard.analysis]] → [[T189-local-playwright-port-isolation-guard.report]] → [[T189-local-playwright-port-isolation-guard.feedback]]
+
 # T189 Local Playwright Port Isolation Guard Plan
 
 Created: 2026-05-21

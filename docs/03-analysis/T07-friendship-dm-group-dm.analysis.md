@@ -1,3 +1,11 @@
+---
+slug: T07-friendship-dm-group-dm
+ticket: T07
+phase: analysis
+hub: "[[T07-friendship-dm-group-dm]]"
+---
+> 🧭 [[T07-friendship-dm-group-dm]] · PDCA: [[T07-friendship-dm-group-dm.plan]] → [[T07-friendship-dm-group-dm.design]] → **analysis** → [[T07-friendship-dm-group-dm.report]] → [[T07-friendship-dm-group-dm.feedback]]
+
 # T07 Friendship/DM/Group DM Analysis
 
 작성일: 2026-05-14  

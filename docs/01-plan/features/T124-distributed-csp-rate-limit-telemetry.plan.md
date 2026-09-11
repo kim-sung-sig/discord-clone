@@ -1,3 +1,11 @@
+---
+slug: T124-distributed-csp-rate-limit-telemetry
+ticket: T124
+phase: plan
+hub: "[[T124-distributed-csp-rate-limit-telemetry]]"
+---
+> 🧭 [[T124-distributed-csp-rate-limit-telemetry]] · PDCA: **plan** → [[T124-distributed-csp-rate-limit-telemetry.design]] → [[T124-distributed-csp-rate-limit-telemetry.analysis]] → [[T124-distributed-csp-rate-limit-telemetry.report]] → [[T124-distributed-csp-rate-limit-telemetry.feedback]]
+
 # T124 Distributed CSP Rate-limit Telemetry Plan
 
 Date: 2026-05-20

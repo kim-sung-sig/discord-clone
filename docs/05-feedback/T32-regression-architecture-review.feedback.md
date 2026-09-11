@@ -1,3 +1,11 @@
+---
+slug: T32-regression-architecture-review
+ticket: T32
+phase: feedback
+hub: "[[T32-regression-architecture-review]]"
+---
+> 🧭 [[T32-regression-architecture-review]] · PDCA: ~~plan~~ → ~~design~~ → ~~analysis~~ → ~~report~~ → **feedback**
+
 # T32 Regression Architecture Review Feedback
 
 ## Scope

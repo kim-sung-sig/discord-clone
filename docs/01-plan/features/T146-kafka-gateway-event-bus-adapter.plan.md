@@ -1,3 +1,11 @@
+---
+slug: T146-kafka-gateway-event-bus-adapter
+ticket: T146
+phase: plan
+hub: "[[T146-kafka-gateway-event-bus-adapter]]"
+---
+> 🧭 [[T146-kafka-gateway-event-bus-adapter]] · PDCA: **plan** → [[T146-kafka-gateway-event-bus-adapter.design]] → [[T146-kafka-gateway-event-bus-adapter.analysis]] → [[T146-kafka-gateway-event-bus-adapter.report]] → [[T146-kafka-gateway-event-bus-adapter.feedback]]
+
 # T146 Kafka Gateway Event Bus Adapter Plan
 
 Date: 2026-05-20

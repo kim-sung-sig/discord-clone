@@ -1,3 +1,11 @@
+---
+slug: T183-redis-gateway-source-node-duplicate-suppression
+ticket: T183
+phase: analysis
+hub: "[[T183-redis-gateway-source-node-duplicate-suppression]]"
+---
+> 🧭 [[T183-redis-gateway-source-node-duplicate-suppression]] · PDCA: [[T183-redis-gateway-source-node-duplicate-suppression.plan]] → [[T183-redis-gateway-source-node-duplicate-suppression.design]] → **analysis** → [[T183-redis-gateway-source-node-duplicate-suppression.report]] → [[T183-redis-gateway-source-node-duplicate-suppression.feedback]]
+
 # T183 Redis Gateway Source-node Duplicate Suppression Analysis
 
 Date: 2026-05-21

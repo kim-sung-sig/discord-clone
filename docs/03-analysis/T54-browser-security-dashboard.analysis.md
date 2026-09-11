@@ -1,3 +1,11 @@
+---
+slug: T54-browser-security-dashboard
+ticket: T54
+phase: analysis
+hub: "[[T54-browser-security-dashboard]]"
+---
+> 🧭 [[T54-browser-security-dashboard]] · PDCA: [[T54-browser-security-dashboard.plan]] → [[T54-browser-security-dashboard.design]] → **analysis** → [[T54-browser-security-dashboard.report]] → [[T54-browser-security-dashboard.feedback]]
+
 # T54 Browser Security Dashboard Analysis
 
 Date: 2026-05-19

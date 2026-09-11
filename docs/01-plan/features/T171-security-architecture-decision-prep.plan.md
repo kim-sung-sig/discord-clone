@@ -1,3 +1,11 @@
+---
+slug: T171-security-architecture-decision-prep
+ticket: T171
+phase: plan
+hub: "[[T171-security-architecture-decision-prep]]"
+---
+> 🧭 [[T171-security-architecture-decision-prep]] · PDCA: **plan** → ~~design~~ → ~~analysis~~ → ~~report~~ → ~~feedback~~
+
 # T171 보안 및 아키텍처 결정 준비 계획
 
 Date: 2026-05-31

@@ -1,3 +1,11 @@
+---
+slug: T21-audit-security-actions-expansion
+ticket: T21
+phase: plan
+hub: "[[T21-audit-security-actions-expansion]]"
+---
+> 🧭 [[T21-audit-security-actions-expansion]] · PDCA: **plan** → [[T21-audit-security-actions-expansion.design]] → [[T21-audit-security-actions-expansion.analysis]] → [[T21-audit-security-actions-expansion.report]] → ~~feedback~~
+
 # T21 Audit/Security Actions Expansion Plan
 
 작성일: 2026-05-15  

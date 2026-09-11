@@ -1,3 +1,11 @@
+---
+slug: T106-database-backed-dashboard-telemetry
+ticket: T106
+phase: plan
+hub: "[[T106-database-backed-dashboard-telemetry]]"
+---
+> 🧭 [[T106-database-backed-dashboard-telemetry]] · PDCA: **plan** → [[T106-database-backed-dashboard-telemetry.design]] → [[T106-database-backed-dashboard-telemetry.analysis]] → [[T106-database-backed-dashboard-telemetry.report]] → [[T106-database-backed-dashboard-telemetry.feedback]]
+
 # T106 Database-backed Dashboard Telemetry Plan
 
 Date: 2026-05-19

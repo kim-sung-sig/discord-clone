@@ -1,3 +1,11 @@
+---
+slug: T57-process-tree-cleanup-helper
+ticket: T57
+phase: report
+hub: "[[T57-process-tree-cleanup-helper]]"
+---
+> 🧭 [[T57-process-tree-cleanup-helper]] · PDCA: [[T57-process-tree-cleanup-helper.plan]] → [[T57-process-tree-cleanup-helper.design]] → [[T57-process-tree-cleanup-helper.analysis]] → **report** → [[T57-process-tree-cleanup-helper.feedback]]
+
 # T57 Process Tree Cleanup Helper Report
 
 Created: 2026-05-21

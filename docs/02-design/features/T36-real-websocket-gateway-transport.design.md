@@ -1,3 +1,11 @@
+---
+slug: T36-real-websocket-gateway-transport
+ticket: T36
+phase: design
+hub: "[[T36-real-websocket-gateway-transport]]"
+---
+> 🧭 [[T36-real-websocket-gateway-transport]] · PDCA: [[T36-real-websocket-gateway-transport.plan]] → **design** → [[T36-real-websocket-gateway-transport.analysis]] → [[T36-real-websocket-gateway-transport.report]] → [[T36-real-websocket-gateway-transport.feedback]]
+
 # T36 Real WebSocket Gateway Transport Design
 
 작성일: 2026-05-17  

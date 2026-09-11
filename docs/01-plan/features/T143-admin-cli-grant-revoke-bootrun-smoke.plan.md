@@ -1,3 +1,11 @@
+---
+slug: T143-admin-cli-grant-revoke-bootrun-smoke
+ticket: T143
+phase: plan
+hub: "[[T143-admin-cli-grant-revoke-bootrun-smoke]]"
+---
+> 🧭 [[T143-admin-cli-grant-revoke-bootrun-smoke]] · PDCA: **plan** → [[T143-admin-cli-grant-revoke-bootrun-smoke.design]] → [[T143-admin-cli-grant-revoke-bootrun-smoke.analysis]] → [[T143-admin-cli-grant-revoke-bootrun-smoke.report]] → [[T143-admin-cli-grant-revoke-bootrun-smoke.feedback]]
+
 # T143 Admin CLI Grant/Revoke BootRun Smoke Plan
 
 Date: 2026-05-21

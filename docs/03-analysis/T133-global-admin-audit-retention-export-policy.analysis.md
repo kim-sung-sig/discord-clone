@@ -1,3 +1,11 @@
+---
+slug: T133-global-admin-audit-retention-export-policy
+ticket: T133
+phase: analysis
+hub: "[[T133-global-admin-audit-retention-export-policy]]"
+---
+> 🧭 [[T133-global-admin-audit-retention-export-policy]] · PDCA: [[T133-global-admin-audit-retention-export-policy.plan]] → [[T133-global-admin-audit-retention-export-policy.design]] → **analysis** → [[T133-global-admin-audit-retention-export-policy.report]] → [[T133-global-admin-audit-retention-export-policy.feedback]]
+
 # T133 Global Admin Audit Retention And Export Policy Analysis
 
 Date: 2026-05-21
