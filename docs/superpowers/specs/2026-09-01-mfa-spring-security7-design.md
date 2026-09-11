@@ -267,8 +267,124 @@ Spring Security 7의 MFA authority 기능은 사용하지 않는다. 이 예제�
 6. level 인가와 오류 응답을 만든다.
 7. 단위·통합 테스트와 README의 curl 실행 예제를 작성한다.
 
+## 구현 blueprint
+
+### Approval Gate
+
+- Status: Approved
+- Approver: 사용자
+- Blocking ambiguity: 없음
+- Competing plan branches: 없음. 현재 design 문서가 구현 기준이다.
+
+### Task Packet
+
+```text
+Task ID: MFA
+Goal: 독립 Spring Security 7 JWT MFA MVP
+Domain: login factor, step-up factor, assurance level
+Allowed write paths: examples/mfa-spring-security7/**, .gitignore, docs/superpowers/specs/2026-09-01-mfa-spring-security7-design.md
+Forbidden changes: 기존 backend/**, root Gradle settings, 외부 인증 provider, 실제 NAVER 연동
+Affected endpoints: /api/login, /api/login/transactions/**, /api/step-up/transactions/**,
+  /api/mock-device/challenges/**, /api/profile, /api/finance/summary
+Persistence/runtime: example-local SQLite only
+Expected tests: factor registry 단위 테스트, 전체 login/step-up MockMvc 흐름
+```
+
+### Participating Code
+
+| 구성 요소 | 책임 |
+|---|---|
+| `SecurityConfiguration` | `typ=access` JWT만 Resource Server bearer authentication으로 허용하고 level 인가를 연결한다. |
+| `JwtTokenService` | access, auth-factor, auth-challenge JWT를 각각 발급·검증한다. |
+| `AuthTransactionService` | LOGIN/STEP_UP transaction, factor 완료 여부, max level과 일회성 완료를 관리한다. |
+| `MfaFactorRegistry` | ServiceLoader와 Spring Bean adapter를 합치고 factor ID 중복을 거부한다. |
+| `MfaFactorAdapter` | factor-specific challenge 시작·승인 검증의 공통 port다. |
+| Mock push adapters | login과 step-up의 `PENDING → APPROVED` mock 흐름을 제공한다. |
+| `SqliteAuthRepository` | 사용자, transaction, challenge 상태를 query-shaped JDBC로 저장한다. |
+| Controllers | HTTP DTO 검증과 token type별 caller 경계를 담당한다. |
+
+### Expected Changed Files
+
+| Path | Expected change |
+|---|---|
+| `.gitignore` | example-local SQLite database file ignore |
+| `examples/mfa-spring-security7/settings.gradle.kts` | 독립 Gradle project name |
+| `examples/mfa-spring-security7/build.gradle.kts` | Boot 4.1.1, Security Resource Server, JDBC, SQLite, test dependencies |
+| `examples/mfa-spring-security7/README.md` | 실행·Mock device 승인·curl MVP walkthrough |
+| `examples/mfa-spring-security7/src/main/resources/application.yml` | JWT, SQLite, factor level, login/step-up policy |
+| `examples/mfa-spring-security7/src/main/resources/schema.sql` | users, auth_transactions, factor_challenges DDL |
+| `examples/mfa-spring-security7/src/main/resources/META-INF/services/...MfaFactorAdapter` | login mock push ServiceLoader provider |
+| `examples/mfa-spring-security7/src/main/java/com/example/mfa/**` | application, security, JWT, transaction, adapter, JDBC, controller code |
+| `examples/mfa-spring-security7/src/test/java/com/example/mfa/**` | registry and complete HTTP flow regression tests |
+
+### Structure Diagram
+
+```mermaid
+classDiagram
+    class LoginController
+    class StepUpController
+    class MockDeviceController
+    class AuthTransactionService
+    class JwtTokenService
+    class AssuranceAuthorizationManager
+    class MfaFactorRegistry
+    class MfaFactorAdapter
+    class SqliteAuthRepository
+
+    LoginController --> AuthTransactionService
+    StepUpController --> AuthTransactionService
+    MockDeviceController --> AuthTransactionService
+    AuthTransactionService --> JwtTokenService
+    AuthTransactionService --> MfaFactorRegistry
+    AuthTransactionService --> SqliteAuthRepository
+    MfaFactorRegistry --> MfaFactorAdapter
+    AssuranceAuthorizationManager --> JwtTokenService
+```
+
+### System Flow Diagram
+
+```mermaid
+flowchart LR
+    Browser -->|password| LoginController
+    LoginController --> AuthTransactionService
+    AuthTransactionService -->|auth-factor JWT| Browser
+    AuthTransactionService -->|auth-challenge JWT| MockDevice
+    MockDevice -->|approve| MockDeviceController
+    Browser -->|complete| LoginController
+    LoginController -->|access JWT| Browser
+    Browser -->|access JWT| FinanceAPI
+    FinanceAPI -->|MFA_REQUIRED| Browser
+    Browser -->|access JWT| StepUpController
+```
+
+### Invariants And Boundaries
+
+- `access` type 이외의 JWT는 Resource Server bearer authentication으로 인정하지 않는다.
+- auth-factor JWT는 자기 transaction에서만, auth-challenge JWT는 자기 challenge에서만 쓸 수 있다.
+- client request는 factor level 또는 사용자 ID를 정하지 않는다. user ID는 JWT subject 또는 password lookup에서만 정한다.
+- access JWT level은 완료 factor configured level의 최댓값이고 step-up에서 낮아지지 않는다.
+- transaction 및 challenge 완료는 만료 전 한 번만 성공한다.
+- raw password와 세 종류 JWT, adapter state는 로그에 기록하지 않는다.
+- mock device 승인 endpoint는 demo contract이며 real possession proof가 아님을 README에 명시한다.
+
+### Verification Gates
+
+- RED/GREEN: 각 새 동작은 JUnit test를 먼저 작성해 missing behavior로 실패를 확인한다.
+- Focused: `../../gradlew -p examples/mfa-spring-security7 test`.
+- Runtime: `../../gradlew -p examples/mfa-spring-security7 bootRun` 후 README curl flow.
+- Security negative: access 전 login 완료 차단, wrong JWT type 차단, 다른 transaction/challenge 차단, 만료·재사용 차단, level 부족 `403 MFA_REQUIRED`.
+
 ## 알려진 한계와 향후 확장
 
 - Mock device approve endpoint는 실제 기기 소유 proof가 아니다. production adapter는 signed callback, push provider 상태 조회, 또는 WebAuthn assertion으로 대체해야 한다.
 - level의 `max` 규칙은 사용자 요청에 따른 예제 계약이다. 실제 보안 정책은 factor 조합·인증 freshness·risk signal을 함께 기준으로 삼을 수 있다.
 - HMAC key는 단일 서비스 MVP에 적합하다. 여러 resource server 또는 key rotation이 필요한 경우 RSA/Ed25519 key pair와 `kid` 기반 검증으로 전환한다.
+
+## MVP 구현 반영 메모
+
+- 독립 프로젝트는 `examples/mfa-spring-security7`에 있으며 root Gradle build에는 포함하지 않는다.
+- 실행 스키마는 MVP에 필요한 `state`, `approved_at`, `expires_at`만 저장한다. adapter 상태·공개 payload의 영속화와 audit event는 실제 provider adapter를 도입할 때 추가한다.
+- `auth-factor JWT`와 `auth-challenge JWT`는 Resource Server의 Bearer 인증 경로를 통과하지 않는다. 각각 `X-Auth-Factor-Token`, `X-Auth-Challenge-Token`에서 controller가 type·subject·transaction/challenge binding을 검증한다.
+- 여러 login/step-up challenge를 만들 수 있도록 응답은 `challenges[]`에 challenge별 `authChallengeToken`을 둔다. 현재 기본 정책에는 login과 step-up 모두 mock push 하나만 있다.
+- 구현은 MVP 응집도를 위해 application/security/JWT/transaction/JDBC 흐름을 `MfaApplication.java`에 모았다. adapter SPI는 외부 연결 지점이므로 별도 파일로 유지한다.
+- 테스트 실행은 로컬 Gradle의 loopback 연결 제약 때문에 사용자 승인으로 보류했다. 정적 MockMvc regression test는 먼저 작성했으며, 환경이 정상화되면 `gradle test`와 README flow를 실행한다.
