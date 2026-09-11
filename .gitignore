@@ -30,3 +30,4 @@ qa/artifacts/
 .playwright-mcp/
 output/
 security-contract-outside-artifacts/
+examples/

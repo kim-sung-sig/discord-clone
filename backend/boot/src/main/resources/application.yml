@@ -3,11 +3,13 @@ spring:
     import: optional:configtree:${DISCORD_JWT_CONFIG_TREE:/etc/discord-config/}
   application:
     name: discord-api
+  jackson:
+    use-jackson2-defaults: true
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
-      - org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration
       - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
 
 management:

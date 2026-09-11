@@ -1,3 +1,7 @@
+spring:
+  jackson:
+    use-jackson2-defaults: true
+
 discord:
   auth:
     jwt:
