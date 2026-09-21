@@ -184,7 +184,7 @@ class JdbcMessageStore implements
                     message.mentions().size()
                 );
                 return message;
-            } catch (SQLException exception) {
+            } catch (SQLException | RuntimeException exception) {
                 connection.rollback();
                 throw exception;
             } finally {
