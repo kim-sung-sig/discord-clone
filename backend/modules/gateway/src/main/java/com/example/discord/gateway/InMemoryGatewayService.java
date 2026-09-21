@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-public final class InMemoryGatewayService implements GatewayCommandService {
+public final class InMemoryGatewayService {
     static final int MAX_RETAINED_EVENTS = 1_000;
 
     private final InMemoryGuildService guildService;

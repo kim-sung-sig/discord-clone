@@ -11,41 +11,75 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class DefaultPinMessageUseCaseTest {
-    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-06-03T12:20:00Z"), ZoneOffset.UTC);
+class EditMessageUseCaseTest {
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-06-03T12:00:00Z"), ZoneOffset.UTC);
 
     @Test
-    void rejectsPinWhenGuardDeniesAccess() {
-        Message existing = message(false);
-        MessageMutationRejectedException rejection = new MessageMutationRejectedException("cannot pin message");
-        PinMessageUseCase useCase = new DefaultPinMessageUseCase(
-            new RejectingMutationGuard(rejection),
-            new RecordingMessageStore(existing),
-            CLOCK
-        );
-
-        assertThatThrownBy(() -> useCase.pin(new PinMessageRequest(existing.id(), existing.author(), true)))
-            .isSameAs(rejection);
-    }
-
-    @Test
-    void changesPinnedState() {
+    void rejectsEditWhenGuardDeniesAccess() {
         Message existing = message(false);
         RecordingMessageStore messages = new RecordingMessageStore(existing);
-        PinMessageUseCase useCase = new DefaultPinMessageUseCase(
-            new AllowingMutationGuard(),
+        MessageMutationRejectedException rejection = new MessageMutationRejectedException("cannot edit message");
+        EditMessageUseCase useCase = new EditMessageUseCase(
+            new RejectingMutationGuard(rejection),
+            (author, target, content, mentions) -> {
+            },
             messages,
             CLOCK
         );
 
-        PinMessageResult result = useCase.pin(new PinMessageRequest(existing.id(), existing.author(), true));
+        assertThatThrownBy(() -> useCase.edit(request()))
+            .isSameAs(rejection);
+    }
+
+    @Test
+    void rejectsEditingDeletedMessage() {
+        RecordingMessageStore messages = new RecordingMessageStore(message(true));
+        EditMessageUseCase useCase = new EditMessageUseCase(
+            new AllowingMutationGuard(),
+            (author, target, content, mentions) -> {
+            },
+            messages,
+            CLOCK
+        );
+
+        assertThatThrownBy(() -> useCase.edit(request()))
+            .isInstanceOf(MessageMutationRejectedException.class)
+            .hasMessage("deleted message cannot be edited");
+    }
+
+    @Test
+    void updatesContentMentionsAndEditHistory() {
+        Message existing = message(false);
+        RecordingMessageStore messages = new RecordingMessageStore(existing);
+        UserMentionTarget mention = new UserMentionTarget(UUID.randomUUID());
+        EditMessageUseCase useCase = new EditMessageUseCase(
+            new AllowingMutationGuard(),
+            (author, target, content, mentions) -> {
+            },
+            messages,
+            CLOCK
+        );
+
+        EditMessageResult result = useCase.edit(new EditMessageRequest(
+            existing.id(),
+            existing.author(),
+            new MessageContent("updated"),
+            List.of(mention, mention)
+        ));
 
         assertThat(result.message()).isSameAs(messages.saved);
-        assertThat(result.message().pinned()).isTrue();
+        assertThat(result.message().content()).isEqualTo(new MessageContent("updated"));
+        assertThat(result.message().mentions()).containsExactly(mention);
+        assertThat(result.message().editHistory()).containsExactly(new MessageEdit(existing.content(), CLOCK.instant()));
         assertThat(result.message().updatedAt()).isEqualTo(CLOCK.instant());
     }
 
-    private static Message message(boolean pinned) {
+    private static EditMessageRequest request() {
+        Message existing = message(false);
+        return new EditMessageRequest(existing.id(), existing.author(), new MessageContent("updated"), List.of());
+    }
+
+    private static Message message(boolean deleted) {
         Instant createdAt = Instant.parse("2026-06-03T11:00:00Z");
         return new Message(
             UUID.randomUUID(),
@@ -53,8 +87,8 @@ class DefaultPinMessageUseCaseTest {
             new ChannelMessageTarget(UUID.randomUUID(), UUID.randomUUID()),
             new MessageContent("original"),
             List.of(),
-            pinned,
             false,
+            deleted,
             List.of(),
             createdAt,
             createdAt
@@ -70,17 +104,17 @@ class DefaultPinMessageUseCaseTest {
         }
 
         @Override
-        public Optional<Message> findById(UUID messageId) {
-            return Optional.of(existing);
-        }
-
-        @Override
         public Optional<Message> findByIdempotencyKey(
             MessageAuthor author,
             MessageTarget target,
             IdempotencyKey idempotencyKey
         ) {
             return Optional.empty();
+        }
+
+        @Override
+        public Optional<Message> findById(UUID messageId) {
+            return Optional.of(existing);
         }
 
         @Override
@@ -112,6 +146,7 @@ class DefaultPinMessageUseCaseTest {
     private record RejectingMutationGuard(MessageMutationRejectedException rejection) implements MessageMutationGuard {
         @Override
         public void requireCanEdit(MessageAuthor actor, Message message) {
+            throw rejection;
         }
 
         @Override
@@ -120,7 +155,6 @@ class DefaultPinMessageUseCaseTest {
 
         @Override
         public void requireCanPin(MessageAuthor actor, Message message) {
-            throw rejection;
         }
     }
 }

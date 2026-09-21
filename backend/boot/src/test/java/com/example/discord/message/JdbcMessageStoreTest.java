@@ -89,7 +89,7 @@ class JdbcMessageStoreTest {
     }
 
     @Test
-    void postgresProfileUsesJdbcMessagePorts() {
+    void postgresProfileSeparatesMessageStateFromOutboxOperations() {
         assertThat(messages).isInstanceOf(JdbcMessageStore.class);
         assertThat(publications).isSameAs(messages);
         assertThat(pages).isSameAs(messages);
@@ -97,8 +97,8 @@ class JdbcMessageStoreTest {
         assertThat(readModels).isSameAs(messages);
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
-        assertThat(outboxQueue).isSameAs(messages);
-        assertThat(deadLetters).isSameAs(messages);
+        assertThat(outboxQueue).isInstanceOf(JdbcMessagePublicationOutbox.class);
+        assertThat(deadLetters).isSameAs(outboxQueue);
     }
 
     @Test

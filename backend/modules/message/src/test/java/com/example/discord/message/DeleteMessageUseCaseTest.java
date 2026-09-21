@@ -11,14 +11,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class DefaultDeleteMessageUseCaseTest {
+class DeleteMessageUseCaseTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-06-03T12:10:00Z"), ZoneOffset.UTC);
 
     @Test
     void rejectsDeleteWhenGuardDeniesAccess() {
         Message existing = message();
         MessageMutationRejectedException rejection = new MessageMutationRejectedException("cannot delete message");
-        DeleteMessageUseCase useCase = new DefaultDeleteMessageUseCase(
+        DeleteMessageUseCase useCase = new DeleteMessageUseCase(
             new RejectingMutationGuard(rejection),
             new RecordingMessageStore(existing),
             CLOCK
@@ -32,7 +32,7 @@ class DefaultDeleteMessageUseCaseTest {
     void marksMessageDeletedAndClearsSensitiveState() {
         Message existing = message();
         RecordingMessageStore messages = new RecordingMessageStore(existing);
-        DeleteMessageUseCase useCase = new DefaultDeleteMessageUseCase(
+        DeleteMessageUseCase useCase = new DeleteMessageUseCase(
             new AllowingMutationGuard(),
             messages,
             CLOCK
