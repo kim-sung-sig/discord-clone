@@ -1,6 +1,7 @@
 package com.example.discord.message;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -89,7 +90,7 @@ class JdbcMessageStoreTest {
     }
 
     @Test
-    void postgresProfileUsesJdbcMessagePorts() {
+    void postgresProfileSeparatesMessageStateFromOutboxOperations() {
         assertThat(messages).isInstanceOf(JdbcMessageStore.class);
         assertThat(publications).isSameAs(messages);
         assertThat(pages).isSameAs(messages);
@@ -97,8 +98,8 @@ class JdbcMessageStoreTest {
         assertThat(readModels).isSameAs(messages);
         assertThat(lookup).isSameAs(messages);
         assertThat(outbox).isSameAs(messages);
-        assertThat(outboxQueue).isSameAs(messages);
-        assertThat(deadLetters).isSameAs(messages);
+        assertThat(outboxQueue).isInstanceOf(JdbcMessagePublicationOutbox.class);
+        assertThat(deadLetters).isSameAs(outboxQueue);
     }
 
     @Test
@@ -122,6 +123,50 @@ class JdbcMessageStoreTest {
             .contains(message);
         assertThat(rowCount("message_publication_outbox")).isEqualTo(1);
         assertThat(rowCount("message_publication_outbox_mentions")).isEqualTo(1);
+    }
+
+    @Test
+    void savePublishedRollsBackAllStateWhenOutboxInsertFails() throws Exception {
+        UUID duplicateEventId = UUID.randomUUID();
+        Message existing = message("existing", List.of());
+        publications.savePublished(
+            existing,
+            new IdempotencyKey("send-" + UUID.randomUUID()),
+            new MessagePublished(
+                duplicateEventId,
+                existing.id(),
+                existing.author(),
+                existing.target(),
+                existing.mentions(),
+                "correlation-existing",
+                NOW
+            )
+        );
+        Message rejected = message("must roll back", List.of(new SpecialMentionTarget(SpecialMentionKind.HERE)));
+        IdempotencyKey rejectedKey = new IdempotencyKey("send-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> publications.savePublished(
+            rejected,
+            rejectedKey,
+            new MessagePublished(
+                duplicateEventId,
+                rejected.id(),
+                rejected.author(),
+                rejected.target(),
+                rejected.mentions(),
+                "correlation-rejected",
+                NOW
+            )
+        )).isInstanceOf(IllegalStateException.class);
+
+        assertThat(messages.findById(rejected.id())).isEmpty();
+        assertThat(messages.findByIdempotencyKey(rejected.author(), rejected.target(), rejectedKey)).isEmpty();
+        assertThat(rowCount("messages")).isEqualTo(1);
+        assertThat(rowCount("message_idempotency_keys")).isEqualTo(1);
+        assertThat(rowCount("message_read_projection")).isEqualTo(1);
+        assertThat(rowCount("message_mention_targets")).isZero();
+        assertThat(rowCount("message_publication_outbox")).isEqualTo(1);
+        assertThat(rowCount("message_publication_outbox_mentions")).isZero();
     }
 
     @Test

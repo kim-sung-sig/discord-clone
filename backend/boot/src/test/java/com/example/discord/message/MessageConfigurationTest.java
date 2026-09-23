@@ -35,12 +35,12 @@ class MessageConfigurationTest {
         UUID channelId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         AuthorizationProjectionStore stale = new DecisionStore(AuthorizationDecision.deny(AuthorizationDecision.Reason.STALE_PROJECTION));
-        MessagePublishGuard guard = new MessageConfiguration().projectedMessagePublishGuard(new InMemoryGuildService(), stale, true);
+        MessagePublishGuard guard = new MessageConfiguration().projectedMessageAuthorizationPolicy(new InMemoryGuildService(), stale, true);
 
         assertThatThrownBy(() -> guard.requireCanPublish(new UserMessageAuthor(userId), new ChannelMessageTarget(guildId, channelId)))
             .hasMessageContaining("send messages permission required");
 
-        MessagePublishGuard allowed = new MessageConfiguration().projectedMessagePublishGuard(
+        MessagePublishGuard allowed = new MessageConfiguration().projectedMessageAuthorizationPolicy(
             new InMemoryGuildService(), new DecisionStore(AuthorizationDecision.allow()), true);
         allowed.requireCanPublish(new UserMessageAuthor(userId), new ChannelMessageTarget(guildId, channelId));
     }
@@ -52,7 +52,7 @@ class MessageConfigurationTest {
         var guild = guilds.createGuild("fallback", ownerId);
         var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
 
-        MessagePublishGuard guard = new MessageConfiguration().projectedMessagePublishGuard(
+        MessagePublishGuard guard = new MessageConfiguration().projectedMessageAuthorizationPolicy(
             guilds, new DecisionStore(AuthorizationDecision.deny(AuthorizationDecision.Reason.STALE_PROJECTION)), false);
 
         guard.requireCanPublish(new UserMessageAuthor(ownerId), new ChannelMessageTarget(guild.id(), channel.id()));

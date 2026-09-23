@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>코드 단순화 계획 — SRP와 실제 구현 중심</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3, h4 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+    h4 {
+      font-size: 16px;
+      margin: 16px 0 8px;
+      display: flex;
+      align-items: center;
+    }
+    h4::before {
+      content: "•";
+      color: var(--primary);
+      font-weight: 800;
+      display: inline-block;
+      width: 1em;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+
+    .point-tag {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      background: var(--success-soft);
+      color: var(--success-text);
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .before-after, .ba-box {
+      background: var(--bg);
+      border-left: 4px solid var(--line);
+      padding: 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+
+    .highlight {
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .decision {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+      border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.94rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>코드 단순화 계획 — SRP와 실제 구현 중심</h1>
+        <p>2026-09-21 · 백엔드 코드 리딩 · 단계별 정리 계획</p>
+      </header>
+
+<section class="report-section" id="summary"><h2>1. 결론과 조사 범위</h2><p><strong>계획한 A–E 단계를 구현해 공개 일반 인터페이스 7개와 main Java 파일 5개를 순감했다.</strong> 단일 구현 유스케이스는 각각 구체 클래스로 합쳤고, 설정의 권한·moderation 정책과 JDBC outbox 운영 책임은 실제 변경 이유에 따라 분리했다.</p><p>구현 브랜치: <code>task_SIMPLIFY01-gateway-contract</code>. 기준 <code>origin/main</code> SHA: <code>d107030bb46955d4fc534c37ca9099ebf01b7eb4</code>. 원래 <code>task_user-privacy-settings</code> 작업 트리의 기존 수정은 건드리지 않았다.</p><p>main Java는 343개에서 338개, 공개 일반 인터페이스는 37개에서 30개, 메시지 모듈 인터페이스는 21개에서 15개가 됐다. 집계는 <code>public interface</code> 선언을 대상으로 하며 package-private·sealed 선언은 포함하지 않는다.</p><p>범위는 gateway 미사용 계약, 메시지 application 경계, boot 정책 조립, PostgreSQL 메시지/outbox adapter다. 프런트엔드·MFA·다른 aggregate는 후속 코드 리딩 대상으로 남긴다.</p></section>
+<section class="report-section" id="findings"><h2>2. 코드 근거와 우선순위</h2><table><tr><th>순서</th><th>관찰</th><th>정리 방향</th></tr><tr><td>A / P2</td><td><code>backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayCommandService.java (삭제됨)</code>:7. 실행 코드의 참조는 선언과 InMemoryGatewayService의 implements뿐이다. 어댑터는 구체 클래스를 사용한다.</td><td>인터페이스와 implements 제거. 메서드·권한·동기화·세션 동작 보존.</td></tr><tr><td>B / P2</td><td>Publish/Edit/Delete/PinMessageUseCase, ChannelMessageQueryService는 각각 Default 구현 하나. Controller → interface → 구현을 탐색해야 한다.</td><td>5개를 각각 같은 이름의 구체 클래스로 통합. 서로 다른 유스케이스를 거대 MessageService로 합치지 않는다.</td></tr><tr><td>C / P2</td><td><code>backend/modules/message/src/main/java/com/example/discord/message/ChannelMessageReader.java (삭제됨)</code>:3. reader는 빈 생성·전용 테스트만 남았다. HTTP 조회는 ChannelMessageQueryService → ChannelMessageReadModelPort를 사용한다.</td><td>현행 query의 권한·삭제 필터·cursor 테스트 확인 후 reader/빈/전용 테스트 정리. PagePort/SearchPort는 JDBC 테스트 소비자가 있어 별도 조사.</td></tr><tr><td>D / P2</td><td><a href="../../backend/boot/src/main/java/com/example/discord/message/MessageConfiguration.java"><code>backend/boot/src/main/java/com/example/discord/message/MessageConfiguration.java</code></a>:121–276. 빈 조립 안에 권한 판단·moderation·익명 mutation guard 구현이 들어 있다.</td><td>조립과 정책 실행 분리. 구체 boot 어댑터로 이동하고 새 인터페이스는 추가하지 않는다.</td></tr><tr><td>E / P2</td><td><a href="../../backend/boot/src/main/java/com/example/discord/message/JdbcMessageStore.java"><code>backend/boot/src/main/java/com/example/discord/message/JdbcMessageStore.java</code></a>:26. 9개 인터페이스를 구현하며 저장·조회 projection·outbox claim/retry/DLQ를 담당한다.</td><td>조회 또는 outbox 운영부터 독립 변경 이유별 추출. savePublished의 메시지·멱등키·projection·outbox 삽입은 같은 connection/transaction으로 유지.</td></tr></table><p>P2는 유지보수 개선 항목이다. 전체 저장소에 보안 문제나 P0/P1이 없다는 판정이 아니다. 파일 길이나 implements 개수만으로 SRP 위반을 확정하지 않았다.</p></section>
+<section class="report-section" id="principles"><h2>3. SOLID 적용 기준</h2><table><tr><th>원칙</th><th>적용</th></tr><tr><td>SRP</td><td>발행·조회·전달 재시도·권한·빈 조립은 별도 변경 이유다. 같은 트랜잭션으로 지켜야 할 저장 책임은 유지한다.</td></tr><tr><td>OCP</td><td>실제 JDBC/메모리, Kafka/로컬 교체 경계 유지. 예상만 있는 확장 포인트 추가 금지.</td></tr><tr><td>LSP</td><td>어댑터의 권한 거절, 정렬/cursor, 멱등성·재시도 계약을 검증한다.</td></tr><tr><td>ISP</td><td>호출자에게 필요한 좁은 계약은 유지. 수를 줄이려 모든 포트를 합치지 않는다.</td></tr><tr><td>DIP</td><td>domain → boot/Spring/JDBC 의존 금지. 컨트롤러가 framework-light 구체 유스케이스를 호출하는 것은 허용한다.</td></tr></table><p>PasswordHasher·privacy guard·ExpressionService는 구현 하나라는 이유로 삭제하지 않는다. MessagePublishGuard/MessageContentPolicy/ChannelMessageReadGuard는 람다 빈, MessageMutationGuard는 익명 구현, AttachmentScanner는 allowAll() 람다 구현이 존재한다.</p><p>MessagePublicationRelay는 boot와 독립 message-service가 함께 사용한다. 두 런타임과 worker 테스트를 별도로 조사하기 전 1차 통합에서 제외한다.</p></section>
+<section class="report-section" id="phases"><h2>4. 단계별 실행·완료 조건</h2><ol><li><strong>A — 미사용 gateway 계약 삭제:</strong> 실행 코드 참조 0, gateway 테스트와 boot 컴파일 성공.</li><li><strong>B — 5개 단일 구현 통합:</strong> 각 interface 파일을 구체 클래스로 바꾸고 Default 파일 5개 제거. 생성자·빈·기존 테스트 갱신. 요청/응답과 정책 동작 동일.</li><li><strong>C — 중복 reader 정리:</strong> 현행 query의 권한 거절·삭제 제외·cursor 보존을 확인하고 기존 reader/빈 정리. 구형 저장 API는 이 단계에서 보존.</li><li><strong>D — 정책/조립 분리:</strong> postgres/projection-enabled/권한/moderation 분기와 오류 결과를 보존하는 구체 boot 어댑터 추출.</li><li><strong>E — JDBC 책임 분리:</strong> 조회 또는 outbox 운영을 하나씩 추출. PostgreSQL에서 원자적 rollback, lease/retry/DLQ, cursor 검증 없이는 완료 금지.</li><li><strong>F — 후속 영역 조사:</strong> 인증·guild·프런트엔드는 실제 흐름을 읽고 별도 계획을 확정한다. 이번 문서로 일괄 수정하지 않는다.</li></ol><p>각 단계는 독립 검수 가능한 변경으로 진행한다. 실패하면 다음 단계로 넘어가지 않는다. 줄 수 감소는 결과 지표이며 할당량이 아니다. 새로운 BaseService·범용 repository·dependency·전역 이름 정리는 추가하지 않는다.</p></section>
+<section class="report-section" id="blueprint"><h2>5. 구현 정합성</h2><p>사용자의 진행 지시에 따라 A→B→C→D→E를 순서대로 수행했다. 각 단계 뒤 집중 테스트를 통과한 후 다음 단계로 진행했다.</p><table><tr><th>단계</th><th>구현 결과</th></tr><tr><td>A</td><td>미사용 <code>GatewayCommandService</code> 삭제</td></tr><tr><td>B</td><td>다섯 유스케이스의 interface/Default 쌍을 각각 구체 클래스 하나로 통합</td></tr><tr><td>C</td><td>미사용 <code>ChannelMessageReader</code> 실행 경로와 전용 테스트 삭제</td></tr><tr><td>D</td><td>권한과 moderation 정책을 <code>MessageAuthorizationPolicy</code>, <code>MessageContentModerationPolicy</code>로 이동</td></tr><tr><td>E</td><td>claim/retry/DLQ를 <code>JdbcMessagePublicationOutbox</code>로 이동. 원자적 <code>savePublished</code>는 저장소에 유지</td></tr></table><h3>현재 구조</h3><pre>MessageController → concrete use cases → narrow domain ports
+MessageConfiguration → policy wiring
+JdbcMessageStore → message/idempotency/read projection/atomic publish save
+JdbcMessagePublicationOutbox → claim/retry/dead-letter operations</pre><h3>Blueprint 계약</h3><p><strong>Review preset:</strong> <code>Implementation Review</code>, 90점 이상 및 P0/P1 0건. <strong>Blocking ambiguity:</strong> 없음. 실행 호출자, Spring profile wiring, JDBC transaction과 PostgreSQL 테스트 소비자를 확인한 뒤 범위를 고정했다.</p><p><strong>Expected Changed Files:</strong> <code>backend/modules/gateway/src/{main,test}/java/com/example/discord/gateway/**</code>, <code>backend/modules/message/src/{main,test}/java/com/example/discord/message/**</code>, <code>backend/boot/src/{main,test}/java/com/example/discord/message/**</code>, <code>docs/04-report/2026-09-21-code-simplification-plan.report.html</code>.</p><p><strong>Competing branches:</strong> 단일 구현 interface를 유지하는 선택은 탐색 비용을 남겨 제외했고, 모든 유스케이스를 하나의 MessageService로 합치는 선택은 SRP를 훼손해 제외했다. 선택안은 유스케이스별 구체 클래스 유지와 outbox 운영 adapter만 분리하는 구조다.</p><pre>System: HTTP adapter → concrete use case → narrow domain port → boot adapter
+Class: MessageConfiguration → MessageAuthorizationPolicy / MessageContentModerationPolicy
+Behavior: savePublished → message + idempotency + projection + outbox insert → commit
+Failure: any SQL/runtime failure → rollback whole transaction</pre><p>HTTP·event·DB schema 계약은 변경하지 않았다. 사용 중인 JDBC/메모리, Kafka/로컬 교체 경계도 유지했다.</p></section>
+<section class="report-section" id="verification"><h2>6. 검증과 독립 검수</h2><p><code>./gradlew --version</code>: Gradle 8.14.3 / Java 21.0.7.</p><p>A: <code>./gradlew :backend:modules:gateway:test :backend:boot:compileJava --rerun-tasks</code> 성공. B–D: 메시지 모듈, <code>MessageConfigurationTest</code>, <code>MessageControllerTest</code> 집중 실행 성공.</p><p>E: Docker PostgreSQL 17.6에 대해 <code>DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test --tests com.example.discord.message.JdbcMessageStoreTest --rerun-tasks</code> 성공. 저장·조회·멱등키·실패 시 전체 rollback·원자적 outbox 기록·claim lease·retry/DLQ를 포함한 11개 테스트가 통과했다.</p><p>최종 <code>./gradlew test --rerun-tasks</code> 성공. 생성된 JUnit XML 집계는 453 tests, 60 skipped, failures/errors 0이다. 별도 PostgreSQL 실행으로 기본 suite에서 skip되는 메시지 JDBC 테스트를 보완했다. <code>git diff --check</code>도 성공했다.</p><p><code>qa/backend-style-contract.ps1</code>은 실패했다. 동일 base에서도 재현되는 기존 6개 이상 parameter signature allowlist 불일치 13건이며, 이번 diff가 새로 만든 실패는 없다. 새 <code>JdbcMessagePublicationOutbox.releaseFailed</code>의 5개 parameter는 warning으로 보고됐고 기존 interface 계약을 그대로 구현한다.</p><p>독립 Plan Review는 100/100, P0/P1/P2 없음으로 통과했다. 초기 구현 리뷰의 rollback 검증 지적은 실제 PostgreSQL 회귀 테스트와 runtime exception rollback 처리로 보완했다.</p><p id="review-result">재배치 전 동일 patch의 구현 커밋은 Spec Review 98/100, Quality/Security Review 98/100, P0/P1 0건으로 승인됐다. 현재 <code>origin/main</code> 기반 reviewed content SHA는 fresh review와 verification 뒤 merge-review artifact에 기록한다.</p></section>
+<section class="report-section" id="inventory"><h2>7. 단순화 결과</h2><table><tr><th>지표</th><th>main 기준</th><th>현재</th></tr><tr><td>main Java 파일</td><td>343</td><td>338</td></tr><tr><td>공개 일반 인터페이스</td><td>37</td><td>30</td></tr><tr><td>메시지 모듈 공개 일반 인터페이스</td><td>21</td><td>15</td></tr><tr><td><code>JdbcMessageStore</code> 길이</td><td>1,146줄</td><td>868줄</td></tr></table><p>줄 수와 인터페이스 수는 결과 지표다. 실제 교체 구현이 있거나 trust/transaction 경계를 표현하는 계약은 제거하지 않았다.</p></section>
+<section class="report-section" id="context"><h2>8. 문맥과 남은 작업</h2><p>Wiki used: <code>index.md</code>, <code>wiki/Backend Architecture.md</code>, <code>wiki/Agent Development Guide.md</code>. 위키의 다른 worktree/MFA 기록을 현재 브랜치 구현으로 취급하지 않았다.</p><p>T172의 과거 설계 기록은 당시 결정을 보존한다. 현재 런타임 조회 경로는 <code>ChannelMessageQueryService → ChannelMessageReadModelPort</code> 하나로 정리됐다.</p><p>후속 전역 단순화는 인증·guild·프런트엔드 흐름을 각각 읽은 뒤 별도 task로 진행한다. 이번 diff에서 추측성 공통화, 새 dependency, DB schema 변경은 추가하지 않았다.</p></section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

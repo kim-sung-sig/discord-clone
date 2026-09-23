@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class DefaultChannelMessageQueryServiceTest {
+class ChannelMessageQueryServiceTest {
     @Test
     void rejectsWhenReadGuardDeniesQueryAccess() {
-        ChannelMessageQueryService service = new DefaultChannelMessageQueryService(
+        ChannelMessageQueryService service = new ChannelMessageQueryService(
             query -> {
                 throw new MessageMutationRejectedException("cannot read channel messages");
             },
@@ -27,7 +27,7 @@ class DefaultChannelMessageQueryServiceTest {
     void returnsReadModelsWithoutDeletedRows() {
         MessageReadModel visible = readModel("visible", false);
         MessageReadModel deleted = readModel("deleted", true);
-        ChannelMessageQueryService service = new DefaultChannelMessageQueryService(
+        ChannelMessageQueryService service = new ChannelMessageQueryService(
             query -> {
             },
             new RecordingReadModels(List.of(deleted, visible), "cursor-next", List.of())
@@ -43,7 +43,7 @@ class DefaultChannelMessageQueryServiceTest {
     void searchesReadModelsWithGuardAndLimit() {
         MessageReadModel result = readModel("searchable", false);
         RecordingReadModels readModels = new RecordingReadModels(List.of(), null, List.of(result));
-        ChannelMessageQueryService service = new DefaultChannelMessageQueryService(
+        ChannelMessageQueryService service = new ChannelMessageQueryService(
             query -> {
             },
             readModels

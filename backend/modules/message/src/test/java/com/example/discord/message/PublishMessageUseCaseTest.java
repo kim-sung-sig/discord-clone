@@ -12,13 +12,13 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class DefaultPublishMessageUseCaseTest {
+class PublishMessageUseCaseTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-06-03T11:00:00Z"), ZoneOffset.UTC);
 
     @Test
     void rejectsPublishWhenGuardDeniesAccess() {
         MessagePublishRejectedException rejection = new MessagePublishRejectedException("cannot publish message");
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
                 throw rejection;
             },
@@ -36,7 +36,7 @@ class DefaultPublishMessageUseCaseTest {
     void storesMessageWithAuthorTargetContentAndMentions() {
         RecordingMessageStore messages = new RecordingMessageStore();
         PublishMessageRequest request = request();
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
             },
             (author, target, content, mentions) -> {
@@ -70,7 +70,7 @@ class DefaultPublishMessageUseCaseTest {
             new IdempotencyKey("send-1"),
             "correlation-1"
         );
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
             },
             contentPolicy,
@@ -99,7 +99,7 @@ class DefaultPublishMessageUseCaseTest {
         PublishMessageRequest request = request();
         Message existing = messageFor(request);
         ExistingMessageStore messages = new ExistingMessageStore(existing);
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
                 throw new AssertionError("guard should not run for idempotent retry");
             },
@@ -119,7 +119,7 @@ class DefaultPublishMessageUseCaseTest {
     void publishesSameContentAgainWhenClientSuppliesDifferentIdempotencyKey() {
         List<MessagePublished> events = new ArrayList<>();
         RecordingMessageStore messages = new RecordingMessageStore(events);
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
             },
             (author, target, content, mentions) -> {
@@ -167,7 +167,7 @@ class DefaultPublishMessageUseCaseTest {
             FIXED_CLOCK.instant(),
             FIXED_CLOCK.instant()
         );
-        PublishMessageUseCase useCase = new DefaultPublishMessageUseCase(
+        PublishMessageUseCase useCase = new PublishMessageUseCase(
             (author, target) -> {
             },
             (author, target, content, mentions) -> {
