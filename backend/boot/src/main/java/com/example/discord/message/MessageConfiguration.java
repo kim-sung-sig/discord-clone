@@ -3,6 +3,7 @@ package com.example.discord.message;
 import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.notification.MessageMentionProjector;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import java.time.Clock;
 import java.time.Duration;
@@ -12,6 +13,7 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -85,7 +87,8 @@ class MessageConfiguration {
     @Profile("!kafka")
     MessagePublishedDispatcher messagePublishedDispatcher(
         InMemoryGatewayService gatewayService,
-        MessageLookupPort messages
+        MessageLookupPort messages,
+        ObjectProvider<MessageMentionProjector> projector
     ) {
         return event -> {
             if (event.target() instanceof ChannelMessageTarget channel) {
@@ -97,6 +100,10 @@ class MessageConfiguration {
                     channel.channelId(),
                     gatewayPayload(message)
                 );
+                MessageMentionProjector available = projector.getIfAvailable();
+                if (available != null) {
+                    available.project(channel, event.messageId());
+                }
             }
         };
     }
