@@ -1,22 +1,28 @@
 package com.example.discord.social;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,10 +32,16 @@ import org.springframework.web.server.ResponseStatusException;
 class SocialController {
     private final InMemorySocialService socialService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final JdbcDirectMessageService jdbcDirectMessageService;
 
-    SocialController(InMemorySocialService socialService, AuthenticatedUserResolver authenticatedUserResolver) {
+    SocialController(
+        InMemorySocialService socialService,
+        AuthenticatedUserResolver authenticatedUserResolver,
+        ObjectProvider<JdbcDirectMessageService> jdbcDirectMessageService
+    ) {
         this.socialService = socialService;
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.jdbcDirectMessageService = jdbcDirectMessageService.getIfAvailable();
     }
 
     @PostMapping("/friends/requests")
@@ -67,7 +79,11 @@ class SocialController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
-        socialService.blockUser(requesterId, targetUserId);
+        if (jdbcDirectMessageService == null) {
+            socialService.blockUser(requesterId, targetUserId);
+        } else {
+            jdbcDirectMessageService.block(requesterId, targetUserId);
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -78,7 +94,9 @@ class SocialController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         requireRequest(request);
-        DirectMessageChannel channel = socialService.directMessageChannel(requesterId, request.targetUserId());
+        DirectMessageChannel channel = jdbcDirectMessageService == null
+            ? socialService.directMessageChannel(requesterId, request.targetUserId())
+            : jdbcDirectMessageService.channel(requesterId, request.targetUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(DirectMessageChannelResponse.from(channel));
     }
 
@@ -86,12 +104,54 @@ class SocialController {
     ResponseEntity<DirectMessageReceiptResponse> sendDirectMessage(
         @PathVariable UUID targetUserId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-        @RequestBody MessageRequest request
+        @Valid @RequestBody MessageRequest request
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         requireRequest(request);
-        DirectMessageReceipt receipt = socialService.sendDirectMessage(requesterId, targetUserId, request.content());
+        DirectMessageReceipt receipt = jdbcDirectMessageService == null
+            ? socialService.sendDirectMessage(requesterId, targetUserId, request.content())
+            : jdbcDirectMessageService.send(requesterId, targetUserId, request.content());
         return ResponseEntity.status(HttpStatus.CREATED).body(DirectMessageReceiptResponse.from(receipt));
+    }
+
+    @GetMapping("/dms/{targetUserId}/messages")
+    List<JdbcDirectMessageService.DirectMessage> directMessages(
+        @PathVariable UUID targetUserId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestParam(required = false) Long beforeSequence,
+        @RequestParam(defaultValue = "50") int limit
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        if (jdbcDirectMessageService == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "direct message history requires persistence");
+        }
+        return jdbcDirectMessageService.messages(requesterId, targetUserId, beforeSequence, limit);
+    }
+
+    @PutMapping("/dms/{targetUserId}/read")
+    DmReadResponse markDirectMessageRead(
+        @PathVariable UUID targetUserId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody DmReadRequest request
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireRequest(request);
+        if (jdbcDirectMessageService == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "direct message read markers require persistence");
+        }
+        return new DmReadResponse(jdbcDirectMessageService.markRead(requesterId, targetUserId, request.lastReadSequence()));
+    }
+
+    @GetMapping("/dms/{targetUserId}/read")
+    DmReadResponse directMessageReadMarker(
+        @PathVariable UUID targetUserId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        if (jdbcDirectMessageService == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "direct message read markers require persistence");
+        }
+        return new DmReadResponse(jdbcDirectMessageService.readSequence(requesterId, targetUserId));
     }
 
     @PostMapping("/group-dms")
@@ -145,7 +205,13 @@ class SocialController {
     record FriendTargetRequest(UUID targetUserId) {
     }
 
-    record MessageRequest(String content) {
+    record MessageRequest(@NotBlank @Size(max = 4000) String content) {
+    }
+
+    record DmReadRequest(long lastReadSequence) {
+    }
+
+    record DmReadResponse(long lastReadSequence) {
     }
 
     record CreateGroupDmRequest(String name, Set<UUID> memberIds) {
