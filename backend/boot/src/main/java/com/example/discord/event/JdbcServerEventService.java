@@ -11,8 +11,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -20,11 +22,14 @@ import org.springframework.stereotype.Repository;
 class JdbcServerEventService {
     private final DataSource dataSource;
     private final Clock clock;
+    private final Function<ServerEvent, Set<UUID>> recipients;
     private Instant lastSignalCreatedAt = Instant.EPOCH;
 
-    JdbcServerEventService(DataSource dataSource, Clock clock) {
+    @Autowired
+    JdbcServerEventService(DataSource dataSource, Clock clock, Function<ServerEvent, Set<UUID>> recipients) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.recipients = Objects.requireNonNull(recipients, "recipients must not be null");
     }
 
     ServerEvent createEvent(CreateServerEventCommand command, boolean canManageEvents) {
@@ -49,7 +54,8 @@ class JdbcServerEventService {
                     now
                 );
                 saveEvent(connection, event);
-                appendSignal(connection, event.guildId(), event.id(), event.creatorId(), ServerEventSignalType.EVENT_CREATED, "event created");
+                UUID signalId = appendSignal(connection, event.guildId(), event.id(), event.creatorId(), ServerEventSignalType.EVENT_CREATED, "event created");
+                notifyRecipients(connection, event, event.creatorId(), signalId, "Server event created");
                 connection.commit();
                 return event;
             } catch (SQLException | RuntimeException exception) {
@@ -66,6 +72,9 @@ class JdbcServerEventService {
             connection.setAutoCommit(false);
             try {
                 ServerEvent current = requireEvent(connection, guildId, eventId);
+                if (current.status() == ServerEventStatus.CANCELED) {
+                    throw new IllegalArgumentException("event already canceled");
+                }
                 boolean changed = insertInterestedMember(connection, eventId, memberId);
                 if (changed) {
                     appendSignal(connection, guildId, eventId, memberId, ServerEventSignalType.EVENT_RSVP_UPDATED, "event rsvp updated");
@@ -87,6 +96,9 @@ class JdbcServerEventService {
             connection.setAutoCommit(false);
             try {
                 ServerEvent current = requireEvent(connection, guildId, eventId);
+                if (current.status() == ServerEventStatus.CANCELED) {
+                    throw new IllegalArgumentException("event already canceled");
+                }
                 ServerEvent canceled = new ServerEvent(
                     current.id(),
                     current.guildId(),
@@ -100,7 +112,8 @@ class JdbcServerEventService {
                     clock.instant()
                 );
                 updateStatus(connection, canceled);
-                appendSignal(connection, guildId, eventId, actorId, ServerEventSignalType.EVENT_CANCELED, reason);
+                UUID signalId = appendSignal(connection, guildId, eventId, actorId, ServerEventSignalType.EVENT_CANCELED, reason);
+                notifyRecipients(connection, canceled, actorId, signalId, "Server event canceled");
                 connection.commit();
                 return canceled;
             } catch (SQLException | RuntimeException exception) {
@@ -123,7 +136,7 @@ class JdbcServerEventService {
                  FROM server_events
                  WHERE guild_id = ?
                    AND channel_id = ANY(?)
-                 ORDER BY starts_at, id
+                 ORDER BY starts_at, id LIMIT 100
                  """)) {
             statement.setObject(1, guildId);
             statement.setArray(2, connection.createArrayOf("uuid", visible.toArray()));
@@ -136,6 +149,14 @@ class JdbcServerEventService {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to list visible server events", exception);
+        }
+    }
+
+    ServerEvent event(UUID guildId, UUID eventId) {
+        try (Connection connection = dataSource.getConnection()) {
+            return requireEvent(connection, guildId, eventId);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to load server event", exception);
         }
     }
 
@@ -261,7 +282,7 @@ class JdbcServerEventService {
         }
     }
 
-    private void appendSignal(
+    private UUID appendSignal(
         Connection connection,
         UUID guildId,
         UUID eventId,
@@ -269,11 +290,12 @@ class JdbcServerEventService {
         ServerEventSignalType type,
         String detail
     ) throws SQLException {
+        UUID signalId = UUID.randomUUID();
         try (var statement = connection.prepareStatement("""
              INSERT INTO server_event_signals(id, guild_id, event_id, actor_id, type, detail, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)
              """)) {
-            statement.setObject(1, UUID.randomUUID());
+            statement.setObject(1, signalId);
             statement.setObject(2, guildId);
             statement.setObject(3, eventId);
             statement.setObject(4, actorId);
@@ -281,6 +303,36 @@ class JdbcServerEventService {
             statement.setString(6, detail == null ? "" : detail);
             statement.setTimestamp(7, Timestamp.from(nextSignalInstant()));
             statement.executeUpdate();
+        }
+        return signalId;
+    }
+
+    private void notifyRecipients(Connection connection, ServerEvent event, UUID actorId, UUID signalId, String summary)
+        throws SQLException {
+        Set<UUID> recipientIds = recipients.apply(event);
+        for (UUID userId : recipientIds) {
+            if (userId.equals(actorId)) {
+                continue;
+            }
+            try (var statement = connection.prepareStatement("""
+                INSERT INTO notification_items(
+                    id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at
+                )
+                SELECT ?, ?, ?, ?, ?, 0, 'SERVER', ?, FALSE, NOW()
+                WHERE COALESCE((
+                    SELECT server_notifications_enabled FROM notification_preferences WHERE user_id = ?
+                ), TRUE)
+                ON CONFLICT (user_id, source_id, kind) DO NOTHING
+                """)) {
+                statement.setObject(1, UUID.randomUUID());
+                statement.setObject(2, userId);
+                statement.setObject(3, event.guildId());
+                statement.setObject(4, event.channelId());
+                statement.setObject(5, signalId);
+                statement.setString(6, summary);
+                statement.setObject(7, userId);
+                statement.executeUpdate();
+            }
         }
     }
 

@@ -40,6 +40,7 @@ class PostgresNotificationInboxServiceTest {
         try (var connection = dataSource.getConnection();
              var statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM notification_items");
+            statement.executeUpdate("DELETE FROM channel_read_markers");
             statement.executeUpdate("DELETE FROM notification_preferences");
             statement.executeUpdate("DELETE FROM premium_entitlements");
             statement.executeUpdate("DELETE FROM channel_role_overwrites");
@@ -121,6 +122,41 @@ class PostgresNotificationInboxServiceTest {
             .filteredOn(NotificationItem::read)
             .extracting(NotificationItem::sequence)
             .containsExactly(11L);
+    }
+
+    @Test
+    void pagesVisibleInboxWithoutLeakingHiddenChannelCount() {
+        service.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, MESSAGE_ID, 1L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "mention"
+        ));
+        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "dm one");
+        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "dm two");
+
+        var first = service.page(VISIBLE_USER_ID, Set.of(), null, 1);
+        var second = service.page(VISIBLE_USER_ID, Set.of(), first.get(0).id(), 1);
+
+        assertThat(first).hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(second).hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(second.get(0).id()).isNotEqualTo(first.get(0).id());
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isEqualTo(2);
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of(CHANNEL_ID))).isEqualTo(3);
+    }
+
+    @Test
+    void delayedMentionProjectionStartsReadWhenMarkerAlreadyAdvanced() throws Exception {
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
+            INSERT INTO channel_read_markers(user_id, channel_id, last_read_sequence) VALUES (?, ?, 10)
+            """)) {
+            statement.setObject(1, VISIBLE_USER_ID);
+            statement.setObject(2, CHANNEL_ID);
+            statement.executeUpdate();
+        }
+        service.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, MESSAGE_ID, 10L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "delayed mention"
+        ));
+        assertThat(service.inbox(VISIBLE_USER_ID)).extracting(NotificationItem::read).containsExactly(true);
     }
 
     private void insertUser(UUID id, String username) throws Exception {

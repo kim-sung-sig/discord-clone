@@ -56,7 +56,7 @@ class PostgresServerEventServiceTest {
         insertUser(CREATOR_ID, "creator");
         insertUser(MEMBER_ID, "member");
         insertGuildAndChannels();
-        service = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC), event -> Set.of(MEMBER_ID));
     }
 
     @Test
@@ -91,6 +91,25 @@ class PostgresServerEventServiceTest {
         assertThat(canceled.status()).isEqualTo(ServerEventStatus.CANCELED);
         assertThat(service.signals()).extracting(ServerEventSignal::type)
             .containsExactly(ServerEventSignalType.EVENT_CANCELED, ServerEventSignalType.EVENT_CREATED);
+    }
+
+    @Test
+    void createAndCancelProduceDistinctPersistentRecipientNotifications() throws Exception {
+        ServerEvent event = service.createEvent(command(STAGE_CHANNEL_ID), true);
+        service.cancelEvent(GUILD_ID, event.id(), CREATOR_ID, "canceled");
+
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
+            SELECT source_id FROM notification_items WHERE user_id = ? AND kind = 'SERVER' ORDER BY created_at
+            """)) {
+            statement.setObject(1, MEMBER_ID);
+            try (var result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                UUID createdSignal = result.getObject(1, UUID.class);
+                assertThat(result.next()).isTrue();
+                assertThat(result.getObject(1, UUID.class)).isNotEqualTo(createdSignal);
+                assertThat(result.next()).isFalse();
+            }
+        }
     }
 
     @Test

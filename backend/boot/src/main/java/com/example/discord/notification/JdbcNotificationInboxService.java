@@ -104,6 +104,86 @@ class JdbcNotificationInboxService {
         }
     }
 
+    List<NotificationItem> page(UUID userId, Set<UUID> visibleChannelIds, UUID beforeId, int limit) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(visibleChannelIds, "visibleChannelIds must not be null");
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            Timestamp beforeTime = null;
+            if (beforeId != null) {
+                try (var cursor = connection.prepareStatement(
+                    "SELECT created_at FROM notification_items WHERE user_id = ? AND id = ?")) {
+                    cursor.setObject(1, userId);
+                    cursor.setObject(2, beforeId);
+                    try (var result = cursor.executeQuery()) {
+                        if (!result.next()) {
+                            throw new IllegalArgumentException("notification cursor not found");
+                        }
+                        beforeTime = result.getTimestamp(1);
+                    }
+                }
+            }
+            try (var statement = connection.prepareStatement("""
+                SELECT id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at
+                FROM notification_items
+                WHERE user_id = ? AND (guild_id IS NULL OR channel_id = ANY(?))
+                  AND (?::timestamptz IS NULL OR (created_at, id) < (?::timestamptz, ?::uuid))
+                ORDER BY created_at DESC, id DESC LIMIT ?
+                """)) {
+                statement.setObject(1, userId);
+                statement.setArray(2, connection.createArrayOf("uuid", visibleChannelIds.toArray()));
+                statement.setTimestamp(3, beforeTime);
+                statement.setTimestamp(4, beforeTime);
+                statement.setObject(5, beforeId);
+                statement.setInt(6, limit);
+                try (var result = statement.executeQuery()) {
+                    List<NotificationItem> items = new ArrayList<>();
+                    while (result.next()) {
+                        items.add(item(result));
+                    }
+                    return List.copyOf(items);
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to page notification inbox", exception);
+        }
+    }
+
+    long unreadCount(UUID userId, Set<UUID> visibleChannelIds) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT COUNT(*) FROM notification_items
+                 WHERE user_id = ? AND read = FALSE AND (guild_id IS NULL OR channel_id = ANY(?))
+                 """)) {
+            statement.setObject(1, userId);
+            statement.setArray(2, connection.createArrayOf("uuid", visibleChannelIds.toArray()));
+            try (var result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to count visible notifications", exception);
+        }
+    }
+
+    boolean markServerItemRead(UUID userId, UUID itemId, Set<UUID> visibleChannelIds) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 UPDATE notification_items SET read = TRUE, updated_at = NOW()
+                 WHERE id = ? AND user_id = ? AND kind = 'SERVER' AND channel_id = ANY(?)
+                 """)) {
+            statement.setObject(1, itemId);
+            statement.setObject(2, userId);
+            statement.setArray(3, connection.createArrayOf("uuid", visibleChannelIds.toArray()));
+            return statement.executeUpdate() == 1;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to mark server notification read", exception);
+        }
+    }
+
     long unreadCount(UUID userId) {
         Objects.requireNonNull(userId, "userId must not be null");
         try (Connection connection = dataSource.getConnection();
@@ -170,7 +250,10 @@ class JdbcNotificationInboxService {
                  INSERT INTO notification_items(
                      id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at
                  )
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, FALSE, ?)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'MENTION' THEN EXISTS (
+                     SELECT 1 FROM channel_read_markers
+                     WHERE user_id = ? AND channel_id = ? AND last_read_sequence >= ?
+                 ) ELSE FALSE END, ?)
                  ON CONFLICT (user_id, source_id, kind) DO NOTHING
                  """)) {
             statement.setObject(1, UUID.randomUUID());
@@ -181,7 +264,11 @@ class JdbcNotificationInboxService {
             statement.setLong(6, sequence);
             statement.setString(7, kind.name());
             statement.setString(8, summary);
-            statement.setTimestamp(9, Timestamp.from(clock.instant()));
+            statement.setString(9, kind.name());
+            statement.setObject(10, userId);
+            statement.setObject(11, channelId);
+            statement.setLong(12, sequence);
+            statement.setTimestamp(13, Timestamp.from(clock.instant()));
             statement.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to add notification item", exception);
