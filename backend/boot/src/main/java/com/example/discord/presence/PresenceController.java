@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,15 +29,18 @@ class PresenceController {
     private final InMemoryPresenceService presenceService;
     private final InMemoryGuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final JdbcChannelReadService jdbcChannelReadService;
 
     PresenceController(
         InMemoryPresenceService presenceService,
         InMemoryGuildService guildService,
-        AuthenticatedUserResolver authenticatedUserResolver
+        AuthenticatedUserResolver authenticatedUserResolver,
+        ObjectProvider<JdbcChannelReadService> jdbcChannelReadService
     ) {
         this.presenceService = presenceService;
         this.guildService = guildService;
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.jdbcChannelReadService = jdbcChannelReadService.getIfAvailable();
     }
 
     @PutMapping("/me")
@@ -91,7 +95,21 @@ class PresenceController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         requireCanViewChannel(channelId, requesterId);
         requireRequest(request);
-        return ReadMarkerResponse.from(presenceService.markRead(channelId, requesterId, request.lastReadSequence()));
+        return ReadMarkerResponse.from(jdbcChannelReadService == null
+            ? presenceService.markRead(channelId, requesterId, request.lastReadSequence())
+            : jdbcChannelReadService.markRead(channelId, requesterId, request.lastReadSequence()));
+    }
+
+    @GetMapping("/channels/{channelId}/read")
+    ReadMarkerResponse readMarker(
+        @PathVariable UUID channelId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
+        requireCanViewChannel(channelId, requesterId);
+        return ReadMarkerResponse.from(jdbcChannelReadService == null
+            ? presenceService.readMarker(channelId, requesterId)
+            : jdbcChannelReadService.readMarker(channelId, requesterId));
     }
 
     @PostMapping("/channels/{channelId}/unread-count")
@@ -103,12 +121,12 @@ class PresenceController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         requireCanViewChannel(channelId, requesterId);
         requireRequest(request);
-        return new UnreadCountResponse(presenceService.unreadCount(
+        return new UnreadCountResponse(jdbcChannelReadService == null ? presenceService.unreadCount(
             channelId,
             requesterId,
             request.lastMessageSequence(),
             request.authoredSequences()
-        ));
+        ) : jdbcChannelReadService.unreadCount(channelId, requesterId));
     }
 
     private void requireCanViewChannel(UUID channelId, UUID requesterId) {
