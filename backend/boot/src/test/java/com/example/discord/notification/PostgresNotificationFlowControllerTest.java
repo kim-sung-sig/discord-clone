@@ -43,6 +43,8 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isOk());
 
         mvc.perform(get("/api/notifications")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/presence/channels/{channelId}/read", channelId))
+            .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/guilds/{guildId}/events", guildId)
                 .header("Authorization", outsider.bearer()))
             .andExpect(status().isForbidden());
@@ -67,6 +69,9 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isOk());
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(0));
+        mvc.perform(get("/api/presence/channels/{channelId}/read", channelId)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.lastReadSequence").value(0));
 
         String hiddenChannel = JsonPath.read(mvc.perform(post("/api/guilds/{guildId}/channels", guildId)
                 .header("Authorization", owner.bearer()).contentType(MediaType.APPLICATION_JSON)
@@ -87,6 +92,9 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isCreated());
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(0));
+        mvc.perform(get("/api/presence/channels/{channelId}/read", hiddenChannel)
+                .header("Authorization", member.bearer()))
+            .andExpect(status().isForbidden());
 
         mvc.perform(post("/api/social/dms/{targetUserId}/messages", member.userId())
                 .header("Authorization", owner.bearer()).contentType(MediaType.APPLICATION_JSON)
@@ -95,6 +103,8 @@ class PostgresNotificationFlowControllerTest {
         mvc.perform(get("/api/social/dms/{targetUserId}/messages", owner.userId())
                 .header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$[0].content").value("persistent hello"));
+        mvc.perform(get("/api/social/dms/{targetUserId}/messages", owner.userId()))
+            .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(1));
         mvc.perform(put("/api/social/dms/{targetUserId}/read", owner.userId())
