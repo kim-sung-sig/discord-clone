@@ -6,7 +6,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -148,6 +150,31 @@ class JdbcNotificationInboxService {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to page notification inbox", exception);
+        }
+    }
+
+    Map<UUID, UUID> serverEventIds(List<NotificationItem> items) {
+        Object[] signalIds = items.stream()
+            .filter(item -> item.kind() == NotificationKind.SERVER)
+            .map(NotificationItem::sourceId)
+            .toArray();
+        if (signalIds.length == 0) {
+            return Map.of();
+        }
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT id, event_id FROM server_event_signals WHERE id = ANY(?)
+                 """)) {
+            statement.setArray(1, connection.createArrayOf("uuid", signalIds));
+            try (var result = statement.executeQuery()) {
+                Map<UUID, UUID> ids = new HashMap<>();
+                while (result.next()) {
+                    ids.put(result.getObject(1, UUID.class), result.getObject(2, UUID.class));
+                }
+                return Map.copyOf(ids);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to resolve server notification targets", exception);
         }
     }
 

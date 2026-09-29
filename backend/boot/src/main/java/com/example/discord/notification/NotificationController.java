@@ -3,7 +3,9 @@ package com.example.discord.notification;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.guild.Channel;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -36,13 +38,15 @@ class NotificationController {
     }
 
     @GetMapping
-    List<NotificationItem> page(
+    List<NotificationResponse> page(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestParam(required = false) UUID before,
         @RequestParam(defaultValue = "50") int limit
     ) {
         UUID userId = users.requireUserId(authorization);
-        return inbox.page(userId, visibleChannels(userId), before, limit);
+        List<NotificationItem> items = inbox.page(userId, visibleChannels(userId), before, limit);
+        Map<UUID, UUID> eventIds = inbox.serverEventIds(items);
+        return items.stream().map(item -> NotificationResponse.from(item, eventIds.get(item.sourceId()))).toList();
     }
 
     @GetMapping("/unread-count")
@@ -72,6 +76,16 @@ class NotificationController {
     }
 
     record UnreadCountResponse(long unreadCount) {
+    }
+
+    record NotificationResponse(
+        UUID id, UUID userId, UUID guildId, UUID channelId, UUID sourceId,
+        long sequence, NotificationKind kind, String summary, boolean read, Instant createdAt, UUID eventId
+    ) {
+        static NotificationResponse from(NotificationItem item, UUID eventId) {
+            return new NotificationResponse(item.id(), item.userId(), item.guildId(), item.channelId(), item.sourceId(),
+                item.sequence(), item.kind(), item.summary(), item.read(), item.createdAt(), eventId);
+        }
     }
 }
 

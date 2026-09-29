@@ -54,13 +54,14 @@ class PostgresNotificationFlowControllerTest {
                 .header("Authorization", member.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content(eventRequest(channelId)))
             .andExpect(status().isForbidden());
-        mvc.perform(post("/api/guilds/{guildId}/events", guildId)
+        String eventId = JsonPath.read(mvc.perform(post("/api/guilds/{guildId}/events", guildId)
                 .header("Authorization", owner.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content(eventRequest(channelId)))
-            .andExpect(status().isCreated());
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
 
         MvcResult inbox = mvc.perform(get("/api/notifications").header("Authorization", member.bearer()))
-            .andExpect(status().isOk()).andExpect(jsonPath("$[0].kind").value("SERVER")).andReturn();
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].kind").value("SERVER"))
+            .andExpect(jsonPath("$[0].eventId").value(eventId)).andReturn();
         String itemId = JsonPath.read(inbox.getResponse().getContentAsString(), "$[0].id");
         mvc.perform(put("/api/notifications/{itemId}/read", itemId).header("Authorization", member.bearer()))
             .andExpect(status().isOk());
