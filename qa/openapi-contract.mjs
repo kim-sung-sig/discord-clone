@@ -79,9 +79,74 @@ const spec = {
     { name: 'moderation' },
     { name: 'voice' },
     { name: 'gateway' },
-    { name: 'security' }
+    { name: 'security' },
+    { name: 'notifications' },
+    { name: 'social' },
+    { name: 'events' }
   ],
   paths: {
+    '/api/notifications': {
+      get: operation({
+        operationId: 'listNotifications', tags: ['notifications'], summary: 'Page visible notifications.',
+        parameters: [authHeader,
+          { name: 'before', in: 'query', required: false, schema: uuid },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } }],
+        responses: { 200: { description: 'Notification items.', content: { 'application/json': { schema: { type: 'array', items: { type: 'object', additionalProperties: true } } } } } }
+      })
+    },
+    '/api/notifications/unread-count': {
+      get: operation({ operationId: 'countUnreadNotifications', tags: ['notifications'], summary: 'Count visible unread notifications.',
+        parameters: [authHeader], responses: { 200: { $ref: '#/components/responses/UnreadCount' } } })
+    },
+    '/api/notifications/{itemId}/read': {
+      put: operation({ operationId: 'markServerNotificationRead', tags: ['notifications'], summary: 'Mark a visible server notification read.',
+        parameters: [authHeader, { name: 'itemId', in: 'path', required: true, schema: uuid }], responses: { 200: { description: 'Marked read.' } } })
+    },
+    '/api/presence/channels/{channelId}/read': {
+      get: operation({ operationId: 'getChannelReadMarker', tags: ['notifications'], summary: 'Get the persisted channel read marker.',
+        parameters: [authHeader, { name: 'channelId', in: 'path', required: true, schema: uuid }], responses: { 200: { $ref: '#/components/responses/ReadMarker' } } }),
+      put: operation({ operationId: 'markChannelRead', tags: ['notifications'], summary: 'Advance a channel read marker.',
+        parameters: [authHeader, { name: 'channelId', in: 'path', required: true, schema: uuid }],
+        requestBody: jsonBody({ $ref: '#/components/schemas/ReadMarkerRequest' }), responses: { 200: { $ref: '#/components/responses/ReadMarker' } } })
+    },
+    '/api/social/dms': {
+      post: operation({ operationId: 'openDirectMessage', tags: ['social'], summary: 'Open a persistent 1:1 DM channel.',
+        parameters: [authHeader], requestBody: jsonBody({ $ref: '#/components/schemas/FriendTargetRequest' }),
+        responses: { 201: { $ref: '#/components/responses/DirectMessageChannel' } } })
+    },
+    '/api/social/dms/{targetUserId}/messages': {
+      get: operation({ operationId: 'listDirectMessages', tags: ['social'], summary: 'Page a 1:1 DM conversation.',
+        parameters: [authHeader, { name: 'targetUserId', in: 'path', required: true, schema: uuid },
+          { name: 'beforeSequence', in: 'query', required: false, schema: { type: 'integer', format: 'int64', minimum: 1 } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } }],
+        responses: { 200: { description: 'Direct messages.', content: { 'application/json': { schema: { type: 'array', items: { type: 'object', additionalProperties: true } } } } } } }),
+      post: operation({ operationId: 'sendDirectMessage', tags: ['social'], summary: 'Persist a 1:1 DM and recipient notification.',
+        parameters: [authHeader, { name: 'targetUserId', in: 'path', required: true, schema: uuid }],
+        requestBody: jsonBody({ $ref: '#/components/schemas/DirectMessageRequest' }),
+        responses: { 201: { $ref: '#/components/responses/DirectMessage' } } })
+    },
+    '/api/social/dms/{targetUserId}/read': {
+      get: operation({ operationId: 'getDirectMessageReadMarker', tags: ['social'], summary: 'Get the persisted DM read sequence.',
+        parameters: [authHeader, { name: 'targetUserId', in: 'path', required: true, schema: uuid }], responses: { 200: { $ref: '#/components/responses/ReadMarker' } } }),
+      put: operation({ operationId: 'markDirectMessageRead', tags: ['social'], summary: 'Advance a DM read marker.',
+        parameters: [authHeader, { name: 'targetUserId', in: 'path', required: true, schema: uuid }],
+        requestBody: jsonBody({ $ref: '#/components/schemas/ReadMarkerRequest' }), responses: { 200: { $ref: '#/components/responses/ReadMarker' } } })
+    },
+    '/api/guilds/{guildId}/events': {
+      get: operation({ operationId: 'listServerEvents', tags: ['events'], summary: 'List visible server events.',
+        parameters: [authHeader, { name: 'guildId', in: 'path', required: true, schema: uuid }],
+        responses: { 200: { description: 'Server events.', content: { 'application/json': { schema: { type: 'array', items: { type: 'object', additionalProperties: true } } } } } } }),
+      post: operation({ operationId: 'createServerEvent', tags: ['events'], summary: 'Create a server event and recipient notifications.',
+        parameters: [authHeader, { name: 'guildId', in: 'path', required: true, schema: uuid }],
+        requestBody: jsonBody({ $ref: '#/components/schemas/CreateServerEventRequest' }),
+        responses: { 201: { $ref: '#/components/responses/ServerEvent' } } })
+    },
+    '/api/guilds/{guildId}/events/{eventId}/cancel': {
+      put: operation({ operationId: 'cancelServerEvent', tags: ['events'], summary: 'Cancel a server event and notify visible members.',
+        parameters: [authHeader, { name: 'guildId', in: 'path', required: true, schema: uuid }, { name: 'eventId', in: 'path', required: true, schema: uuid }],
+        requestBody: jsonBody({ $ref: '#/components/schemas/CancelServerEventRequest' }),
+        responses: { 200: { $ref: '#/components/responses/ServerEvent' } } })
+    },
     '/api/auth/login': {
       post: operation({
         operationId: 'login',
@@ -241,6 +306,13 @@ const spec = {
   components: {
     schemas: {
       ApiErrorResponse: apiErrorResponse,
+      ReadMarkerRequest: { type: 'object', required: ['lastReadSequence'], properties: { lastReadSequence: { type: 'integer', format: 'int64', minimum: 0 } } },
+      FriendTargetRequest: { type: 'object', required: ['targetUserId'], properties: { targetUserId: uuid } },
+      DirectMessageRequest: { type: 'object', required: ['content'], properties: { content: { type: 'string', minLength: 1, maxLength: 4000 } } },
+      CreateServerEventRequest: { type: 'object', required: ['channelId', 'title', 'startsAt', 'endsAt'], properties: {
+        channelId: uuid, title: { type: 'string', minLength: 1, maxLength: 160 }, startsAt: { type: 'string', format: 'date-time' }, endsAt: { type: 'string', format: 'date-time' }
+      } },
+      CancelServerEventRequest: { type: 'object', properties: { reason: { type: 'string' } } },
       LoginRequest: {
         type: 'object',
         required: ['email', 'password'],
@@ -303,7 +375,12 @@ for (const [name, description] of [
   ['MessageReportList', 'Pending message report list response.'],
   ['VoiceJoin', 'Voice join response.'],
   ['GatewayEvents', 'Gateway events response.'],
-  ['GlobalRoleAuditLog', 'Global role audit log response.']
+  ['GlobalRoleAuditLog', 'Global role audit log response.'],
+  ['UnreadCount', 'Unread notification count.'],
+  ['ReadMarker', 'Persisted read marker.'],
+  ['DirectMessageChannel', '1:1 DM channel.'],
+  ['DirectMessage', 'Persisted 1:1 DM receipt.'],
+  ['ServerEvent', 'Server event response.']
 ]) {
   spec.components.responses[name] = {
     description,
