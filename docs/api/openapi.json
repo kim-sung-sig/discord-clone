@@ -370,6 +370,64 @@
         ],
         "type": "object"
       },
+      "NotificationItem": {
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "eventId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "guildId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "MENTION",
+              "DM",
+              "SERVER"
+            ],
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "sequence": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "sourceId",
+          "sequence",
+          "kind",
+          "read",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "ReadMarkerRequest": {
         "properties": {
           "lastReadSequence": {
@@ -1374,8 +1432,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/NotificationItem"
                   },
                   "type": "array"
                 }

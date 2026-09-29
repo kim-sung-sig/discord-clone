@@ -11,6 +11,7 @@ const contractScript = readFileSync(new URL('./openapi-contract.mjs', import.met
 assert.equal(spec.openapi, '3.1.0')
 assert.equal(spec.info.title, 'Discord Clone API')
 assert.ok(spec.components.schemas.ApiErrorResponse)
+assert.ok(spec.components.schemas.NotificationItem.properties.eventId)
 assert.deepEqual(Object.keys(spec.components.schemas.ApiErrorResponse.properties).sort(), [
   'code',
   'message',

@@ -91,7 +91,7 @@ const spec = {
         parameters: [authHeader,
           { name: 'before', in: 'query', required: false, schema: uuid },
           { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } }],
-        responses: { 200: { description: 'Notification items.', content: { 'application/json': { schema: { type: 'array', items: { type: 'object', additionalProperties: true } } } } } }
+        responses: { 200: { description: 'Notification items.', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/NotificationItem' } } } } } }
       })
     },
     '/api/notifications/unread-count': {
@@ -306,6 +306,12 @@ const spec = {
   components: {
     schemas: {
       ApiErrorResponse: apiErrorResponse,
+      NotificationItem: { type: 'object', required: ['id', 'channelId', 'sourceId', 'sequence', 'kind', 'read', 'createdAt'], properties: {
+        id: uuid, guildId: { ...uuid, nullable: true }, channelId: uuid, sourceId: uuid,
+        eventId: { ...uuid, nullable: true }, sequence: { type: 'integer', format: 'int64' },
+        kind: { type: 'string', enum: ['MENTION', 'DM', 'SERVER'] }, summary: { type: 'string' },
+        read: { type: 'boolean' }, createdAt: { type: 'string', format: 'date-time' }
+      } },
       ReadMarkerRequest: { type: 'object', required: ['lastReadSequence'], properties: { lastReadSequence: { type: 'integer', format: 'int64', minimum: 0 } } },
       FriendTargetRequest: { type: 'object', required: ['targetUserId'], properties: { targetUserId: uuid } },
       DirectMessageRequest: { type: 'object', required: ['content'], properties: { content: { type: 'string', minLength: 1, maxLength: 4000 } } },
