@@ -98,6 +98,12 @@ const spec = {
       get: operation({ operationId: 'countUnreadNotifications', tags: ['notifications'], summary: 'Count visible unread notifications.',
         parameters: [authHeader], responses: { 200: { $ref: '#/components/responses/UnreadCount' } } })
     },
+    '/api/notifications/channel-unread': {
+      get: operation({ operationId: 'countUnreadChannelMessages', tags: ['notifications'], summary: 'Count unread messages by visible channel.',
+        parameters: [authHeader], responses: { 200: { description: 'Unread count by channel ID.', content: { 'application/json': {
+          schema: { type: 'object', additionalProperties: { type: 'integer', format: 'int64' } }
+        } } } } })
+    },
     '/api/notifications/{itemId}/read': {
       put: operation({ operationId: 'markServerNotificationRead', tags: ['notifications'], summary: 'Mark a visible server notification read.',
         parameters: [authHeader, { name: 'itemId', in: 'path', required: true, schema: uuid }], responses: { 200: { description: 'Marked read.' } } })
@@ -308,10 +314,12 @@ const spec = {
       ApiErrorResponse: apiErrorResponse,
       NotificationItem: { type: 'object', required: ['id', 'channelId', 'sourceId', 'sequence', 'kind', 'read', 'createdAt'], properties: {
         id: uuid, guildId: { ...uuid, nullable: true }, channelId: uuid, sourceId: uuid,
-        eventId: { ...uuid, nullable: true }, sequence: { type: 'integer', format: 'int64' },
+        eventId: { ...uuid, nullable: true }, targetUserId: { ...uuid, nullable: true }, sequence: { type: 'integer', format: 'int64' },
         kind: { type: 'string', enum: ['MENTION', 'DM', 'SERVER'] }, summary: { type: 'string' },
         read: { type: 'boolean' }, createdAt: { type: 'string', format: 'date-time' }
       } },
+      MessageResponse: { type: 'object', required: ['id', 'channelId', 'sequence'], additionalProperties: true,
+        properties: { id: uuid, channelId: uuid, sequence: { type: 'integer', format: 'int64', minimum: 1 } } },
       ReadMarkerRequest: { type: 'object', required: ['lastReadSequence'], properties: { lastReadSequence: { type: 'integer', format: 'int64', minimum: 0 } } },
       FriendTargetRequest: { type: 'object', required: ['targetUserId'], properties: { targetUserId: uuid } },
       DirectMessageRequest: { type: 'object', required: ['content'], properties: { content: { type: 'string', minLength: 1, maxLength: 4000 } } },
@@ -337,7 +345,10 @@ const spec = {
       CreateMessageRequest: {
         type: 'object',
         required: ['content', 'idempotencyKey'],
-        properties: { content: { type: 'string' }, idempotencyKey: { type: 'string' }, clientEventId: { type: 'string' } }
+        properties: { content: { type: 'string' }, idempotencyKey: { type: 'string' }, clientEventId: { type: 'string' },
+          mentions: { type: 'array', items: { type: 'object', required: ['type'], properties: {
+            type: { type: 'string', enum: ['USER', 'EVERYONE'] }, id: uuid
+          } } } }
       },
       ReportMessageRequest: {
         type: 'object',
@@ -442,6 +453,14 @@ function assertFresh(filePath, expected) {
   const current = readFileSync(filePath, 'utf8')
   if (normalizeLineEndings(current) !== normalizeLineEndings(expected)) {
     throw new Error(`${filePath} is stale. Run node qa/openapi-contract.mjs --write`)
+  }
+}
+
+spec.components.responses.Message.content['application/json'].schema = { $ref: '#/components/schemas/MessageResponse' }
+spec.components.responses.MessageList.content['application/json'].schema = {
+  type: 'object', required: ['messages'], properties: {
+    messages: { type: 'array', items: { $ref: '#/components/schemas/MessageResponse' } },
+    nextCursor: { type: 'string', nullable: true }
   }
 }
 

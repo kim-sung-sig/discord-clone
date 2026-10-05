@@ -210,6 +210,26 @@ describe('Discord shell API and Gateway contracts', () => {
     expect(wrapper.get('[data-gateway-sequence="43"]').text()).toContain('MESSAGE_CREATE')
   })
 
+  it('sends only resolved user and standalone everyone mentions', async () => {
+    await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+    const userId = '123e4567-e89b-12d3-a456-426614174000'
+    let requestBody: Record<string, unknown> | undefined
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return new Response(JSON.stringify({
+        id: 'message-mentioned', channelId: 'channel-general', authorId: shell.currentUser,
+        content: 'hello', mentions: [], pinned: false, deleted: false, edited: false,
+        createdAt: '2026-05-16T00:00:00.000Z'
+      }), { status: 201, headers: { 'content-type': 'application/json' } })
+    })
+
+    await shell.sendBackendMessage('channel-general', `<@${userId}> @everyone @everyoneish name@example.com @here <@${userId}>`, 'access-token')
+
+    expect(requestBody?.mentions).toEqual([{ type: 'USER', id: userId }, { type: 'EVERYONE' }])
+  })
+
   it('reconciles REST message success with the matching Gateway echo without duplicating state', async () => {
     await mountSuspended(App)
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []

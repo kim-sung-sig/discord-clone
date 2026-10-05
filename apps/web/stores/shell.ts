@@ -43,6 +43,7 @@ interface BackendUserGuildsResponse {
 interface BackendMessageResponse {
   id: string
   channelId: string
+  sequence?: number | null
   authorId: string
   content: string
   mentions: string[]
@@ -55,6 +56,34 @@ interface BackendMessageResponse {
 interface BackendMessagePageResponse {
   messages: BackendMessageResponse[]
   nextCursor: string | null
+}
+
+export interface BackendNotification {
+  id: string
+  guildId: string | null
+  channelId: string
+  sourceId: string
+  sequence: number
+  kind: 'MENTION' | 'DM' | 'SERVER'
+  summary: string
+  read: boolean
+  createdAt: string
+  eventId: string | null
+  targetUserId: string | null
+}
+
+interface BackendDirectMessage {
+  id: string
+  sequence: number
+  senderId: string
+  content: string
+}
+
+interface BackendServerEvent {
+  id: string
+  channelId: string
+  title: string
+  startsAt: string
 }
 
 interface BackendAttachmentUploadResponse {
@@ -484,6 +513,19 @@ const extractMentions = (body: string): string[] => {
   return Array.from(mentions)
 }
 
+const extractStructuredMentions = (body: string): Array<{ type: 'USER', id: string } | { type: 'EVERYONE' }> => {
+  const userIds = new Set<string>()
+  for (const match of body.matchAll(/<@([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})>/gi)) {
+    userIds.add(match[1].toLowerCase())
+  }
+  const mentions: Array<{ type: 'USER', id: string } | { type: 'EVERYONE' }> =
+    Array.from(userIds, (id) => ({ type: 'USER', id }))
+  if (/(^|[^\p{L}\p{N}_@<])@everyone(?![\p{L}\p{N}_>])/u.test(body)) {
+    mentions.push({ type: 'EVERYONE' })
+  }
+  return mentions
+}
+
 const payloadString = (dispatch: GatewayDispatch, key: string): string | undefined => {
   const value = dispatch.payload[key]
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
@@ -570,6 +612,14 @@ export const useShellStore = defineStore('shell', {
     apiError: null as string | null,
     apiLastRequestId: null as string | null,
     apiBusy: false,
+    backendWorkspace: false,
+    backendNotifications: [] as BackendNotification[],
+    backendUnreadCount: 0,
+    backendChannelUnread: {} as Record<string, number>,
+    backendDmTargetUserId: null as string | null,
+    backendDmMessages: [] as BackendDirectMessage[],
+    backendDmReadMarkers: {} as Record<string, number>,
+    backendOpenEvent: null as BackendServerEvent | null,
     guild: {
       id: 'guild-discord-clone',
       name: 'Discord Clone'
@@ -1020,6 +1070,17 @@ export const useShellStore = defineStore('shell', {
           .map((channel) => [channel.id, channel])
       )
 
+      if (state.backendWorkspace) {
+        return state.backendNotifications
+          .filter((item) => item.kind === 'MENTION')
+          .map((item) => ({
+            id: item.sourceId,
+            channelId: item.channelId,
+            channelName: channels.get(item.channelId)?.name ?? item.channelId,
+            author: item.summary
+          }))
+      }
+
       return state.messages
         .filter((message) => !message.deleted && message.mentions.includes(state.currentUser))
         .sort((left, right) => right.sequence - left.sequence)
@@ -1044,6 +1105,9 @@ export const useShellStore = defineStore('shell', {
         .filter((typing) => typing.expiresAt > state.presence.nowMs)
         .map((typing) => typing.userId),
     unreadCountForChannel: (state) => (channelId: string): number => {
+      if (state.backendWorkspace) {
+        return state.backendChannelUnread[channelId] ?? 0
+      }
       const lastReadSequence = state.presence.readMarkers[channelId]?.lastReadSequence ?? 0
 
       return state.messages.filter(
@@ -1328,8 +1392,21 @@ export const useShellStore = defineStore('shell', {
 
       if (channelExists) {
         this.activeChannelId = channelId
-        this.markChannelRead(channelId)
+        if (!this.backendWorkspace) {
+          this.markChannelRead(channelId)
+        }
       }
+    },
+    async selectBackendChannel(channelId: string, bearerToken: string): Promise<void> {
+      if (!this.channelGroups.some((group) => group.channels.some((channel) => channel.id === channelId))) {
+        await this.loadCurrentUserGuilds(bearerToken, channelId)
+      }
+      if (!this.channelGroups.some((group) => group.channels.some((channel) => channel.id === channelId))) {
+        return
+      }
+      this.selectChannel(channelId)
+      await this.resyncChannelMessages(channelId, bearerToken)
+      await this.loadBackendChannelRead(channelId, bearerToken)
     },
     async sendMessage(bearerToken?: string | null) {
       const body = this.composerBody.trim()
@@ -1387,30 +1464,33 @@ export const useShellStore = defineStore('shell', {
         return this.guild
       })
     },
-    async loadCurrentUserGuilds(bearerToken: string): Promise<BackendUserGuildResponse[] | null> {
+    async loadCurrentUserGuilds(bearerToken: string, channelId?: string): Promise<BackendUserGuildResponse[] | null> {
       return this.withBackendRequest(async (client, requestId) => {
         const response = await client.get<BackendUserGuildsResponse>(
           discordApiPaths.auth.guilds(),
           { bearerToken, requestId }
         )
-        const firstGuild = response.guilds[0]
-        if (!firstGuild) {
+        this.backendWorkspace = true
+        const selectedGuild = channelId
+          ? response.guilds.find((guild) => guild.channels.some((channel) => channel.id === channelId))
+          : response.guilds[0]
+        if (!selectedGuild) {
           return response.guilds
         }
 
         this.guild = {
-          id: firstGuild.id,
-          name: firstGuild.name
+          id: selectedGuild.id,
+          name: selectedGuild.name
         }
 
-        const textChannels = firstGuild.channels
+        const textChannels = selectedGuild.channels
           .filter((channel) => channel.type !== 'GUILD_VOICE')
           .map((channel) => ({
             id: channel.id,
             name: channel.name,
             type: channel.type
           }) satisfies ShellChannel)
-        const voiceChannels = firstGuild.channels
+        const voiceChannels = selectedGuild.channels
           .filter((channel) => channel.type === 'GUILD_VOICE')
           .map((channel) => ({
             id: channel.id,
@@ -1452,10 +1532,125 @@ export const useShellStore = defineStore('shell', {
       const activeChannel = this.activeChannel
       if (activeChannel && activeChannel.type !== 'GUILD_VOICE') {
         await this.resyncChannelMessages(activeChannel.id, bearerToken)
-        this.markChannelRead(activeChannel.id)
+        await this.loadBackendChannelRead(activeChannel.id, bearerToken)
       }
 
       return guilds
+    },
+    async loadBackendNotifications(bearerToken: string): Promise<BackendNotification[] | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const options = { bearerToken, requestId }
+        const items = await client.get<BackendNotification[]>(discordApiPaths.notification.page(), options)
+        const count = await client.get<{ unreadCount: number }>(discordApiPaths.notification.unreadCount(), options)
+        const channels = await client.get<Record<string, number>>(discordApiPaths.notification.channelUnread(), options)
+        this.backendNotifications = items
+        this.backendUnreadCount = count.unreadCount
+        this.backendChannelUnread = channels
+        return items
+      })
+    },
+    async loadBackendNotificationPage(bearerToken: string, before: string): Promise<BackendNotification[] | null> {
+      return this.withBackendRequest((client, requestId) =>
+        client.get<BackendNotification[]>(discordApiPaths.notification.page({ before }), { bearerToken, requestId })
+      )
+    },
+    async loadBackendChannelRead(channelId: string, bearerToken: string): Promise<number | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const marker = await client.get<{ lastReadSequence: number }>(
+          discordApiPaths.presence.channelRead(channelId), { bearerToken, requestId }
+        )
+        const markers = this.presence.readMarkers as Record<string, ShellReadMarker>
+        markers[channelId] = { channelId, lastReadSequence: marker.lastReadSequence }
+        return marker.lastReadSequence
+      })
+    },
+    async markBackendChannelRead(channelId: string, sequence: number, bearerToken: string): Promise<boolean> {
+      const markers = this.presence.readMarkers as Record<string, ShellReadMarker>
+      if (sequence <= (markers[channelId]?.lastReadSequence ?? 0)) {
+        return true
+      }
+      const marker = await this.withBackendRequest(async (client, requestId) =>
+        client.put<{ lastReadSequence: number }>(
+          discordApiPaths.presence.channelRead(channelId), { lastReadSequence: sequence },
+          { bearerToken, requestId }
+        )
+      )
+      if (!marker) {
+        return false
+      }
+      markers[channelId] = { channelId, lastReadSequence: marker.lastReadSequence }
+      await this.loadBackendNotifications(bearerToken)
+      return true
+    },
+    async markBackendServerNotificationRead(itemId: string, bearerToken: string): Promise<boolean> {
+      const result = await this.withBackendRequest(async (client, requestId) => {
+        await client.put(discordApiPaths.notification.markServerRead(itemId), undefined, { bearerToken, requestId })
+        return true
+      })
+      if (result) {
+        await this.loadBackendNotifications(bearerToken)
+      }
+      return result === true
+    },
+    async openBackendDm(targetUserId: string, bearerToken: string): Promise<BackendDirectMessage[] | null> {
+      return this.withBackendRequest(async (client, requestId) => {
+        const options = { bearerToken, requestId }
+        const messages = await client.get<BackendDirectMessage[]>(
+          discordApiPaths.social.dmMessages(targetUserId), options
+        )
+        const marker = await client.get<{ lastReadSequence: number }>(discordApiPaths.social.dmRead(targetUserId), options)
+        this.backendDmTargetUserId = targetUserId
+        this.backendDmMessages = messages
+        this.backendDmReadMarkers[targetUserId] = marker.lastReadSequence
+        this.backendOpenEvent = null
+        return messages
+      })
+    },
+    async sendBackendDm(targetUserId: string, content: string, bearerToken: string): Promise<boolean> {
+      if (!content.trim()) {
+        return false
+      }
+      const sent = await this.withBackendRequest(async (client, requestId) => {
+        await client.post(discordApiPaths.social.dmMessages(targetUserId), { content: content.trim() }, { bearerToken, requestId })
+        return true
+      })
+      if (sent) {
+        await this.openBackendDm(targetUserId, bearerToken)
+      }
+      return sent === true
+    },
+    async markBackendDmRead(targetUserId: string, sequence: number, bearerToken: string): Promise<boolean> {
+      if (sequence <= (this.backendDmReadMarkers[targetUserId] ?? 0)) {
+        return true
+      }
+      const marker = await this.withBackendRequest(async (client, requestId) =>
+        client.put<{ lastReadSequence: number }>(
+          discordApiPaths.social.dmRead(targetUserId), { lastReadSequence: sequence },
+          { bearerToken, requestId }
+        )
+      )
+      if (!marker) {
+        return false
+      }
+      this.backendDmReadMarkers[targetUserId] = marker.lastReadSequence
+      await this.loadBackendNotifications(bearerToken)
+      return true
+    },
+    async openBackendEvent(
+      guildId: string, eventId: string, itemId: string, bearerToken: string
+    ): Promise<BackendServerEvent | null> {
+      const event = await this.withBackendRequest(async (client, requestId) => {
+        const events = await client.get<BackendServerEvent[]>(
+          discordApiPaths.event.list(guildId), { bearerToken, requestId }
+        )
+        return events.find((candidate) => candidate.id === eventId) ?? null
+      })
+      if (event && await this.markBackendServerNotificationRead(itemId, bearerToken)) {
+        this.backendOpenEvent = event
+        this.backendDmTargetUserId = null
+        return event
+      }
+      return null
     },
     async createBackendChannel(
       guildId: string,
@@ -1602,7 +1797,7 @@ export const useShellStore = defineStore('shell', {
         try {
           const message = await client.post<BackendMessageResponse>(
             discordApiPaths.channel.messages(channelId),
-            { content: body, idempotencyKey: clientEventId, clientEventId },
+            { content: body, idempotencyKey: clientEventId, clientEventId, mentions: extractStructuredMentions(body) },
             { bearerToken, requestId }
           )
           const shellMessage = this.confirmBackendMessage(message, clientEventId, requestId)
@@ -1626,7 +1821,7 @@ export const useShellStore = defineStore('shell', {
       const shellMessage: ShellMessage = {
         id: message.id,
         channelId: message.channelId,
-        sequence: existing?.sequence ?? nextShellMessageSequence(this.messages),
+        sequence: message.sequence ?? existing?.sequence ?? nextShellMessageSequence(this.messages),
         author: message.authorId,
         body: message.content,
         createdAt: message.createdAt,
@@ -1683,7 +1878,7 @@ export const useShellStore = defineStore('shell', {
           return {
             id: message.id,
             channelId: message.channelId,
-            sequence: existing?.sequence ?? nextSequence + index,
+            sequence: message.sequence ?? existing?.sequence ?? nextSequence + index,
             author: message.authorId,
             body: message.content,
             createdAt: message.createdAt,
@@ -1722,7 +1917,7 @@ export const useShellStore = defineStore('shell', {
           .map((message, index) => ({
             id: message.id,
             channelId: message.channelId,
-            sequence: nextSequence + index,
+            sequence: message.sequence ?? nextSequence + index,
             author: message.authorId,
             body: message.content,
             createdAt: message.createdAt,

@@ -22,6 +22,7 @@ export type ApiPath =
   | '/api/guilds/{guildId}/message-reports/{reportId}/resolve'
   | '/api/notifications'
   | '/api/notifications/{itemId}/read'
+  | '/api/notifications/channel-unread'
   | '/api/notifications/unread-count'
   | '/api/presence/channels/{channelId}/read'
   | '/api/security/csp-report'
@@ -119,6 +120,11 @@ export const apiOperations = [
     "method": "PUT",
     "path": "/api/notifications/{itemId}/read",
     "operationId": "markServerNotificationRead"
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/channel-unread",
+    "operationId": "countUnreadChannelMessages"
   },
   {
     "method": "GET",

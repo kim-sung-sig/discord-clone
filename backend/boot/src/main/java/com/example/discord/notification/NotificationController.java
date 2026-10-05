@@ -46,7 +46,10 @@ class NotificationController {
         UUID userId = users.requireUserId(authorization);
         List<NotificationItem> items = inbox.page(userId, visibleChannels(userId), before, limit);
         Map<UUID, UUID> eventIds = inbox.serverEventIds(items);
-        return items.stream().map(item -> NotificationResponse.from(item, eventIds.get(item.sourceId()))).toList();
+        Map<UUID, UUID> dmSenderIds = inbox.dmSenderIds(items);
+        return items.stream().map(item -> NotificationResponse.from(
+            item, eventIds.get(item.sourceId()), dmSenderIds.get(item.sourceId())
+        )).toList();
     }
 
     @GetMapping("/unread-count")
@@ -55,6 +58,14 @@ class NotificationController {
     ) {
         UUID userId = users.requireUserId(authorization);
         return new UnreadCountResponse(inbox.unreadCount(userId, visibleChannels(userId)));
+    }
+
+    @GetMapping("/channel-unread")
+    Map<UUID, Long> unreadByChannel(
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        UUID userId = users.requireUserId(authorization);
+        return inbox.unreadByChannel(userId, visibleChannels(userId));
     }
 
     @PutMapping("/{itemId}/read")
@@ -80,11 +91,12 @@ class NotificationController {
 
     record NotificationResponse(
         UUID id, UUID userId, UUID guildId, UUID channelId, UUID sourceId,
-        long sequence, NotificationKind kind, String summary, boolean read, Instant createdAt, UUID eventId
+        long sequence, NotificationKind kind, String summary, boolean read, Instant createdAt,
+        UUID eventId, UUID targetUserId
     ) {
-        static NotificationResponse from(NotificationItem item, UUID eventId) {
+        static NotificationResponse from(NotificationItem item, UUID eventId, UUID targetUserId) {
             return new NotificationResponse(item.id(), item.userId(), item.guildId(), item.channelId(), item.sourceId(),
-                item.sequence(), item.kind(), item.summary(), item.read(), item.createdAt(), eventId);
+                item.sequence(), item.kind(), item.summary(), item.read(), item.createdAt(), eventId, targetUserId);
         }
     }
 }

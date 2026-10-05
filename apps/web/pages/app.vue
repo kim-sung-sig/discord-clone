@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ServerRail from '../components/shell/ServerRail.vue'
 import ChannelSidebar from '../components/shell/ChannelSidebar.vue'
 import ChatViewport from '../components/shell/ChatViewport.vue'
@@ -15,7 +15,7 @@ import GatewayStatusPanel from '../components/shell/GatewayStatusPanel.vue'
 import UserPanel from '../components/shell/UserPanel.vue'
 import { useAuthStore } from '../stores/auth'
 import { usePreferencesStore, type LocaleId, type ThemeId } from '../stores/preferences'
-import { useShellStore } from '../stores/shell'
+import { useShellStore, type BackendNotification } from '../stores/shell'
 
 const auth = useAuthStore()
 const shell = useShellStore()
@@ -28,6 +28,15 @@ const activeMobilePane = ref<MobilePane>('chat')
 const activeWorkbenchView = ref<WorkbenchView>('explorer')
 const bottomPanelOpen = ref(false)
 const searchQuery = ref('')
+const backendDmDraft = ref('')
+const backendDmSection = ref<HTMLElement | null>(null)
+let backendDmReadObserver: IntersectionObserver | null = null
+let backendDmReadPending = false
+const browserNotificationsEnabled = ref(false)
+const browserNotificationPermission = ref<NotificationPermission | 'unsupported'>('unsupported')
+const seenNotificationIds = new Set<string>()
+let notificationPollTimer: number | null = null
+let notificationPollingGeneration = 0
 const mobileShellReady = ref(false)
 const platformSurface = ref<'web-desktop' | 'pwa-mobile'>('web-desktop')
 const mobilePanes = computed<Array<{ id: MobilePane, label: string }>>(() => [
@@ -117,10 +126,140 @@ function updateTheme(event: Event) {
 function setWorkbenchView(view: WorkbenchView) {
   activeWorkbenchView.value = view
   bottomPanelOpen.value = false
+  if (view === 'inbox' && auth.accessToken) {
+    void shell.loadBackendNotifications(auth.accessToken)
+  }
 }
 
+async function openBackendNotification(item: BackendNotification) {
+  if (!auth.accessToken) {
+    return
+  }
+  if (item.kind === 'MENTION') {
+    openInboxChannel(item.channelId)
+  } else if (item.kind === 'DM' && item.targetUserId) {
+    activeWorkbenchView.value = 'inbox'
+    await shell.openBackendDm(item.targetUserId, auth.accessToken)
+  } else if (item.kind === 'SERVER' && item.guildId && item.eventId) {
+    activeWorkbenchView.value = 'inbox'
+    await shell.openBackendEvent(item.guildId, item.eventId, item.id, auth.accessToken)
+  }
+}
+
+async function sendBackendDm() {
+  if (!auth.accessToken || !shell.backendDmTargetUserId) {
+    return
+  }
+  if (await shell.sendBackendDm(shell.backendDmTargetUserId, backendDmDraft.value, auth.accessToken)) {
+    backendDmDraft.value = ''
+  }
+}
+
+async function enableBrowserNotifications() {
+  if (!('Notification' in window)) {
+    browserNotificationPermission.value = 'unsupported'
+    return
+  }
+  browserNotificationPermission.value = await Notification.requestPermission()
+  browserNotificationsEnabled.value = browserNotificationPermission.value === 'granted'
+  window.localStorage.setItem('discord-browser-notifications', String(browserNotificationsEnabled.value))
+  void syncBrowserNotificationPolling()
+}
+
+async function pollBackendNotifications() {
+  if (!auth.accessToken || document.visibilityState !== 'hidden' || !browserNotificationsEnabled.value
+      || !('Notification' in window) || Notification.permission !== 'granted') {
+    return
+  }
+  const token = auth.accessToken
+  const generation = notificationPollingGeneration
+  const items = await shell.loadBackendNotifications(token)
+  if (!items || generation !== notificationPollingGeneration || auth.accessToken !== token
+      || document.visibilityState !== 'hidden') {
+    return
+  }
+  let page = items
+  while (page.length === 50 && !page.some((item) => seenNotificationIds.has(item.id))) {
+    const older = await shell.loadBackendNotificationPage(token, page[page.length - 1]!.id)
+    if (!older || generation !== notificationPollingGeneration || auth.accessToken !== token
+        || document.visibilityState !== 'hidden') {
+      return
+    }
+    items.push(...older)
+    page = older
+  }
+  for (const item of items) {
+    if (!seenNotificationIds.has(item.id) && !item.read) {
+      const notice = new Notification(`${item.kind} · ${item.summary}`, { body: '', tag: item.id })
+      notice.onclick = () => {
+        window.focus()
+        void openBackendNotification(item)
+        notice.close()
+      }
+    }
+    seenNotificationIds.add(item.id)
+  }
+}
+
+async function syncBrowserNotificationPolling() {
+  const generation = ++notificationPollingGeneration
+  if (notificationPollTimer !== null) {
+    window.clearInterval(notificationPollTimer)
+    notificationPollTimer = null
+  }
+  browserNotificationPermission.value = 'Notification' in window ? Notification.permission : 'unsupported'
+  if (!browserNotificationsEnabled.value || browserNotificationPermission.value !== 'granted'
+      || !auth.accessToken || document.visibilityState !== 'hidden') {
+    return
+  }
+  const items = await shell.loadBackendNotifications(auth.accessToken)
+  if (!items || generation !== notificationPollingGeneration || document.visibilityState !== 'hidden' || !auth.accessToken) {
+    return
+  }
+  seenNotificationIds.clear()
+  items.forEach((item) => seenNotificationIds.add(item.id))
+  notificationPollTimer = window.setInterval(() => { void pollBackendNotifications() }, 10_000)
+}
+
+watch(() => [shell.backendDmTargetUserId, shell.backendDmMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+  backendDmReadObserver?.disconnect()
+  if (!auth.accessToken || !shell.backendDmTargetUserId || typeof IntersectionObserver === 'undefined') {
+    return
+  }
+  const targetUserId = shell.backendDmTargetUserId
+  const latest = shell.backendDmMessages.reduce<(typeof shell.backendDmMessages)[number] | null>(
+    (current, message) => !current || message.sequence > current.sequence ? message : current, null
+  )
+  if (!latest || latest.sequence <= (shell.backendDmReadMarkers[shell.backendDmTargetUserId] ?? 0)) {
+    return
+  }
+  await nextTick()
+  const element = Array.from(backendDmSection.value?.querySelectorAll<HTMLElement>('[data-dm-message-id]') ?? [])
+    .find((candidate) => candidate.dataset.dmMessageId === latest.id)
+  if (!element) {
+    return
+  }
+  backendDmReadObserver = new IntersectionObserver(async (entries) => {
+    if (!entries.some((entry) => entry.isIntersecting) || backendDmReadPending || !auth.accessToken
+        || shell.backendDmTargetUserId !== targetUserId) {
+      return
+    }
+    backendDmReadPending = true
+    const saved = await shell.markBackendDmRead(targetUserId, latest.sequence, auth.accessToken)
+    backendDmReadPending = false
+    if (saved) {
+      backendDmReadObserver?.disconnect()
+    }
+  })
+  backendDmReadObserver.observe(element)
+}, { flush: 'post' })
+
 function openInboxChannel(channelId: string) {
-  shell.selectChannel(channelId)
+  if (auth.accessToken) {
+    void shell.selectBackendChannel(channelId, auth.accessToken)
+  } else {
+    shell.selectChannel(channelId)
+  }
   activeWorkbenchView.value = 'explorer'
   activeMobilePane.value = 'chat'
 }
@@ -170,6 +309,9 @@ onMounted(() => {
   preferences.applyTheme()
   updatePlatformSurface()
   window.addEventListener('resize', updatePlatformSurface)
+  browserNotificationsEnabled.value = window.localStorage.getItem('discord-browser-notifications') === 'true'
+  browserNotificationPermission.value = 'Notification' in window ? Notification.permission : 'unsupported'
+  document.addEventListener('visibilitychange', syncBrowserNotificationPolling)
   mobileShellReady.value = true
 
   if ('serviceWorker' in navigator) {
@@ -178,9 +320,15 @@ onMounted(() => {
 })
 
 watch(() => preferences.themeId, () => preferences.applyTheme(), { immediate: true })
+watch(() => auth.accessToken, () => { void syncBrowserNotificationPolling() })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updatePlatformSurface)
+  document.removeEventListener('visibilitychange', syncBrowserNotificationPolling)
+  if (notificationPollTimer !== null) {
+    window.clearInterval(notificationPollTimer)
+  }
+  backendDmReadObserver?.disconnect()
 })
 </script>
 
@@ -436,6 +584,30 @@ onBeforeUnmount(() => {
             <strong>@</strong>
           </article>
         </section>
+        <section v-if="auth.accessToken" class="workbench-list" data-testid="workbench-inbox-server-items">
+          <article
+            v-for="item in shell.backendNotifications.filter((candidate) => candidate.kind !== 'MENTION')"
+            :key="item.id"
+            class="workbench-list-row"
+            :data-testid="`workbench-inbox-${item.kind.toLowerCase()}-${item.id}`"
+          >
+            <button type="button" @click="openBackendNotification(item)">{{ item.summary }}</button>
+            <small>{{ item.kind }}</small>
+            <strong v-if="!item.read">●</strong>
+          </article>
+        </section>
+        <section v-if="auth.accessToken && shell.backendDmTargetUserId" ref="backendDmSection" data-testid="workbench-inbox-dm-conversation">
+          <h3>{{ preferences.t('view.inbox.directMessage') }}</h3>
+          <p v-for="message in shell.backendDmMessages" :key="message.id" :data-dm-message-id="message.id">{{ message.content }}</p>
+          <form @submit.prevent="sendBackendDm">
+            <input v-model="backendDmDraft" data-testid="workbench-inbox-dm-input" aria-label="Direct message">
+            <button type="submit">{{ preferences.t('composer.send') }}</button>
+          </form>
+        </section>
+        <section v-if="auth.accessToken && shell.backendOpenEvent" data-testid="workbench-inbox-event-detail">
+          <h3>{{ shell.backendOpenEvent.title }}</h3>
+          <p>{{ shell.backendOpenEvent.startsAt }}</p>
+        </section>
         <section class="workbench-list" data-testid="workbench-inbox-unreads">
           <article
             v-for="channel in unreadInboxChannels"
@@ -449,18 +621,20 @@ onBeforeUnmount(() => {
             <small>{{ channel.groupName }}</small>
             <strong>{{ channel.unreadCount }}</strong>
           </article>
-          <article
-            v-for="dm in directMessageInboxItems"
-            :key="`dm-${dm.id}`"
-            class="workbench-list-row"
-            :data-testid="`workbench-inbox-dm-${dm.id}`"
-          >
-            <button type="button" @click="openInboxDirectMessage(dm.id)">
-              {{ dm.friend?.name }}
-            </button>
-            <small>{{ preferences.t('view.inbox.directMessage') }}</small>
-            <strong>{{ dm.unreadCount }}</strong>
-          </article>
+          <template v-if="!auth.accessToken">
+            <article
+              v-for="dm in directMessageInboxItems"
+              :key="`dm-${dm.id}`"
+              class="workbench-list-row"
+              :data-testid="`workbench-inbox-dm-${dm.id}`"
+            >
+              <button type="button" @click="openInboxDirectMessage(dm.id)">
+                {{ dm.friend?.name }}
+              </button>
+              <small>{{ preferences.t('view.inbox.directMessage') }}</small>
+              <strong>{{ dm.unreadCount }}</strong>
+            </article>
+          </template>
         </section>
       </section>
       <section
@@ -514,6 +688,15 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </label>
+        <button
+          type="button"
+          data-testid="settings-browser-notifications-enable"
+          :disabled="browserNotificationPermission === 'unsupported' || browserNotificationPermission === 'denied'"
+          @click="enableBrowserNotifications"
+        >
+          {{ preferences.t('view.settings.browserNotifications') }}
+        </button>
+        <p data-testid="settings-browser-notifications-status">{{ preferences.t(`view.settings.browserNotifications.${browserNotificationPermission}`) }}</p>
         <dl class="workbench-settings-summary">
           <div>
             <dt>{{ preferences.t('view.settings.guild') }}</dt>

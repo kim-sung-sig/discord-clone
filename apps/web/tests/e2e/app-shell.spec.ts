@@ -116,6 +116,14 @@ test('opens notification inbox and jumps to unread channel work', async ({ page 
       body: JSON.stringify({ accessToken: 'inbox-e2e-access-token' })
     })
   })
+  await page.route('**/api/notifications**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    const body = path.endsWith('/unread-count') ? { unreadCount: 1 }
+      : path.endsWith('/channel-unread') ? {}
+        : [{ id: 'dm-e2e', channelId: 'dm-channel', sourceId: 'dm-message', sequence: 1,
+          kind: 'DM', summary: 'New direct message', read: false, targetUserId: 'friend-id' }]
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+  })
   await page.goto('/')
   await expect(page.getByTestId('message-input')).toBeEnabled()
 
@@ -124,7 +132,7 @@ test('opens notification inbox and jumps to unread channel work', async ({ page 
   await expect(page.getByTestId('workbench-inbox-view')).toContainText('Notification inbox')
   await expect(page.getByTestId('workbench-inbox-mention-message-architecture-notes')).toContainText('architecture')
   await expect(page.getByTestId('workbench-inbox-unread-channel-architecture')).toContainText('1')
-  await expect(page.getByTestId('workbench-inbox-dm-dm-cto-bot')).toContainText('2')
+  await expect(page.getByTestId('workbench-inbox-dm-dm-e2e')).toContainText('New direct message')
 
   await page.getByTestId('workbench-inbox-unread-channel-architecture').getByRole('button').click()
 

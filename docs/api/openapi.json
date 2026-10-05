@@ -293,6 +293,28 @@
           },
           "idempotencyKey": {
             "type": "string"
+          },
+          "mentions": {
+            "items": {
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "USER",
+                    "EVERYONE"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -370,6 +392,30 @@
         ],
         "type": "object"
       },
+      "MessageResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sequence": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "sequence"
+        ],
+        "type": "object"
+      },
       "NotificationItem": {
         "properties": {
           "channelId": {
@@ -414,6 +460,11 @@
             "type": "string"
           },
           "summary": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "format": "uuid",
+            "nullable": true,
             "type": "string"
           }
         },
@@ -1509,6 +1560,63 @@
           }
         },
         "summary": "Mark a visible server notification read.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/channel-unread": {
+      "get": {
+        "operationId": "countUnreadChannelMessages",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unread count by channel ID."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Count unread messages by visible channel.",
         "tags": [
           "notifications"
         ]

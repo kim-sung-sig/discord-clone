@@ -28,19 +28,23 @@ class JdbcNotificationInboxService {
     }
 
     void recordMention(MentionNotificationCommand command) {
-        for (UUID userId : command.mentionedUserIds()) {
-            if (userId.equals(command.authorId()) || !command.visibleRecipientIds().contains(userId)) {
-                continue;
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                for (UUID userId : command.mentionedUserIds()) {
+                    if (userId.equals(command.authorId()) || !command.visibleRecipientIds().contains(userId)) {
+                        continue;
+                    }
+                    addItem(connection, userId, command.guildId(), command.channelId(), command.messageId(),
+                        command.sequence(), NotificationKind.MENTION, command.summary());
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
             }
-            addItem(
-                userId,
-                command.guildId(),
-                command.channelId(),
-                command.messageId(),
-                command.sequence(),
-                NotificationKind.MENTION,
-                command.summary()
-            );
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to record mention notifications", exception);
         }
     }
 
@@ -178,6 +182,29 @@ class JdbcNotificationInboxService {
         }
     }
 
+    Map<UUID, UUID> dmSenderIds(List<NotificationItem> items) {
+        Object[] messageIds = items.stream()
+            .filter(item -> item.kind() == NotificationKind.DM)
+            .map(NotificationItem::sourceId)
+            .toArray();
+        if (messageIds.length == 0) {
+            return Map.of();
+        }
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("SELECT id, sender_id FROM dm_messages WHERE id = ANY(?)")) {
+            statement.setArray(1, connection.createArrayOf("uuid", messageIds));
+            try (var result = statement.executeQuery()) {
+                Map<UUID, UUID> ids = new HashMap<>();
+                while (result.next()) {
+                    ids.put(result.getObject(1, UUID.class), result.getObject(2, UUID.class));
+                }
+                return Map.copyOf(ids);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to resolve direct message notification targets", exception);
+        }
+    }
+
     long unreadCount(UUID userId, Set<UUID> visibleChannelIds) {
         Objects.requireNonNull(userId, "userId must not be null");
         try (Connection connection = dataSource.getConnection();
@@ -193,6 +220,33 @@ class JdbcNotificationInboxService {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to count visible notifications", exception);
+        }
+    }
+
+    Map<UUID, Long> unreadByChannel(UUID userId, Set<UUID> visibleChannelIds) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT message.channel_id, COUNT(*) AS unread_count
+                 FROM messages message
+                 LEFT JOIN channel_read_markers marker
+                   ON marker.channel_id = message.channel_id AND marker.user_id = ?
+                 WHERE message.channel_id = ANY(?) AND message.author_id <> ? AND message.deleted = FALSE
+                   AND message.sequence > COALESCE(marker.last_read_sequence, 0)
+                 GROUP BY message.channel_id
+                 """)) {
+            statement.setObject(1, userId);
+            statement.setArray(2, connection.createArrayOf("uuid", visibleChannelIds.toArray()));
+            statement.setObject(3, userId);
+            try (var result = statement.executeQuery()) {
+                Map<UUID, Long> counts = new HashMap<>();
+                while (result.next()) {
+                    counts.put(result.getObject("channel_id", UUID.class), result.getLong("unread_count"));
+                }
+                return Map.copyOf(counts);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to count unread channel messages", exception);
         }
     }
 
@@ -269,11 +323,21 @@ class JdbcNotificationInboxService {
         Objects.requireNonNull(sourceId, "sourceId must not be null");
         Objects.requireNonNull(kind, "kind must not be null");
         Objects.requireNonNull(summary, "summary must not be null");
-        if (!preferences(userId).enabled(kind)) {
+        try (Connection connection = dataSource.getConnection()) {
+            addItem(connection, userId, guildId, channelId, sourceId, sequence, kind, summary);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to add notification item", exception);
+        }
+    }
+
+    private void addItem(
+        Connection connection, UUID userId, UUID guildId, UUID channelId, UUID sourceId,
+        long sequence, NotificationKind kind, String summary
+    ) throws SQLException {
+        if (!preferences(connection, userId).enabled(kind)) {
             return;
         }
-        try (Connection connection = dataSource.getConnection();
-             var statement = connection.prepareStatement("""
+        try (var statement = connection.prepareStatement("""
                  INSERT INTO notification_items(
                      id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at
                  )
@@ -297,14 +361,11 @@ class JdbcNotificationInboxService {
             statement.setLong(12, sequence);
             statement.setTimestamp(13, Timestamp.from(clock.instant()));
             statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new IllegalStateException("failed to add notification item", exception);
         }
     }
 
-    private NotificationPreferences preferences(UUID userId) {
-        try (Connection connection = dataSource.getConnection();
-             var statement = connection.prepareStatement("""
+    private NotificationPreferences preferences(Connection connection, UUID userId) throws SQLException {
+        try (var statement = connection.prepareStatement("""
                  SELECT mentions_enabled, direct_messages_enabled, server_notifications_enabled
                  FROM notification_preferences
                  WHERE user_id = ?
@@ -320,8 +381,6 @@ class JdbcNotificationInboxService {
                     resultSet.getBoolean("server_notifications_enabled")
                 );
             }
-        } catch (SQLException exception) {
-            throw new IllegalStateException("failed to load notification preferences", exception);
         }
     }
 

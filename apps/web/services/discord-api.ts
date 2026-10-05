@@ -107,6 +107,28 @@ const gatewayPaths = {
   publish: () => '/api/gateway/events'
 } as const
 
+const notificationPaths = {
+  page: (query: { before?: string, limit?: number } = {}) => withQuery('/api/notifications', query),
+  unreadCount: () => '/api/notifications/unread-count',
+  channelUnread: () => '/api/notifications/channel-unread',
+  markServerRead: (itemId: string) => `/api/notifications/${segment(itemId)}/read`
+} as const
+
+const presencePaths = {
+  channelRead: (channelId: string) => `/api/presence/channels/${segment(channelId)}/read`,
+  channelUnread: (channelId: string) => `/api/presence/channels/${segment(channelId)}/unread-count`
+} as const
+
+const socialPaths = {
+  dmMessages: (targetUserId: string, query: { beforeSequence?: number, limit?: number } = {}) =>
+    withQuery(`/api/social/dms/${segment(targetUserId)}/messages`, query),
+  dmRead: (targetUserId: string) => `/api/social/dms/${segment(targetUserId)}/read`
+} as const
+
+const eventPaths = {
+  list: (guildId: string) => `/api/guilds/${segment(guildId)}/events`
+} as const
+
 export const discordApiPaths = {
   authLogin: authPaths.login,
   channelMessages: channelPaths.messages,
@@ -117,7 +139,11 @@ export const discordApiPaths = {
   channel: channelPaths,
   attachment: attachmentPaths,
   invite: invitePaths,
-  gateway: gatewayPaths
+  gateway: gatewayPaths,
+  notification: notificationPaths,
+  presence: presencePaths,
+  social: socialPaths,
+  event: eventPaths
 } as const
 
 const joinUrl = (baseUrl: string | undefined, path: string): string => {

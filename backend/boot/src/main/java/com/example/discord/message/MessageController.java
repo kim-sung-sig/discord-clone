@@ -35,6 +35,7 @@ class MessageController {
     private final DeleteMessageUseCase deleteMessage;
     private final PinMessageUseCase pinMessage;
     private final ChannelMessageQueryService messageQueries;
+    private final ChannelMessageReadModelPort readModels;
     private final InMemoryGuildService guildService;
     private final InMemoryModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
@@ -45,6 +46,7 @@ class MessageController {
         DeleteMessageUseCase deleteMessage,
         PinMessageUseCase pinMessage,
         ChannelMessageQueryService messageQueries,
+        ChannelMessageReadModelPort readModels,
         InMemoryGuildService guildService,
         InMemoryModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
@@ -54,6 +56,7 @@ class MessageController {
         this.deleteMessage = deleteMessage;
         this.pinMessage = pinMessage;
         this.messageQueries = messageQueries;
+        this.readModels = readModels;
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -76,7 +79,7 @@ class MessageController {
             new IdempotencyKey(request.idempotencyKey()),
             UUID.randomUUID().toString()
         )).message();
-        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message, readModels.sequenceOf(message.id())));
     }
 
     @GetMapping
@@ -112,7 +115,7 @@ class MessageController {
             new MessageContent(request.content()),
             mentionTargetsFrom(request.mentions())
         )).message();
-        return MessageResponse.from(message);
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
     }
 
     @DeleteMapping("/{messageId}")
@@ -143,7 +146,7 @@ class MessageController {
             true
         )).message();
         moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_PINNED, requesterId, messageId, "message pinned");
-        return MessageResponse.from(message);
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
     }
 
     @DeleteMapping("/{messageId}/pin")
@@ -159,7 +162,7 @@ class MessageController {
             false
         )).message();
         moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_UNPINNED, requesterId, messageId, "message unpinned");
-        return MessageResponse.from(message);
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
     }
 
     @GetMapping("/search")
@@ -245,6 +248,7 @@ class MessageController {
         UUID id,
         UUID guildId,
         UUID channelId,
+        Long sequence,
         UUID authorId,
         String content,
         List<String> mentions,
@@ -255,11 +259,12 @@ class MessageController {
         Instant createdAt,
         Instant updatedAt
     ) {
-        static MessageResponse from(Message message) {
+        static MessageResponse from(Message message, long sequence) {
             return new MessageResponse(
                 message.id(),
                 message.guildId(),
                 message.channelId(),
+                sequence,
                 message.authorId(),
                 message.content().value(),
                 message.mentions().stream().map(MessageResponse::mentionToken).toList(),
@@ -277,6 +282,7 @@ class MessageController {
                 message.id(),
                 message.guildId(),
                 message.channelId(),
+                message.sequence(),
                 message.authorId(),
                 message.content(),
                 message.mentions(),

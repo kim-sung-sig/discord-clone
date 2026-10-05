@@ -77,6 +77,157 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="workbench-settings-view"]').text()).not.toContain('Theme')
   })
 
+  it('loads authenticated DM and server notifications and opens their saved targets', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    shell.backendWorkspace = true
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input)
+      requests.push(`${init?.method} ${path}`)
+      if (path.endsWith('/api/notifications')) {
+        return jsonResponse([
+          { id: 'dm-item', channelId: 'dm-channel', sourceId: 'dm-message', kind: 'DM',
+            summary: 'New direct message', sequence: 1, read: false, targetUserId: 'friend-id' },
+          { id: 'event-item', guildId: 'guild-id', channelId: 'channel-id', sourceId: 'signal-id',
+            kind: 'SERVER', summary: 'Server event created', sequence: 0, read: false, eventId: 'event-id' }
+        ])
+      }
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 2 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      if (path.endsWith('/api/social/dms/friend-id/messages')) {
+        return jsonResponse([{ id: 'dm-message', sequence: 1, senderId: 'friend-id', content: 'Saved DM' }])
+      }
+      if (path.endsWith('/api/social/dms/friend-id/read')) return jsonResponse({ lastReadSequence: 0 })
+      if (path.endsWith('/api/guilds/guild-id/events')) {
+        return jsonResponse([{ id: 'event-id', channelId: 'channel-id', title: 'Saved event', startsAt: '2026-10-01T10:00:00Z' }])
+      }
+      if (path.endsWith('/api/notifications/event-item/read')) return new Response(null, { status: 204 })
+      return jsonResponse({}, 404)
+    })
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="workbench-inbox-dm-dm-item"]').exists()).toBe(true))
+    await wrapper.get('[data-testid="workbench-inbox-dm-dm-item"] button').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="workbench-inbox-dm-conversation"]').text()).toContain('Saved DM'))
+    await wrapper.get('[data-testid="workbench-inbox-server-event-item"] button').trigger('click')
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="workbench-inbox-event-detail"]').text()).toContain('Saved event'))
+    expect(requests.some((request) => request.startsWith('PUT ') && request.endsWith('/api/notifications/event-item/read'))).toBe(true)
+  })
+
+  it('requests browser permission only from settings and alerts only for new hidden-tab items', async () => {
+    const notices: Array<{ title: string, options: NotificationOptions }> = []
+    class NotificationStub {
+      static permission: NotificationPermission = 'default'
+      static requestPermission = vi.fn(async () => {
+        NotificationStub.permission = 'granted'
+        return 'granted' as NotificationPermission
+      })
+      onclick: (() => void) | null = null
+      constructor(title: string, options: NotificationOptions) {
+        notices.push({ title, options })
+      }
+      close() {}
+    }
+    vi.stubGlobal('Notification', NotificationStub)
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    let poll: (() => void) | undefined
+    const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler, delay) => {
+      if (delay === 10_000) poll = handler as () => void
+      return 1
+    })
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    useShellStore().backendWorkspace = true
+    let pageLoads = 0
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.includes('/api/notifications?before=')) {
+        return jsonResponse([{
+          id: 'new-dm', kind: 'DM', summary: 'New direct message', read: false,
+          channelId: 'dm-channel', sourceId: 'message-id', sequence: 1, targetUserId: 'friend-id'
+        }])
+      }
+      if (path.endsWith('/api/notifications')) {
+        pageLoads++
+        if (pageLoads === 4) {
+          return jsonResponse(Array.from({ length: 50 }, (_, index) => ({
+            id: `new-dm-${index}`, kind: 'DM', summary: 'New direct message', read: false,
+            channelId: 'dm-channel', sourceId: `message-${index}`, sequence: index + 2, targetUserId: 'friend-id'
+          })))
+        }
+        return jsonResponse(pageLoads === 1 ? [] : [{
+          id: 'new-dm', kind: 'DM', summary: 'New direct message', read: false,
+          channelId: 'dm-channel', sourceId: 'message-id', sequence: 1, targetUserId: 'friend-id'
+        }])
+      }
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 1 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+
+    expect(NotificationStub.requestPermission).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="activity-settings"]').trigger('click')
+    await wrapper.get('[data-testid="settings-browser-notifications-enable"]').trigger('click')
+    await vi.waitFor(() => expect(poll).toBeDefined())
+    expect(NotificationStub.requestPermission).toHaveBeenCalledTimes(1)
+    expect(notices).toHaveLength(0)
+    poll!()
+    await vi.waitFor(() => expect(notices).toHaveLength(1))
+    expect(notices[0]?.options).toMatchObject({ body: '', tag: 'new-dm' })
+    poll!()
+    await vi.waitFor(() => expect(pageLoads).toBe(3))
+    expect(notices).toHaveLength(1)
+    poll!()
+    await vi.waitFor(() => expect(notices).toHaveLength(51))
+    interval.mockRestore()
+    visibility.mockRestore()
+  })
+
+  it('marks an authenticated channel read only after its latest message is visible', async () => {
+    const observers: Array<{ notify: () => void }> = []
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: IntersectionObserverCallback) {
+        observers.push({ notify: () => { void callback([{ isIntersecting: true } as IntersectionObserverEntry], this as IntersectionObserver) } })
+      }
+      observe() {}
+      disconnect() {}
+    })
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    shell.backendWorkspace = true
+    shell.backendChannelUnread = { 'channel-general': 1 }
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input)
+      requests.push(`${init?.method} ${path}`)
+      if (path.endsWith('/api/presence/channels/channel-general/read')) return jsonResponse({ lastReadSequence: 7 })
+      if (path.endsWith('/api/notifications')) return jsonResponse([])
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 0 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+    shell.messages = [{
+      id: 'visible-message', channelId: 'channel-general', sequence: 7, author: 'other-user', body: 'hello',
+      createdAt: '2026-10-01T10:00:00Z', edited: false, pinned: false, deleted: false, mentions: [], attachments: []
+    }]
+    await vi.waitFor(() => expect(observers.length).toBeGreaterThan(0))
+    expect(requests.some((request) => request.startsWith('PUT '))).toBe(false)
+    expect(shell.unreadCountForChannel('channel-general')).toBe(1)
+    observers.at(-1)!.notify()
+    await vi.waitFor(() => expect(shell.presence.readMarkers['channel-general']?.lastReadSequence).toBe(7))
+    expect(shell.unreadCountForChannel('channel-general')).toBe(0)
+    expect(wrapper.get('[data-testid="chat-viewport"]').exists()).toBe(true)
+  })
+
   it('switches locale and theme from JSON-backed user preferences', async () => {
     const wrapper = await mountSuspended(App)
 
@@ -403,6 +554,33 @@ describe('Discord app shell', () => {
     expect(String(calls[0].input)).toContain('/api/users/@me/guilds')
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer access-token')
     expect(shell.apiError).toBeNull()
+  })
+
+  it('opens a mention channel from another authenticated guild', async () => {
+    await mountSuspended(App)
+    const shell = useShellStore()
+    shell.$reset()
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.endsWith('/api/users/@me/guilds')) {
+        return jsonResponse({ guilds: [
+          { id: 'first-guild', name: 'First', ownerId: 'user-1', channels: [
+            { id: 'first-channel', name: 'first', type: 'GUILD_TEXT', parentId: null }
+          ] },
+          { id: 'other-guild', name: 'Other', ownerId: 'user-1', channels: [
+            { id: 'other-channel', name: 'other', type: 'GUILD_TEXT', parentId: null }
+          ] }
+        ] })
+      }
+      if (path.includes('/api/channels/other-channel/messages')) return jsonResponse({ messages: [], nextCursor: null })
+      if (path.endsWith('/api/presence/channels/other-channel/read')) return jsonResponse({ lastReadSequence: 0 })
+      return jsonResponse({}, 404)
+    })
+
+    await shell.selectBackendChannel('other-channel', 'access-token')
+
+    expect(shell.guild).toEqual({ id: 'other-guild', name: 'Other' })
+    expect(shell.activeChannelId).toBe('other-channel')
   })
 
   it('loads active channel messages after authenticated shell bootstrap', async () => {

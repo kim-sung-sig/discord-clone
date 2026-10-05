@@ -256,6 +256,19 @@ class JdbcMessageStore implements
     }
 
     @Override
+    public long sequenceOf(UUID messageId) {
+        try (Connection connection = dataSource.getConnection()) {
+            Long sequence = existingSequence(connection, messageId);
+            if (sequence == null) {
+                throw new MessageNotFoundException();
+            }
+            return sequence;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to read message sequence", exception);
+        }
+    }
+
+    @Override
     public List<MessageReadModel> searchModels(ChannelMessageTarget target, String query, int limit) {
         Objects.requireNonNull(target, "target must not be null");
         String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
@@ -264,7 +277,8 @@ class JdbcMessageStore implements
         }
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement("""
-                 SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+                 SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at,
+                        (SELECT sequence FROM messages WHERE id = message_id) AS sequence
                  FROM message_read_projection
                  WHERE guild_id = ?
                    AND channel_id = ?
@@ -361,6 +375,7 @@ class JdbcMessageStore implements
             messageId,
             resultSet.getObject("guild_id", UUID.class),
             resultSet.getObject("channel_id", UUID.class),
+            resultSet.getLong("sequence"),
             resultSet.getObject("author_id", UUID.class),
             resultSet.getString("content"),
             mentionTokensFrom(resultSet),
@@ -421,7 +436,8 @@ class JdbcMessageStore implements
     ) throws SQLException {
         if (before == null) {
             try (var statement = connection.prepareStatement("""
-                SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+                SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at,
+                       (SELECT sequence FROM messages WHERE id = message_id) AS sequence
                 FROM message_read_projection
                 WHERE guild_id = ?
                   AND channel_id = ?
@@ -436,7 +452,8 @@ class JdbcMessageStore implements
         }
 
         try (var statement = connection.prepareStatement("""
-            SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at
+            SELECT message_id, guild_id, channel_id, author_id, content, mention_tokens, pinned, deleted, edited, created_at, updated_at,
+                   (SELECT sequence FROM messages WHERE id = message_id) AS sequence
             FROM message_read_projection
             WHERE guild_id = ?
               AND channel_id = ?

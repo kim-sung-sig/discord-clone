@@ -69,6 +69,12 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isOk());
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(0));
+        mvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"channel unread\",\"idempotencyKey\":\"t43-channel-unread\"}"))
+            .andExpect(status().isCreated());
+        mvc.perform(get("/api/notifications/channel-unread").header("Authorization", member.bearer()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$['" + channelId + "']").value(1));
         mvc.perform(get("/api/presence/channels/{channelId}/read", channelId)
                 .header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.lastReadSequence").value(0));
@@ -105,6 +111,10 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$[0].content").value("persistent hello"));
         mvc.perform(get("/api/social/dms/{targetUserId}/messages", owner.userId()))
             .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/notifications").header("Authorization", member.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].kind").value("DM"))
+            .andExpect(jsonPath("$[0].targetUserId").value(owner.userId()));
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(1));
         mvc.perform(put("/api/social/dms/{targetUserId}/read", owner.userId())

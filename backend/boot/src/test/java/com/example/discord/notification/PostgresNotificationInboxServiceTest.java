@@ -1,6 +1,7 @@
 package com.example.discord.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.discord.channel.ChannelType;
 import java.sql.Timestamp;
@@ -81,6 +82,20 @@ class PostgresNotificationInboxServiceTest {
     }
 
     @Test
+    void mentionProjectionRollsBackAllRecipientsWhenOneInsertFails() throws Exception {
+        Set<UUID> recipientIds = Set.of(UUID.randomUUID(), UUID.randomUUID());
+        MentionNotificationCommand command = new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, UUID.randomUUID(), 1L, AUTHOR_ID,
+            recipientIds, recipientIds, "mention"
+        );
+        UUID firstRecipient = command.mentionedUserIds().iterator().next();
+        insertUser(firstRecipient, "first_recipient");
+
+        assertThatThrownBy(() -> service.recordMention(command)).isInstanceOf(IllegalStateException.class);
+        assertThat(service.inbox(firstRecipient)).isEmpty();
+    }
+
+    @Test
     void preferenceSuppressesNewMentionItems() {
         service.updatePreferences(VISIBLE_USER_ID, new NotificationPreferences(false, true, true));
 
@@ -141,6 +156,22 @@ class PostgresNotificationInboxServiceTest {
         assertThat(second.get(0).id()).isNotEqualTo(first.get(0).id());
         assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isEqualTo(2);
         assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of(CHANNEL_ID))).isEqualTo(3);
+    }
+
+    @Test
+    void fillsPageWhenNewestNotificationIsFromHiddenChannel() {
+        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "visible dm");
+        JdbcNotificationInboxService later = new JdbcNotificationInboxService(
+            dataSource, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC)
+        );
+        later.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, UUID.randomUUID(), 2L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "hidden mention"
+        ));
+
+        assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 1))
+            .hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isEqualTo(1);
     }
 
     @Test
