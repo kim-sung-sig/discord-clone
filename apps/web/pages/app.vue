@@ -31,12 +31,15 @@ const searchQuery = ref('')
 const backendDmDraft = ref('')
 const backendDmSection = ref<HTMLElement | null>(null)
 let backendDmReadObserver: IntersectionObserver | null = null
-let backendDmReadPending = false
+let backendDmReadGeneration = 0
 const browserNotificationsEnabled = ref(false)
 const browserNotificationPermission = ref<NotificationPermission | 'unsupported'>('unsupported')
 const seenNotificationIds = new Set<string>()
 let notificationPollTimer: number | null = null
 let notificationPollingGeneration = 0
+let notificationPollingPending = false
+let notificationWatermark = 0
+let mounted = true
 const mobileShellReady = ref(false)
 const platformSurface = ref<'web-desktop' | 'pwa-mobile'>('web-desktop')
 const mobilePanes = computed<Array<{ id: MobilePane, label: string }>>(() => [
@@ -150,7 +153,9 @@ async function sendBackendDm() {
   if (!auth.accessToken || !shell.backendDmTargetUserId) {
     return
   }
-  if (await shell.sendBackendDm(shell.backendDmTargetUserId, backendDmDraft.value, auth.accessToken)) {
+  const generation = shell.accountGeneration
+  if (await shell.sendBackendDm(shell.backendDmTargetUserId, backendDmDraft.value, auth.accessToken)
+      && generation === shell.accountGeneration) {
     backendDmDraft.value = ''
   }
 }
@@ -167,63 +172,84 @@ async function enableBrowserNotifications() {
 }
 
 async function pollBackendNotifications() {
-  if (!auth.accessToken || document.visibilityState !== 'hidden' || !browserNotificationsEnabled.value
+  if (!mounted || notificationPollingPending || !auth.accessToken || document.visibilityState !== 'hidden' || !browserNotificationsEnabled.value
       || !('Notification' in window) || Notification.permission !== 'granted') {
     return
   }
   const token = auth.accessToken
   const generation = notificationPollingGeneration
-  const items = await shell.loadBackendNotifications(token)
-  if (!items || generation !== notificationPollingGeneration || auth.accessToken !== token
-      || document.visibilityState !== 'hidden') {
-    return
-  }
-  let page = items
-  while (page.length === 50 && !page.some((item) => seenNotificationIds.has(item.id))) {
-    const older = await shell.loadBackendNotificationPage(token, page[page.length - 1]!.id)
-    if (!older || generation !== notificationPollingGeneration || auth.accessToken !== token
+  const accountGeneration = shell.accountGeneration
+  notificationPollingPending = true
+  try {
+    const firstPage = await shell.loadBackendNotifications(token)
+    if (!firstPage || generation !== notificationPollingGeneration || auth.accessToken !== token
         || document.visibilityState !== 'hidden') {
       return
     }
-    items.push(...older)
-    page = older
-  }
-  for (const item of items) {
-    if (!seenNotificationIds.has(item.id) && !item.read) {
-      const notice = new Notification(`${item.kind} · ${item.summary}`, { body: '', tag: item.id })
-      notice.onclick = () => {
-        window.focus()
-        void openBackendNotification(item)
-        notice.close()
+    const items = [...firstPage]
+    let page = items
+    // ponytail: at most 500 items per poll; use a server delta cursor if volume exceeds this window.
+    let pages = 1
+    while (pages++ < 10 && page.length === 50 && !page.some((item) => seenNotificationIds.has(item.id) || Date.parse(item.createdAt) < notificationWatermark)) {
+      const older = await shell.loadBackendNotificationPage(token, page[page.length - 1]!.id)
+      if (!older || generation !== notificationPollingGeneration || auth.accessToken !== token
+          || document.visibilityState !== 'hidden') {
+        return
       }
+      items.push(...older)
+      page = older
     }
-    seenNotificationIds.add(item.id)
+    for (const item of items) {
+      if (!seenNotificationIds.has(item.id) && !item.read && Date.parse(item.createdAt) >= notificationWatermark) {
+        const notice = new Notification(`${item.kind} · ${item.summary}`, { body: '', tag: item.id })
+        notice.onclick = () => {
+          if (!mounted || accountGeneration !== shell.accountGeneration || !auth.accessToken) {
+            notice.close()
+            return
+          }
+          window.focus()
+          void openBackendNotification(item)
+          notice.close()
+        }
+      }
+      seenNotificationIds.add(item.id)
+    }
+    notificationWatermark = Math.max(notificationWatermark, ...items.map((item) => Date.parse(item.createdAt)).filter(Number.isFinite))
+    while (seenNotificationIds.size > 1_000) seenNotificationIds.delete(seenNotificationIds.values().next().value!)
+  } finally {
+    if (generation === notificationPollingGeneration) notificationPollingPending = false
   }
 }
 
 async function syncBrowserNotificationPolling() {
   const generation = ++notificationPollingGeneration
+  notificationPollingPending = false
   if (notificationPollTimer !== null) {
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = null
   }
   browserNotificationPermission.value = 'Notification' in window ? Notification.permission : 'unsupported'
-  if (!browserNotificationsEnabled.value || browserNotificationPermission.value !== 'granted'
+  if (!mounted || !browserNotificationsEnabled.value || browserNotificationPermission.value !== 'granted'
       || !auth.accessToken || document.visibilityState !== 'hidden') {
     return
   }
-  const items = await shell.loadBackendNotifications(auth.accessToken)
-  if (!items || generation !== notificationPollingGeneration || document.visibilityState !== 'hidden' || !auth.accessToken) {
+  const token = auth.accessToken
+  const baselineTime = Date.now()
+  const items = await shell.loadBackendNotifications(token)
+  if (!items || generation !== notificationPollingGeneration || document.visibilityState !== 'hidden' || auth.accessToken !== token) {
     return
   }
   seenNotificationIds.clear()
   items.forEach((item) => seenNotificationIds.add(item.id))
+  notificationWatermark = items.length ? Math.max(...items.map((item) => Date.parse(item.createdAt)).filter(Number.isFinite), 0) : baselineTime
   notificationPollTimer = window.setInterval(() => { void pollBackendNotifications() }, 10_000)
 }
 
-watch(() => [shell.backendDmTargetUserId, shell.backendDmMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, activeWorkbenchView.value, shell.backendDmTargetUserId, shell.backendDmMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+  const generation = ++backendDmReadGeneration
   backendDmReadObserver?.disconnect()
-  if (!auth.accessToken || !shell.backendDmTargetUserId || typeof IntersectionObserver === 'undefined') {
+  backendDmReadObserver = null
+  if (!mounted || activeWorkbenchView.value !== 'inbox' || !auth.accessToken || !shell.backendDmTargetUserId || typeof IntersectionObserver === 'undefined') {
     return
   }
   const targetUserId = shell.backendDmTargetUserId
@@ -234,24 +260,28 @@ watch(() => [shell.backendDmTargetUserId, shell.backendDmMessages.map((message) 
     return
   }
   await nextTick()
+  if (!mounted || generation !== backendDmReadGeneration) return
   const element = Array.from(backendDmSection.value?.querySelectorAll<HTMLElement>('[data-dm-message-id]') ?? [])
     .find((candidate) => candidate.dataset.dmMessageId === latest.id)
   if (!element) {
     return
   }
-  backendDmReadObserver = new IntersectionObserver(async (entries) => {
-    if (!entries.some((entry) => entry.isIntersecting) || backendDmReadPending || !auth.accessToken
+  let pending = false
+  const observer = new IntersectionObserver(async (entries) => {
+    if (generation !== backendDmReadGeneration || document.visibilityState === 'hidden'
+        || !entries.some((entry) => entry.isIntersecting) || pending || !auth.accessToken
         || shell.backendDmTargetUserId !== targetUserId) {
       return
     }
-    backendDmReadPending = true
+    pending = true
     const saved = await shell.markBackendDmRead(targetUserId, latest.sequence, auth.accessToken)
-    backendDmReadPending = false
+    pending = false
     if (saved) {
-      backendDmReadObserver?.disconnect()
+      observer.disconnect()
     }
   })
-  backendDmReadObserver.observe(element)
+  backendDmReadObserver = observer
+  observer.observe(element)
 }, { flush: 'post' })
 
 function openInboxChannel(channelId: string) {
@@ -320,9 +350,22 @@ onMounted(() => {
 })
 
 watch(() => preferences.themeId, () => preferences.applyTheme(), { immediate: true })
-watch(() => auth.accessToken, () => { void syncBrowserNotificationPolling() })
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration], () => { void syncBrowserNotificationPolling() })
+watch(() => [auth.accessToken, auth.user?.id] as const, ([token, userId], [oldToken, oldUserId]) => {
+  if (userId !== oldUserId || (token !== oldToken && (!userId || !auth.isApplyingSession)) || !token) {
+    shell.resetAccountState()
+    backendDmDraft.value = ''
+    seenNotificationIds.clear()
+    ++notificationPollingGeneration
+    ++backendDmReadGeneration
+    backendDmReadObserver?.disconnect()
+  }
+}, { flush: 'sync' })
 
 onBeforeUnmount(() => {
+  mounted = false
+  ++notificationPollingGeneration
+  ++backendDmReadGeneration
   window.removeEventListener('resize', updatePlatformSurface)
   document.removeEventListener('visibilitychange', syncBrowserNotificationPolling)
   if (notificationPollTimer !== null) {

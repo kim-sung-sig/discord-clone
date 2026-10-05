@@ -129,6 +129,23 @@ class PostgresServerEventServiceTest {
             .hasMessage("event end must be after start");
     }
 
+    @Test
+    void notificationFailureRollsBackCreateAndCancelWithTheirSignals() {
+        var failing = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC),
+            event -> Set.of(UUID.randomUUID()));
+        assertThatThrownBy(() -> failing.createEvent(command(STAGE_CHANNEL_ID), true))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(service.visibleEvents(GUILD_ID, Set.of(STAGE_CHANNEL_ID))).isEmpty();
+        assertThat(service.signals()).isEmpty();
+
+        ServerEvent event = service.createEvent(command(STAGE_CHANNEL_ID), true);
+        assertThatThrownBy(() -> failing.cancelEvent(GUILD_ID, event.id(), CREATOR_ID, "must roll back"))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(service.event(GUILD_ID, event.id()).status()).isEqualTo(ServerEventStatus.SCHEDULED);
+        assertThat(service.signals()).extracting(ServerEventSignal::type)
+            .containsExactly(ServerEventSignalType.EVENT_CREATED);
+    }
+
     private static CreateServerEventCommand command(UUID channelId) {
         return new CreateServerEventCommand(
             GUILD_ID,

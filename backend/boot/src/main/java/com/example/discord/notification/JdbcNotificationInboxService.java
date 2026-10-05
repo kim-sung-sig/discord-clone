@@ -134,7 +134,16 @@ class JdbcNotificationInboxService {
             try (var statement = connection.prepareStatement("""
                 SELECT id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at
                 FROM notification_items
-                WHERE user_id = ? AND (guild_id IS NULL OR channel_id = ANY(?))
+                WHERE user_id = ? AND ((guild_id IS NOT NULL AND channel_id = ANY(?)) OR (kind = 'DM' AND EXISTS (
+                    SELECT 1 FROM dm_channels dm
+                    WHERE dm.id = notification_items.channel_id
+                      AND notification_items.user_id IN (dm.first_user_id, dm.second_user_id)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM social_blocks block
+                          WHERE (block.blocker_id = dm.first_user_id AND block.blocked_id = dm.second_user_id)
+                             OR (block.blocker_id = dm.second_user_id AND block.blocked_id = dm.first_user_id)
+                      )
+                )))
                   AND (?::timestamptz IS NULL OR (created_at, id) < (?::timestamptz, ?::uuid))
                 ORDER BY created_at DESC, id DESC LIMIT ?
                 """)) {
@@ -210,7 +219,17 @@ class JdbcNotificationInboxService {
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement("""
                  SELECT COUNT(*) FROM notification_items
-                 WHERE user_id = ? AND read = FALSE AND (guild_id IS NULL OR channel_id = ANY(?))
+                 WHERE user_id = ? AND read = FALSE
+                   AND ((guild_id IS NOT NULL AND channel_id = ANY(?)) OR (kind = 'DM' AND EXISTS (
+                       SELECT 1 FROM dm_channels dm
+                       WHERE dm.id = notification_items.channel_id
+                         AND notification_items.user_id IN (dm.first_user_id, dm.second_user_id)
+                         AND NOT EXISTS (
+                             SELECT 1 FROM social_blocks block
+                             WHERE (block.blocker_id = dm.first_user_id AND block.blocked_id = dm.second_user_id)
+                                OR (block.blocker_id = dm.second_user_id AND block.blocked_id = dm.first_user_id)
+                         )
+                   )))
                  """)) {
             statement.setObject(1, userId);
             statement.setArray(2, connection.createArrayOf("uuid", visibleChannelIds.toArray()));

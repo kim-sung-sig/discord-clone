@@ -52,6 +52,7 @@ class PostgresInviteServiceTest {
             statement.executeUpdate("DELETE FROM channels");
             statement.executeUpdate("DELETE FROM guild_roles");
             statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM premium_entitlements");
             statement.executeUpdate("DELETE FROM guilds");
             statement.executeUpdate("DELETE FROM auth_accounts");
             statement.executeUpdate("DELETE FROM users");

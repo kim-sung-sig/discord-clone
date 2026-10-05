@@ -109,18 +109,40 @@ test('clears a channel unread badge after selecting the channel', async ({ page 
 })
 
 test('opens notification inbox and jumps to unread channel work', async ({ page }) => {
+  let lastReadSequence = 0
   await page.route('**/api/auth/refresh', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ accessToken: 'inbox-e2e-access-token' })
+      body: JSON.stringify({ accessToken: 'inbox-e2e-access-token',
+        user: { id: 'viewer-id', username: 'viewer', displayName: 'Viewer' } })
     })
+  })
+  await page.route('**/api/users/@me/guilds', async (route) => {
+    await route.fulfill({ json: { guilds: [{ id: 'guild-e2e', name: 'Inbox guild', ownerId: 'viewer-id',
+      channels: ['general', 'architecture'].map((name) => ({
+        id: `channel-${name}`, name, type: 'GUILD_TEXT', parentId: null
+      })) }] } })
+  })
+  await page.route('**/api/channels/*/messages**', async (route) => {
+    const architecture = new URL(route.request().url()).pathname.includes('channel-architecture')
+    await route.fulfill({ json: { messages: architecture ? [{ id: 'message-architecture-notes',
+      channelId: 'channel-architecture', sequence: 1, authorId: 'author-id', content: 'Architecture notes',
+      mentions: ['viewer-id'], pinned: false, deleted: false, edited: false,
+      createdAt: '2026-10-05T10:00:00Z', updatedAt: '2026-10-05T10:00:00Z' }] : [], nextCursor: null } })
+  })
+  await page.route('**/api/presence/channels/*/read', async (route) => {
+    if (route.request().method() === 'PUT') lastReadSequence = route.request().postDataJSON().lastReadSequence
+    await route.fulfill({ json: { lastReadSequence } })
   })
   await page.route('**/api/notifications**', async (route) => {
     const path = new URL(route.request().url()).pathname
-    const body = path.endsWith('/unread-count') ? { unreadCount: 1 }
-      : path.endsWith('/channel-unread') ? {}
-        : [{ id: 'dm-e2e', channelId: 'dm-channel', sourceId: 'dm-message', sequence: 1,
+    const body = path.endsWith('/unread-count') ? { unreadCount: lastReadSequence ? 1 : 2 }
+      : path.endsWith('/channel-unread') ? { 'channel-architecture': lastReadSequence ? 0 : 1 }
+        : [{ id: 'mention-e2e', guildId: 'guild-e2e', channelId: 'channel-architecture',
+          sourceId: 'message-architecture-notes', sequence: 1, kind: 'MENTION', summary: 'Architecture mention',
+          read: lastReadSequence > 0 },
+        { id: 'dm-e2e', channelId: 'dm-channel', sourceId: 'dm-message', sequence: 1,
           kind: 'DM', summary: 'New direct message', read: false, targetUserId: 'friend-id' }]
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
   })

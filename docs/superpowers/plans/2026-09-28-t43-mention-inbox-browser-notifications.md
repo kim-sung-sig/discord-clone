@@ -10,7 +10,9 @@
 
 ---
 
-**Approval Status:** 설계가 멘션에서 DM·서버 일정까지 확장되었으므로 이전 설계 승인 SHA `2b31191`은 현 설계의 승인 근거가 아니다. 사용자의 직접 구현 지시에 따라 작업을 시작했지만, 확장된 설계와 이 계획의 동일 revision 재검수·승인은 아직 완료되지 않았다. 따라서 검증·리뷰 gate를 통과하기 전에는 커밋·푸시·병합하지 않는다.
+**Approval Status: Approved.** 사용자 2026-10-05 개선 및 MR 지시를 근거로 아래 승인된 개선 절을 적용한다. 독립 계획 검수는 96/100, P0/P1 0으로 통과했다. 구현 스펙·품질/보안 검수와 검증은 각각 별도 게이트다.
+
+**이전 승인 이력:** 멘션에서 DM·서버 일정까지 확장된 뒤 이전 승인 SHA `2b31191`을 승인 근거로 사용하지 않았다. 확대 범위의 재검수가 끝나기 전 작업 보존 WIP 커밋만 사용자 요청으로 생성했다.
 
 **2026-10-05 작업 보존 예외:** 사용자가 현재 미커밋 변경의 커밋을 명시적으로 요청했다. 현재 T43 변경은 로컬 WIP 커밋으로 보존하며, 이 요청은 설계·구현 승인이나 푸시·병합 gate 통과를 뜻하지 않는다. `./gradlew test checkstyleMain checkstyleTest`, 웹 테스트(143 통과·8 skip), 웹 build, OpenAPI 검사, frontend lint는 성공했다. PostgreSQL 집중 테스트 18개는 `127.0.0.1:15432` 연결 거부로 실패했다. 독립 리뷰에서 차단 후 DM 조회·읽음 허용과 로그아웃·계정 변경 후 이전 사용자 알림/DM 상태 잔존을 발견했다. 두 결함 수정, 실제 DB 검증, 새 독립 리뷰 및 `docs/03-analysis/task_T43-merge-review.md`의 승인 근거가 필요하다.
 
@@ -240,3 +242,103 @@ if (enabled && Notification.permission === 'granted' && document.visibilityState
 - 구현 착수 전 사용자 계획 승인과 프로젝트 blueprint 승인 상태를 확인한다.
 - `backend/AGENTS.md`와 `.agents/rules/backend/{architecture,logging}.md`를 구현 시작 시 읽는다.
 - Wiki used: `index.md`, `wiki/Agent Development Guide.md`, `wiki/Backend Architecture.md`, `wiki/Frontend Client Architecture.md`, `wiki/QA Infra Operations.md`, `wiki/Current Roadmap And Risks.md`.
+
+## 2026-10-05 승인된 개선 및 MR 게이트
+
+### Approval Gate
+- Status: Approved
+- Approver: 사용자 (2026-10-05, 개선 진행 및 MR 요청, 각 리뷰 90점 이상·P0/P1 전부 해결)
+- Blocking ambiguity: 없음. 원래 T43 제품 범위와 아래 보완을 대상으로 한다.
+- 앞의 작업 보존 기록은 이전 revision의 결과이며 현재 승인/검증 결과를 대체하지 않는다.
+
+### 결함과 최소 수정
+1. DM: 모든 조회·읽음·전송 경로에서 기존 `requireNotBlocked`를 사용한다. 차단 방향에 관계없이 차단 후 양쪽 사용자 요청을 403으로 거부한다. Inbox 페이지·unread도 차단된 DM을 제외한다.
+2. 사용자 경계: 로그아웃 및 계정 전환 시 서버 workspace/메시지/알림/DM/읽음/일정 상태를 초기화한다. 이전 사용자 요청의 지연 응답은 현재 상태를 덮어쓰지 못한다. 토큰 갱신과 계정 전환을 구별하되 인증 주체를 확정할 수 없으면 안전하게 초기화한다.
+3. 읽음 observer: 각 observer가 자체 pending 상태와 수명을 소유한다. 이전 채널/DM 요청이 새로운 observer를 해제할 수 없다. DOM 갱신·계정 전환·unmount 후 stale callback을 무효화한다. 숨긴 탭에서 읽음 처리하지 않는다.
+4. 브라우저 polling: unmount/로그아웃/계정 전환 때 generation을 증가시켜 지연 응답·알림 클릭을 무효화한다. interval 요청 중첩과 과거 알림 재표시를 회귀 테스트로 검사한다.
+5. 검증: 기존 Docker/로컬 PostgreSQL 실행 수단을 재사용하고, 새 schema/dependency 없이 실제 DB rollback·가시성·재생성·단조 읽음 경계를 검사한다.
+
+### 참여 경계
+- `SocialController → JdbcDirectMessageService → requireNotBlocked`: 인증 주체 기반 1:1 DM 정책.
+- `NotificationController → JdbcNotificationInboxService`: 현재 가시성·차단 정책을 적용한 bounded 페이지와 별도 unread.
+- `auth store → shell store → App/ChatViewport`: 사용자 경계 초기화, 요청 generation 및 observer lifecycle.
+- 위 class/sequence diagram과 이 절의 수정 항목이 합쳐져 이번 구현 blueprint를 구성한다.
+
+### Expected Changed Files — 전체 MR 기준
+아래 목록은 `origin/main...reviewed-content` 전체 변경 파일의 정확한 허용 목록이다. 변경하지 않는 기존 파일도 기존 T43 커밋 범위 검수에 포함한다. `docs/03-analysis/task_T43-merge-review.md`는 별도 evidence commit으로만 추가한다.
+
+- `apps/web/components/shell/ChannelSidebar.vue`
+- `apps/web/components/shell/ChatViewport.vue`
+- `apps/web/locales/en-US.json`
+- `apps/web/locales/ko-KR.json`
+- `apps/web/pages/app.vue`
+- `apps/web/services/discord-api.ts`
+- `apps/web/stores/auth.ts`
+- `apps/web/stores/shell.ts`
+- `apps/web/tests/components/app-shell.test.ts`
+- `apps/web/tests/components/shell-contracts.test.ts`
+- `apps/web/tests/e2e/app-shell.spec.ts`
+- `backend/boot/src/main/java/com/example/discord/event/JdbcServerEventService.java`
+- `backend/boot/src/main/java/com/example/discord/event/ServerEventController.java`
+- `backend/boot/src/main/java/com/example/discord/event/ServerEventRecipientResolver.java`
+- `backend/boot/src/main/java/com/example/discord/message/JdbcMessageStore.java`
+- `backend/boot/src/main/java/com/example/discord/message/MessageConfiguration.java`
+- `backend/boot/src/main/java/com/example/discord/message/MessageController.java`
+- `backend/boot/src/main/java/com/example/discord/notification/JdbcNotificationInboxService.java`
+- `backend/boot/src/main/java/com/example/discord/notification/KafkaMessageMentionConsumer.java`
+- `backend/boot/src/main/java/com/example/discord/notification/MessageMentionProjector.java`
+- `backend/boot/src/main/java/com/example/discord/notification/MessageMentionRecipientResolver.java`
+- `backend/boot/src/main/java/com/example/discord/notification/NotificationController.java`
+- `backend/boot/src/main/java/com/example/discord/notification/NotificationProjectionConfiguration.java`
+- `backend/boot/src/main/java/com/example/discord/presence/JdbcChannelReadService.java`
+- `backend/boot/src/main/java/com/example/discord/presence/PresenceController.java`
+- `backend/boot/src/main/java/com/example/discord/social/JdbcDirectMessageService.java`
+- `backend/boot/src/main/java/com/example/discord/social/SocialController.java`
+- `backend/boot/src/main/resources/db/migration/V18__channel_read_markers.sql`
+- `backend/boot/src/main/resources/db/migration/V19__direct_messages.sql`
+- `backend/boot/src/main/resources/db/migration/V20__direct_message_sender_delete.sql`
+- `backend/boot/src/test/java/com/example/discord/event/PostgresServerEventServiceTest.java`
+- `backend/boot/src/test/java/com/example/discord/guild/PostgresGuildServiceTest.java`
+- `backend/boot/src/test/java/com/example/discord/invite/PostgresInviteServiceTest.java`
+- `backend/boot/src/test/java/com/example/discord/message/JdbcMessageStoreTest.java`
+- `backend/boot/src/test/java/com/example/discord/message/MessageConfigurationTest.java`
+- `backend/boot/src/test/java/com/example/discord/message/MessageControllerTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/KafkaMessageMentionConsumerTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/MessageMentionProjectorTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/MessageMentionRecipientResolverTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/NotificationProjectionConfigurationTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/PostgresNotificationFlowControllerTest.java`
+- `backend/boot/src/test/java/com/example/discord/notification/PostgresNotificationInboxServiceTest.java`
+- `backend/boot/src/test/java/com/example/discord/presence/PostgresChannelReadServiceTest.java`
+- `backend/boot/src/test/java/com/example/discord/social/PostgresDirectMessageServiceTest.java`
+- `backend/modules/message/src/main/java/com/example/discord/message/ChannelMessageReadModelPort.java`
+- `backend/modules/message/src/main/java/com/example/discord/message/InMemoryMessageService.java`
+- `backend/modules/message/src/main/java/com/example/discord/message/MessageReadModel.java`
+- `backend/modules/message/src/test/java/com/example/discord/message/ChannelMessageQueryServiceTest.java`
+- `backend/modules/notification/src/main/java/com/example/discord/notification/MentionNotificationCommand.java`
+- `backend/services/message/src/test/java/com/example/discord/messageservice/JdbcMessagePublicationOutboxPostgresTest.java`
+- `docs/api/openapi.json`
+- `docs/superpowers/plans/2026-09-28-t43-mention-inbox-browser-notifications.md`
+- `docs/superpowers/plans/2026-09-29-t43-design2-persistence.md`
+- `docs/superpowers/plans/2026-09-29-t43-mention-projection-slice.md`
+- `docs/superpowers/specs/2026-09-28-t43-mention-inbox-browser-notifications-design.md`
+- `packages/api-client/src/generated/openapi-types.ts`
+- `qa/openapi-contract.mjs`
+- `qa/openapi-contract.test.mjs`
+
+### Verification Gates
+- 별도 message-service outbox PostgreSQL adapter 테스트는 DB claim/ACK 기록/retry/DLQ만 검사한다. 실제 DataSource/JdbcTemplate/Flyway와 기존 adapter를 직접 구성해 테스트 전용 schema에서 검증하며, Kafka와 Spring runtime 기동은 별도 opt-in smoke의 책임이다. broker 전달 성공을 이 테스트의 근거로 주장하지 않는다.
+- 실제 전체 PostgreSQL 실행에서 위 세 fixture가 `premium_entitlements`를 남긴 채 부모 길드를 삭제해 FK 오류를 일으켰다. 기존 다른 fixture의 정리 순서를 재사용해 자식 행을 먼저 정리한다. 운영 schema나 데이터 삭제 동작은 변경하지 않는다.
+- RED/GREEN: 실제 PostgreSQL에서 차단 후 양방향 GET messages·GET/PUT read와 Inbox 노출 회귀, DM/일정 원자 rollback·설정 억제, 웹 계정 전환·지연 응답·observer 전환·unmount 회귀.
+- `./gradlew --version`, `./gradlew test checkstyleMain checkstyleTest`.
+- `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test` (환경 기반 PostgreSQL 테스트가 skip 없이 성공; PostgreSQL 외 별도 opt-in은 구분 기록).
+- `npm run test -w apps/web -- --run`, `npm run build -w apps/web`, `npm run openapi:check`, `npm run lint:frontend`.
+- `npm run e2e -- app-shell.spec.ts --grep notification` (격리 포트), `pwsh qa/migration-guard.contract.ps1`, `git diff --check`.
+- 전체 SHA 고정 후 독립 spec review → 독립 quality/security review 각각 90/100 이상, P0/P1 0. Evidence artifact도 별도 독립 검수한다.
+- base origin/main SHA와 reviewed content SHA 및 모든 검증 대상 SHA를 일치시킨다. 마지막 evidence commit은 merge-review 파일만 포함한다.
+- gate 통과 후 feature branch push 및 main 대상 PR(MR)을 생성한다. 이번 요청은 main merge를 포함하지 않는다.
+
+### Review Score Preset
+- 스펙: Implementation Review, alignment 20 / correctness 20 / security 15 / verification 20 / maintainability 15 / operations-docs 10.
+- 품질·보안: Security Review, threat 20 / access 20 / exposure 15 / regression 20 / operational 15 / config 10. Java 경계는 Principal Java 8항목도 대조한다.
+- 두 리뷰 모두 90/100 이상·P0/P1 없음. 점수와 각 차감의 근거를 기록한다.

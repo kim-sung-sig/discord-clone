@@ -114,7 +114,7 @@ class PostgresNotificationFlowControllerTest {
         mvc.perform(get("/api/notifications").header("Authorization", member.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].kind").value("DM"))
-            .andExpect(jsonPath("$[0].targetUserId").value(owner.userId()));
+            .andExpect(jsonPath("$[0].targetUserId").value(owner.userId().toString()));
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(1));
         mvc.perform(put("/api/social/dms/{targetUserId}/read", owner.userId())
@@ -123,6 +123,22 @@ class PostgresNotificationFlowControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.lastReadSequence").value(1));
         mvc.perform(get("/api/notifications/unread-count").header("Authorization", member.bearer()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(0));
+        mvc.perform(put("/api/social/blocks/{userId}", owner.userId()).header("Authorization", member.bearer()))
+            .andExpect(status().isNoContent());
+        for (Session[] pair : new Session[][] {{owner, member}, {member, owner}}) {
+            mvc.perform(get("/api/social/dms/{targetUserId}/messages", pair[1].userId())
+                    .header("Authorization", pair[0].bearer()))
+                .andExpect(status().isForbidden());
+            mvc.perform(get("/api/social/dms/{targetUserId}/read", pair[1].userId())
+                    .header("Authorization", pair[0].bearer()))
+                .andExpect(status().isForbidden());
+            mvc.perform(put("/api/social/dms/{targetUserId}/read", pair[1].userId())
+                    .header("Authorization", pair[0].bearer()).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"lastReadSequence\":1}"))
+                .andExpect(status().isForbidden());
+        }
+        mvc.perform(get("/api/notifications").header("Authorization", member.bearer()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.kind == 'DM')]").isEmpty());
     }
 
     private static String eventRequest(String channelId) {

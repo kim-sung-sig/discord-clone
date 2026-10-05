@@ -1,4 +1,5 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../../pages/app.vue'
@@ -10,10 +11,114 @@ import {
   toShellGatewayEvent
 } from '../../services/gateway-client'
 import { useShellStore } from '../../stores/shell'
+import { useAuthStore } from '../../stores/auth'
+
+enableAutoUnmount(afterEach)
 
 describe('Discord shell API and Gateway contracts', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    useAuthStore().$reset()
+    useShellStore().$reset()
+  })
+
+  it('clears account data immediately on logout and rejects delayed workspace responses', async () => {
+    await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.$patch({ accessToken: 'old-token', user: { id: 'old-user', username: 'old', displayName: 'Old' } })
+    shell.backendWorkspace = true
+    shell.backendDmTargetUserId = 'old-friend'
+    shell.backendDmMessages = [{ id: 'old-dm', sequence: 1, senderId: 'old-friend', content: 'private' }]
+    let resolvePage!: (response: Response) => void
+    let resolveLogout!: (response: Response) => void
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/auth/logout')) return new Promise<Response>((resolve) => { resolveLogout = resolve })
+      return new Promise<Response>((resolve) => { resolvePage = resolve })
+    })
+    const page = shell.resyncChannelMessages('channel-general', 'old-token')
+    const logout = auth.logout()
+    expect(auth.accessToken).toBeNull()
+    expect(shell.backendDmTargetUserId).toBeNull()
+    expect(shell.backendDmMessages).toEqual([])
+    expect(shell.messages).toEqual([])
+    resolvePage(new Response(JSON.stringify({ messages: [{ id: 'leaked', channelId: 'channel-general', content: 'private' }], nextCursor: null })))
+    await expect(page).resolves.toBeNull()
+    expect(shell.messages).toEqual([])
+    expect(shell.apiError).toBeNull()
+    resolveLogout(new Response(null, { status: 204 }))
+    await logout
+  })
+
+  it('ignores a refresh response after logout and old session responses after login', async () => {
+    const auth = useAuthStore()
+    auth.$reset()
+    let resolveRefresh!: (response: Response) => void
+    let resolveSessions!: (response: Response) => void
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.endsWith('/refresh')) return new Promise<Response>((resolve) => { resolveRefresh = resolve })
+      if (path.endsWith('/sessions')) return new Promise<Response>((resolve) => { resolveSessions = resolve })
+      if (path.endsWith('/login')) return Promise.resolve(new Response(JSON.stringify({ accessToken: 'new-token', user: { id: 'new-user', username: 'new', displayName: 'New' } })))
+      return Promise.resolve(new Response(null, { status: 204 }))
+    })
+    const restore = auth.restoreSession()
+    await auth.logout()
+    resolveRefresh(new Response(JSON.stringify({ accessToken: 'old-token', user: { id: 'old-user' } })))
+    await expect(restore).resolves.toBe(false)
+    expect(auth.accessToken).toBeNull()
+    auth.accessToken = 'old-token'
+    const sessions = auth.loadSessions()
+    await auth.login({ email: 'new@example.com', password: 'password' })
+    resolveSessions(new Response(JSON.stringify({ sessions: [{ id: 'private-session' }] })))
+    await sessions
+    expect(auth.accessToken).toBe('new-token')
+    expect(auth.sessions).toEqual([])
+  })
+
+  it('preserves confirmed same-user refresh data but resets unknown-token and account changes', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    const user = { id: 'user-a', username: 'a', displayName: 'A' }
+    auth.acceptSession({ accessToken: 'token-a', user })
+    shell.backendDmTargetUserId = 'friend-a'
+    shell.backendUnreadCount = 9
+    auth.acceptSession({ accessToken: 'refreshed-a', user })
+    expect(shell.backendDmTargetUserId).toBe('friend-a')
+    expect(shell.backendUnreadCount).toBe(9)
+    auth.accessToken = 'unconfirmed-token'
+    expect(shell.backendDmTargetUserId).toBeNull()
+    expect(shell.backendUnreadCount).toBe(0)
+    shell.backendDmTargetUserId = 'friend-a'
+    auth.acceptSession({ accessToken: 'token-b', user: { id: 'user-b', username: 'b', displayName: 'B' } })
+    expect(shell.backendDmTargetUserId).toBeNull()
+    expect(shell.backendWorkspace).toBe(false)
+    expect(window.localStorage.getItem('accessToken')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('rejects mismatched bearer tokens before sending and invalidates delayed body parsing', async () => {
+    const auth = useAuthStore()
+    auth.$reset()
+    const shell = useShellStore()
+    shell.$reset()
+    auth.acceptSession({ accessToken: 'token-a', user: { id: 'user-a', username: 'a', displayName: 'A' } })
+    let resolveBody!: (body: unknown) => void
+    const response = new Response('{}')
+    response.json = () => new Promise((resolve) => { resolveBody = resolve })
+    const fetch = vi.fn(async () => response)
+    vi.stubGlobal('fetch', fetch)
+    await expect(shell.resyncChannelMessages('channel-a', 'wrong-token')).resolves.toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    const page = shell.resyncChannelMessages('channel-a', 'token-a')
+    await vi.waitFor(() => expect(resolveBody).toBeDefined())
+    auth.acceptSession({ accessToken: 'token-b', user: { id: 'user-b', username: 'b', displayName: 'B' } })
+    resolveBody({ messages: [{ id: 'private-a', channelId: 'channel-a', content: 'private' }], nextCursor: null })
+    await expect(page).resolves.toBeNull()
+    expect(shell.messages).toEqual([])
   })
 
   it('builds stable REST paths for auth, guild, channel, invite, and gateway calls', () => {

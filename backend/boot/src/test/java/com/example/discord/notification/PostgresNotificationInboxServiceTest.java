@@ -29,6 +29,7 @@ class PostgresNotificationInboxServiceTest {
     private static final UUID AUTHOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000434");
     private static final UUID VISIBLE_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000435");
     private static final UUID HIDDEN_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000436");
+    private static final UUID DM_CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000437");
     private static final Instant NOW = Instant.parse("2026-05-18T00:00:00Z");
 
     private JdbcNotificationInboxService service;
@@ -57,6 +58,13 @@ class PostgresNotificationInboxServiceTest {
         insertUser(VISIBLE_USER_ID, "visible");
         insertUser(HIDDEN_USER_ID, "hidden");
         insertGuildAndChannel();
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement(
+            "INSERT INTO dm_channels(id, first_user_id, second_user_id) VALUES (?, ?, ?)")) {
+            statement.setObject(1, DM_CHANNEL_ID);
+            statement.setObject(2, AUTHOR_ID);
+            statement.setObject(3, VISIBLE_USER_ID);
+            statement.executeUpdate();
+        }
         service = new JdbcNotificationInboxService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -145,8 +153,8 @@ class PostgresNotificationInboxServiceTest {
             GUILD_ID, CHANNEL_ID, MESSAGE_ID, 1L, AUTHOR_ID,
             Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "mention"
         ));
-        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "dm one");
-        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "dm two");
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "dm one");
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "dm two");
 
         var first = service.page(VISIBLE_USER_ID, Set.of(), null, 1);
         var second = service.page(VISIBLE_USER_ID, Set.of(), first.get(0).id(), 1);
@@ -160,7 +168,7 @@ class PostgresNotificationInboxServiceTest {
 
     @Test
     void fillsPageWhenNewestNotificationIsFromHiddenChannel() {
-        service.recordDirectMessage(VISIBLE_USER_ID, UUID.randomUUID(), UUID.randomUUID(), 1L, "visible dm");
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "visible dm");
         JdbcNotificationInboxService later = new JdbcNotificationInboxService(
             dataSource, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC)
         );
@@ -188,6 +196,28 @@ class PostgresNotificationInboxServiceTest {
             Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "delayed mention"
         ));
         assertThat(service.inbox(VISIBLE_USER_ID)).extracting(NotificationItem::read).containsExactly(true);
+    }
+
+    @Test
+    void excludesBlockedAndNonParticipantDmsFromPageAndUnread() throws Exception {
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "private dm");
+        service.recordDirectMessage(HIDDEN_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "not a participant");
+        assertThat(service.page(HIDDEN_USER_ID, Set.of(), null, 50)).isEmpty();
+        assertThat(service.unreadCount(HIDDEN_USER_ID, Set.of())).isZero();
+        assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 50)).hasSize(1);
+        for (UUID[] pair : new UUID[][] {{AUTHOR_ID, VISIBLE_USER_ID}, {VISIBLE_USER_ID, AUTHOR_ID}}) {
+            try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement(
+                "INSERT INTO social_blocks(blocker_id, blocked_id) VALUES (?, ?)")) {
+                statement.setObject(1, pair[0]);
+                statement.setObject(2, pair[1]);
+                statement.executeUpdate();
+            }
+            assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 50)).isEmpty();
+            assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isZero();
+            try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+                statement.executeUpdate("DELETE FROM social_blocks");
+            }
+        }
     }
 
     private void insertUser(UUID id, String username) throws Exception {

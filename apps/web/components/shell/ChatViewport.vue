@@ -13,7 +13,7 @@ const preferences = usePreferencesStore()
 const composerReady = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
 let readObserver: IntersectionObserver | null = null
-let readPending = false
+let readGeneration = 0
 const activeChannelLabel = computed(() => {
   const activeChannel = shell.activeChannel
 
@@ -34,8 +34,10 @@ onMounted(() => {
   composerReady.value = true
 })
 
-watch(() => [shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+  const generation = ++readGeneration
   readObserver?.disconnect()
+  readObserver = null
   if (!auth.accessToken || !shell.backendWorkspace || typeof IntersectionObserver === 'undefined') {
     return
   }
@@ -46,27 +48,34 @@ watch(() => [shell.activeChannelId, shell.activeMessages.map((message) => `${mes
     return
   }
   await nextTick()
+  if (generation !== readGeneration) return
   const element = Array.from(messageListRef.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])
     .find((candidate) => candidate.dataset.messageId === latest.id)
   if (!element) {
     return
   }
-  readObserver = new IntersectionObserver(async (entries) => {
-    if (!entries.some((entry) => entry.isIntersecting) || readPending || !auth.accessToken
+  let pending = false
+  const observer = new IntersectionObserver(async (entries) => {
+    if (generation !== readGeneration || document.visibilityState === 'hidden'
+        || !entries.some((entry) => entry.isIntersecting) || pending || !auth.accessToken
         || shell.activeChannelId !== latest.channelId) {
       return
     }
-    readPending = true
+    pending = true
     const saved = await shell.markBackendChannelRead(latest.channelId, latest.sequence, auth.accessToken)
-    readPending = false
+    pending = false
     if (saved) {
-      readObserver?.disconnect()
+      observer.disconnect()
     }
   })
-  readObserver.observe(element)
+  readObserver = observer
+  observer.observe(element)
 }, { flush: 'post', immediate: true })
 
-onBeforeUnmount(() => readObserver?.disconnect())
+onBeforeUnmount(() => {
+  ++readGeneration
+  readObserver?.disconnect()
+})
 
 async function submitMessage() {
   await shell.sendMessage(auth.accessToken)

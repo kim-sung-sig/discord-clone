@@ -123,6 +123,7 @@ class JdbcDirectMessageService {
             SELECT id, sender_id, sequence, content, created_at FROM dm_messages
             WHERE channel_id = ? AND sequence < ? ORDER BY sequence DESC LIMIT ?
             """)) {
+            requireNotBlocked(connection, requesterId, targetUserId);
             statement.setObject(1, pair.channelId());
             statement.setLong(2, beforeSequence == null ? Long.MAX_VALUE : beforeSequence);
             statement.setInt(3, limit);
@@ -150,6 +151,7 @@ class JdbcDirectMessageService {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                requireNotBlocked(connection, requesterId, targetUserId);
                 long latest = latestSequence(connection, pair.channelId());
                 if (sequence > latest) {
                     throw new IllegalArgumentException("lastReadSequence exceeds saved messages");
@@ -195,6 +197,7 @@ class JdbcDirectMessageService {
         try (Connection connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
             SELECT last_read_sequence FROM dm_read_markers WHERE user_id = ? AND channel_id = ?
             """)) {
+            requireNotBlocked(connection, requesterId, targetUserId);
             statement.setObject(1, requesterId);
             statement.setObject(2, pair.channelId());
             try (var result = statement.executeQuery()) {

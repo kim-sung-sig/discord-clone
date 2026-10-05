@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useRuntimeConfig } from '#app'
 import { DiscordRestError, createDiscordRestClient, discordApiPaths } from '../services/discord-api'
+import { useAuthStore } from './auth'
 import {
   normalizeGatewayDispatch,
   toShellGatewayEvent,
@@ -609,6 +610,7 @@ const toShellAttachment = (
 
 export const useShellStore = defineStore('shell', {
   state: () => ({
+    accountGeneration: 0,
     apiError: null as string | null,
     apiLastRequestId: null as string | null,
     apiBusy: false,
@@ -1295,6 +1297,15 @@ export const useShellStore = defineStore('shell', {
     }
   },
   actions: {
+    resetAccountState(): void {
+      const generation = this.accountGeneration + 1
+      this.$reset()
+      this.accountGeneration = generation
+      this.messages = []
+      this.channelGroups = []
+      this.activeChannelId = ''
+      this.guild = { id: '', name: '' }
+    },
     setPresenceClock(nowMs: number) {
       this.presence.nowMs = nowMs
     },
@@ -1398,9 +1409,11 @@ export const useShellStore = defineStore('shell', {
       }
     },
     async selectBackendChannel(channelId: string, bearerToken: string): Promise<void> {
+      const generation = this.accountGeneration
       if (!this.channelGroups.some((group) => group.channels.some((channel) => channel.id === channelId))) {
         await this.loadCurrentUserGuilds(bearerToken, channelId)
       }
+      if (generation !== this.accountGeneration) return
       if (!this.channelGroups.some((group) => group.channels.some((channel) => channel.id === channelId))) {
         return
       }
@@ -1565,6 +1578,7 @@ export const useShellStore = defineStore('shell', {
       })
     },
     async markBackendChannelRead(channelId: string, sequence: number, bearerToken: string): Promise<boolean> {
+      const generation = this.accountGeneration
       const markers = this.presence.readMarkers as Record<string, ShellReadMarker>
       if (sequence <= (markers[channelId]?.lastReadSequence ?? 0)) {
         return true
@@ -1575,7 +1589,7 @@ export const useShellStore = defineStore('shell', {
           { bearerToken, requestId }
         )
       )
-      if (!marker) {
+      if (!marker || generation !== this.accountGeneration) {
         return false
       }
       markers[channelId] = { channelId, lastReadSequence: marker.lastReadSequence }
@@ -1620,6 +1634,7 @@ export const useShellStore = defineStore('shell', {
       return sent === true
     },
     async markBackendDmRead(targetUserId: string, sequence: number, bearerToken: string): Promise<boolean> {
+      const generation = this.accountGeneration
       if (sequence <= (this.backendDmReadMarkers[targetUserId] ?? 0)) {
         return true
       }
@@ -1629,7 +1644,7 @@ export const useShellStore = defineStore('shell', {
           { bearerToken, requestId }
         )
       )
-      if (!marker) {
+      if (!marker || generation !== this.accountGeneration) {
         return false
       }
       this.backendDmReadMarkers[targetUserId] = marker.lastReadSequence
@@ -1639,13 +1654,15 @@ export const useShellStore = defineStore('shell', {
     async openBackendEvent(
       guildId: string, eventId: string, itemId: string, bearerToken: string
     ): Promise<BackendServerEvent | null> {
+      const generation = this.accountGeneration
       const event = await this.withBackendRequest(async (client, requestId) => {
         const events = await client.get<BackendServerEvent[]>(
           discordApiPaths.event.list(guildId), { bearerToken, requestId }
         )
         return events.find((candidate) => candidate.id === eventId) ?? null
       })
-      if (event && await this.markBackendServerNotificationRead(itemId, bearerToken)) {
+      if (event && generation === this.accountGeneration && await this.markBackendServerNotificationRead(itemId, bearerToken)
+          && generation === this.accountGeneration) {
         this.backendOpenEvent = event
         this.backendDmTargetUserId = null
         return event
@@ -1989,21 +2006,45 @@ export const useShellStore = defineStore('shell', {
     async withBackendRequest<T>(
       operation: (client: ReturnType<typeof createDiscordRestClient>, requestId: string) => Promise<T>
     ): Promise<T | null> {
+      const auth = useAuthStore()
+      const generation = this.accountGeneration
+      const token = auth.accessToken
+      const userId = auth.user?.id
+      const isCurrent = () => generation === this.accountGeneration && token === auth.accessToken && userId === auth.user?.id
+      const stale = new Error('Account changed during request')
       this.apiError = null
       const requestId = createShellRequestId()
       this.apiLastRequestId = requestId
       this.apiBusy = true
       try {
         const config = useRuntimeConfig()
-        return await operation(createDiscordRestClient({
+        const client = createDiscordRestClient({
           baseUrl: config.public.apiBaseUrl,
-          fetcher: globalThis.fetch
-        }), requestId)
+          fetcher: (input, init) => {
+            if (!isCurrent() || (token && new Headers(init?.headers).get('Authorization') !== `Bearer ${token}`)) {
+              throw stale
+            }
+            return globalThis.fetch(input, init)
+          }
+        })
+        const guardedClient = new Proxy(client, {
+          get(target, method: keyof typeof client) {
+            return async (...args: unknown[]) => {
+              if (!isCurrent()) throw stale
+              const result = await Reflect.apply(target[method], target, args)
+              if (!isCurrent()) throw stale
+              return result
+            }
+          }
+        })
+        const result = await operation(guardedClient, requestId)
+        return isCurrent() ? result : null
       } catch (error) {
+        if (!isCurrent() || error === stale) return null
         this.apiError = `${backendErrorMessage(error)} Request id: ${requestId}`
         return null
       } finally {
-        this.apiBusy = false
+        if (isCurrent()) this.apiBusy = false
       }
     },
     recordGatewayEvent(event: ShellGatewayEvent): boolean {
@@ -2381,6 +2422,7 @@ export const useShellStore = defineStore('shell', {
       })
     },
     async reportMessage(messageId: string, bearerToken?: string | null): Promise<boolean> {
+      const generation = this.accountGeneration
       const message = this.messages.find((candidate) => candidate.id === messageId && !candidate.deleted)
       if (!message) {
         return false
@@ -2401,6 +2443,7 @@ export const useShellStore = defineStore('shell', {
             { bearerToken, requestId }
           )
         )
+        if (generation !== this.accountGeneration) return false
         if (report) {
           this.moderation.messageReports.unshift(toShellMessageReport(report, this.currentUser))
           this.appendAuditLog('MESSAGE_REPORTED', `${this.currentUser} reported ${messageId}`)
@@ -2427,6 +2470,7 @@ export const useShellStore = defineStore('shell', {
       status: Exclude<ShellMessageReportStatus, 'OPEN'> = 'RESOLVED',
       bearerToken?: string | null
     ): Promise<boolean> {
+      const generation = this.accountGeneration
       const report = this.moderation.messageReports.find((candidate) => candidate.id === reportId)
       if (!report || report.status !== 'OPEN') {
         return false
@@ -2440,6 +2484,7 @@ export const useShellStore = defineStore('shell', {
             { bearerToken, requestId }
           )
         )
+        if (generation !== this.accountGeneration) return false
         if (!resolved) {
           report.status = status
           report.resolvedAt = new Date().toISOString()
