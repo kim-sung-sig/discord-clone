@@ -1,0 +1,9 @@
+{
+  "name": "node-forge",
+  "version": "1.4.1+discord.1",
+  "private": true,
+  "description": "Local node-forge 1.4.0 backport requiring canonical DigestInfo DER for RSA PKCS#1 v1.5 verification.",
+  "license": "(BSD-3-Clause OR GPL-2.0)",
+  "repository": "digitalbazaar/forge",
+  "main": "lib/index.js"
+}

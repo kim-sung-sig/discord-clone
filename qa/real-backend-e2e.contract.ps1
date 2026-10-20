@@ -18,6 +18,10 @@ $tokens = $null
 $parseErrors = $null
 [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref] $tokens, [ref] $parseErrors) | Out-Null
 Assert ($parseErrors.Count -eq 0) "qa/real-backend-e2e.ps1 has parse errors: $($parseErrors | ConvertTo-Json -Compress)"
+$apiTokens = $null
+$apiParseErrors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($apiSmokePath, [ref] $apiTokens, [ref] $apiParseErrors) | Out-Null
+Assert ($apiParseErrors.Count -eq 0) "qa/api-smoke.ps1 has parse errors: $($apiParseErrors | ConvertTo-Json -Compress)"
 
 $requiredSnippets = @(
   "`$BackendUrl = 'http://127.0.0.1:18080'",
@@ -70,5 +74,11 @@ Assert ($apiSmokeContent.Contains('idempotencyKey="api-smoke-message-$stamp"')) 
   'qa/api-smoke.ps1 must include the required idempotency key when creating the runtime smoke message'
 Assert ($apiSmokeContent.Contains('idempotencyKey="api-smoke-automod-$stamp"')) `
   'qa/api-smoke.ps1 must include the required idempotency key when probing automod message rejection'
+Assert ($apiSmokeContent.Contains('TimeoutSec=30')) `
+  'qa/api-smoke.ps1 must bound each HTTP request so runtime QA cannot hang indefinitely'
+Assert ($apiSmokeContent.Contains('Write-Host "[api-smoke] -> $method $path"')) `
+  'qa/api-smoke.ps1 must log the request before sending it so a stalled endpoint is identifiable'
+Assert ($apiSmokeContent.Contains('Write-Host "[api-smoke] <- $method $path $($response.StatusCode)"')) `
+  'qa/api-smoke.ps1 must log the response after each HTTP request'
 
 Write-Output 'REAL_BACKEND_E2E_CONTRACT_PASS'

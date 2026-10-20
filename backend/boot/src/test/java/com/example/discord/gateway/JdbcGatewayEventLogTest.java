@@ -79,6 +79,13 @@ class JdbcGatewayEventLogTest {
     }
 
     @Test
+    void latestSequenceIncludesAllocatedValuesBeforeTheirRowsAreAppended() {
+        long allocated = eventLog.allocateSequence();
+
+        assertThat(eventLog.latestSequence()).isEqualTo(allocated);
+    }
+
+    @Test
     void oldestSequenceIgnoresExpiredRows() throws Exception {
         GatewayBusEvent expired = new GatewayBusEvent(
             UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
