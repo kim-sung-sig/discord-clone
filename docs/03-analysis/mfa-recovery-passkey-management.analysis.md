@@ -30,7 +30,7 @@
 | `node --check` (E2E runner 및 `mfa-webauthn.js`), `git diff --check` | 통과 |
 | `MFA_E2E_PLAYWRIGHT_ROOT=C:/git/discord node qa/mfa-local-ui-e2e.mjs` | 통과. 가입→TOTP→passkey→잠금→unlock→reset/교체→old secret 거부→삭제. storage 0, `JSESSIONID`만 확인, 두 포트 종료 |
 
-브라우저 E2E 산출물은 `qa/artifacts/mfa-local-ui-e2e/20261020131627/summary.json`이다. E2E는 H2와 가상 authenticator를 사용했으며 실제 장치 UV 동작 증거가 아니다.
+브라우저 E2E 산출물은 최신 `origin/main` 기반 commit에서 실행한 `qa/artifacts/mfa-local-ui-e2e/20261020132627/summary.json`이다. E2E는 H2와 가상 authenticator를 사용했으며 실제 장치 UV 동작 증거가 아니다.
 
 ## 독립 검수
 
