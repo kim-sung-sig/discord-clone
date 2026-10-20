@@ -166,7 +166,18 @@ class JdbcGatewayEventLog implements GatewayEventLog {
     @Override
     public long latestSequence() {
         try (Connection connection = dataSource.getConnection();
-             var statement = connection.prepareStatement("SELECT COALESCE(MAX(event_sequence), 0) FROM gateway_event_log")) {
+             var statement = connection.prepareStatement("""
+                 SELECT COALESCE(sequence.last_value, 0)
+                 FROM pg_sequences sequence
+                 JOIN pg_class sequence_relation
+                   ON sequence_relation.relname = sequence.sequencename
+                 JOIN pg_namespace sequence_schema
+                   ON sequence_schema.oid = sequence_relation.relnamespace
+                  AND sequence_schema.nspname = sequence.schemaname
+                 WHERE sequence_relation.oid = pg_get_serial_sequence(
+                     'gateway_event_log', 'event_sequence'
+                 )::regclass
+                 """)) {
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getLong(1);

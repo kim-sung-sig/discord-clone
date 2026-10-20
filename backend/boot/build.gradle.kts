@@ -3,6 +3,19 @@ plugins {
     id("io.spring.dependency-management")
 }
 
+dependencyManagement {
+    dependencies {
+        dependency("com.fasterxml.jackson.core:jackson-core:2.21.7")
+        dependency("com.fasterxml.jackson.core:jackson-databind:2.21.7")
+        dependency("tools.jackson.core:jackson-core:3.1.7")
+        dependency("tools.jackson.core:jackson-databind:3.1.7")
+        dependency("org.apache.tomcat.embed:tomcat-embed-core:11.0.27")
+        dependency("org.apache.tomcat.embed:tomcat-embed-el:11.0.27")
+        dependency("org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27")
+        dependency("at.yawk.lz4:lz4-java:1.11.4")
+    }
+}
+
 dependencies {
     implementation(project(":backend:modules:identity"))
     implementation(project(":backend:modules:channel"))

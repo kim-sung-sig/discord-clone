@@ -98,9 +98,12 @@ jobs:
       - name: Real backend browser smoke default contract
         run: pwsh qa/real-backend-browser-smoke-default.contract.ps1
       - name: Start backend for runtime QA
+        id: start-backend
         shell: bash
         run: |
           set -euo pipefail
+          backend_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+          echo "port=$backend_port" >> "$GITHUB_OUTPUT"
           mkdir -p qa/artifacts/real-backend-e2e/ci
           mkdir -p qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/public-key-locations
           printf '%s' 'discord-identity' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/issuer
@@ -108,13 +111,13 @@ jobs:
           printf '%s' 'identity-2026-07' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/key-id
           printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-private.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/private-key-location
           printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-public.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/public-key-locations/identity-2026-07
-          ./gradlew :backend:boot:bootRun \
+          SERVER_ADDRESS="127.0.0.1" SERVER_PORT="$backend_port" ./gradlew :backend:boot:bootRun \
             > qa/artifacts/real-backend-e2e/ci/backend-bootRun.log \
             2> qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log &
           echo "$!" > qa/artifacts/real-backend-e2e/ci/backend.pid
 
           for attempt in {1..60}; do
-            if curl -fsS http://127.0.0.1:8080/actuator/health > qa/artifacts/real-backend-e2e/ci/health.json; then
+            if curl -fsS "http://127.0.0.1:$backend_port/actuator/health" > qa/artifacts/real-backend-e2e/ci/health.json; then
               exit 0
             fi
             if ! kill -0 "$(cat qa/artifacts/real-backend-e2e/ci/backend.pid)" 2>/dev/null; then
@@ -136,8 +139,9 @@ jobs:
           POSTGRES_USER: dev_user
           POSTGRES_PASSWORD: dev_password
       - name: Real backend smoke
-        run: pwsh qa/real-backend-e2e.ps1 -BackendUrl http://127.0.0.1:8080 -SkipServiceStart
+        run: pwsh qa/real-backend-e2e.ps1 -BackendUrl "$BACKEND_URL" -SkipServiceStart
         env:
+          BACKEND_URL: http://127.0.0.1:${{ steps.start-backend.outputs.port }}
           POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
           POSTGRES_USER: dev_user
           POSTGRES_PASSWORD: dev_password

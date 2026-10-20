@@ -12,9 +12,11 @@ function Request($method, $path, $body = $null, $token = $null, $requestId = $nu
   $headers = @{}
   if ($token) { $headers.Authorization = "Bearer $token" }
   if ($requestId) { $headers.'X-Request-Id' = $requestId }
-  $params = @{ UseBasicParsing=$true; Method=$method; Uri="$base$path"; Headers=$headers }
+  $params = @{ UseBasicParsing=$true; Method=$method; Uri="$base$path"; Headers=$headers; TimeoutSec=30 }
   if ($null -ne $body) { $params.ContentType='application/json'; $params.Body=(Json $body) }
+  Write-Host "[api-smoke] -> $method $path"
   $response = Invoke-WebRequest @params
+  Write-Host "[api-smoke] <- $method $path $($response.StatusCode)"
   Assert $response.Headers['X-Request-Id'] "missing X-Request-Id for $method $path"
   Assert ($response.Headers['X-Content-Type-Options'] -eq 'nosniff') "missing nosniff for $method $path"
   Assert ($response.Headers['X-Frame-Options'] -eq 'DENY') "missing frame deny for $method $path"
