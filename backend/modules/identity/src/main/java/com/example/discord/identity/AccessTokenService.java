@@ -32,6 +32,18 @@ public final class AccessTokenService {
         Instant now=clock.instant();
         return Jwts.builder().header().keyId(kid).and().subject(userId.toString()).issuer(issuer).audience().add(audience).and().issuedAt(Date.from(now)).expiration(Date.from(now.plus(ttl))).signWith(privateKey, Jwts.SIG.EdDSA).compact();
     }
+    /** Called only after the application has verified and consumed fresh factor evidence. */
+    public String issueMfa(UUID userId, String factor) {
+        if (privateKey == null || userId == null) throw new IllegalStateException("access token issuer unavailable");
+        if (!java.util.Set.of("totp", "passkey").contains(factor)) throw new IllegalArgumentException("unsupported MFA factor");
+        Instant now = clock.instant();
+        Duration lifetime = ttl.compareTo(Duration.ofMinutes(5)) < 0 ? ttl : Duration.ofMinutes(5);
+        return Jwts.builder().header().keyId(kid).and().subject(userId.toString()).issuer(issuer).audience().add(audience).and()
+            .issuedAt(Date.from(now)).expiration(Date.from(now.plus(lifetime))).claim("typ", "access")
+            .claim("amr", java.util.List.of(factor)).claim("auth_time", now.getEpochSecond())
+            .signWith(privateKey, Jwts.SIG.EdDSA).compact();
+    }
+
     public AccessTokenClaims verify(String token) {
         try {
             Jws<Claims> jws = Jwts.parser().clock(() -> Date.from(clock.instant())).keyLocator(header -> {
@@ -40,7 +52,18 @@ public final class AccessTokenService {
             }).build().parseSignedClaims(token);
             Claims claims=jws.getPayload();
             if (!"EdDSA".equals(jws.getHeader().getAlgorithm()) || !issuer.equals(claims.getIssuer()) || !claims.getAudience().contains(audience) || claims.getIssuedAt()==null || claims.getExpiration()==null || !claims.getExpiration().toInstant().isAfter(clock.instant())) throw new TokenVerificationException("access token invalid");
-            return new AccessTokenClaims(UUID.fromString(claims.getSubject()), claims.getIssuedAt().toInstant(), claims.getExpiration().toInstant());
+            if (claims.containsKey("typ") && !"access".equals(claims.get("typ"))) throw new TokenVerificationException("access token invalid");
+            java.util.List<String> methods = java.util.List.of();
+            Instant authTime = null;
+            if (claims.containsKey("amr")) {
+                Object raw = claims.get("amr");
+                if (!(raw instanceof java.util.List<?> values) || values.isEmpty()
+                    || values.stream().anyMatch(value -> !java.util.Set.of("totp", "passkey").contains(value))) throw new TokenVerificationException("access token invalid");
+                methods = values.stream().map(String.class::cast).toList();
+                authTime = Instant.ofEpochSecond(claims.get("auth_time", Long.class));
+                if (authTime.isAfter(clock.instant()) || claims.getExpiration().toInstant().isAfter(authTime.plusSeconds(300))) throw new TokenVerificationException("access token invalid");
+            }
+            return new AccessTokenClaims(UUID.fromString(claims.getSubject()), claims.getIssuedAt().toInstant(), claims.getExpiration().toInstant(), methods, authTime);
         } catch (TokenVerificationException e) { throw e; } catch (Exception e) { throw new TokenVerificationException("access token invalid"); }
     }
     private static boolean blank(String v) { return v == null || v.isBlank(); }

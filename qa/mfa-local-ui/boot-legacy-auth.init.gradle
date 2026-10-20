@@ -1,0 +1,10 @@
+// Local-only: adds boot's test runtime classpath to :backend:boot:bootRun so the `test` profile
+// configurations (TestExpressionConfiguration, TestThreadConfiguration, ...) exist. The legacy-auth login path
+// itself (AuthController/AuthService/InMemoryAuthStore/BCryptPasswordHasher/AccessTokenService) is main code.
+// Runtime arguments are passed by the caller via --args; this script changes the classpath only.
+gradle.projectsEvaluated {
+    def boot = gradle.rootProject.project(':backend:boot')
+    boot.tasks.named('bootRun') {
+        classpath += boot.sourceSets.test.runtimeClasspath
+    }
+}
