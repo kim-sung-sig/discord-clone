@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useRuntimeConfig } from '#app'
 import { DiscordRestError, createDiscordRestClient, discordApiPaths } from '../services/discord-api'
+import { useShellStore } from './shell'
 
 type LoginCredentials = {
   email: string
@@ -49,9 +50,19 @@ export const useAuthStore = defineStore('auth', {
     sessionError: null as string | null,
     isLoading: false,
     isRestoring: false,
+    sessionGeneration: 0,
+    isApplyingSession: false,
     restorePromise: null as Promise<boolean> | null
   }),
   actions: {
+    acceptSession(response: AuthResponse): void {
+      if (!this.user || this.user.id !== response.user.id) {
+        useShellStore().resetAccountState()
+      }
+      this.isApplyingSession = true
+      this.$patch({ accessToken: response.accessToken, user: response.user, sessions: [], error: null })
+      this.isApplyingSession = false
+    },
     async restoreSession() {
       if (!isClient()) {
         return false
@@ -64,21 +75,24 @@ export const useAuthStore = defineStore('auth', {
       }
 
       this.isRestoring = true
+      const generation = this.sessionGeneration
       this.restorePromise = authClient()
         .post<AuthResponse>(discordApiPaths.auth.refresh())
         .then((response) => {
-          this.accessToken = response.accessToken
-          this.user = response.user
-          this.error = null
+          if (generation !== this.sessionGeneration) return false
+          this.acceptSession(response)
           return true
         })
         .catch(() => {
+          if (generation !== this.sessionGeneration) return false
+          if (this.user) useShellStore().resetAccountState()
           this.accessToken = null
           this.user = null
           this.sessions = []
           return false
         })
         .finally(() => {
+          if (generation !== this.sessionGeneration) return
           this.isRestoring = false
           this.restorePromise = null
         })
@@ -86,6 +100,9 @@ export const useAuthStore = defineStore('auth', {
       return this.restorePromise
     },
     async login(credentials: LoginCredentials) {
+      const generation = ++this.sessionGeneration
+      this.restorePromise = null
+      this.isRestoring = false
       this.error = null
       this.isLoading = true
 
@@ -94,16 +111,17 @@ export const useAuthStore = defineStore('auth', {
           email: credentials.email,
           password: credentials.password
         })
-        this.accessToken = response.accessToken
-        this.user = response.user
-        this.sessions = []
+        if (generation !== this.sessionGeneration) return
+        this.acceptSession(response)
       } catch (error) {
+        if (generation !== this.sessionGeneration) return
+        useShellStore().resetAccountState()
         this.accessToken = null
         this.user = null
         this.sessions = []
         this.error = loginErrorMessage(error)
       } finally {
-        this.isLoading = false
+        if (generation === this.sessionGeneration) this.isLoading = false
       }
     },
     async loadSessions() {
@@ -112,13 +130,17 @@ export const useAuthStore = defineStore('auth', {
         return []
       }
       this.sessionError = null
+      const generation = this.sessionGeneration
+      const token = this.accessToken
       try {
         const response = await authClient().get<SessionsResponse>(discordApiPaths.auth.sessions(), {
-          bearerToken: this.accessToken
+          bearerToken: token
         })
+        if (generation !== this.sessionGeneration || token !== this.accessToken) return []
         this.sessions = response.sessions
         return this.sessions
       } catch (error) {
+        if (generation !== this.sessionGeneration || token !== this.accessToken) return []
         this.sessionError = sessionErrorMessage(error)
         return this.sessions
       }
@@ -128,19 +150,27 @@ export const useAuthStore = defineStore('auth', {
         return
       }
       this.sessionError = null
+      const generation = this.sessionGeneration
+      const token = this.accessToken
       try {
         await authClient().delete<void>(discordApiPaths.auth.session(sessionId), {
-          bearerToken: this.accessToken
+          bearerToken: token
         })
+        if (generation !== this.sessionGeneration || token !== this.accessToken) return
         this.sessions = this.sessions.map((session) =>
           session.id === sessionId ? { ...session, revoked: true } : session
         )
       } catch (error) {
+        if (generation !== this.sessionGeneration || token !== this.accessToken) return
         this.sessionError = sessionErrorMessage(error)
       }
     },
     async logout() {
       const token = this.accessToken
+      ++this.sessionGeneration
+      useShellStore().resetAccountState()
+      this.$patch({ accessToken: null, user: null, sessions: [], error: null, sessionError: null,
+        restorePromise: null, isRestoring: false, isLoading: false })
       try {
         await authClient().post<void>(
           discordApiPaths.auth.logout(),
@@ -150,11 +180,6 @@ export const useAuthStore = defineStore('auth', {
       } catch {
         // Local state must be cleared even if the network path is unavailable.
       }
-      this.accessToken = null
-      this.user = null
-      this.sessions = []
-      this.error = null
-      this.sessionError = null
     }
   }
 })

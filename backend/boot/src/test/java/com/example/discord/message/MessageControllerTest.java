@@ -76,7 +76,8 @@ class MessageControllerTest {
                 .header("Authorization", owner.bearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.messages", hasSize(1)))
-            .andExpect(jsonPath("$.messages[0].id").value(firstId));
+            .andExpect(jsonPath("$.messages[0].id").value(firstId))
+            .andExpect(jsonPath("$.messages[0].sequence").value(1));
         org.assertj.core.api.Assertions.assertThat(secondId).isEqualTo(firstId);
     }
 
@@ -318,6 +319,7 @@ class MessageControllerTest {
                     }
                     """.formatted(content, idempotencyKey)))
             .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sequence").isNumber())
             .andReturn();
 
         return JsonPath.read(messageResult.getResponse().getContentAsString(), "$.id");

@@ -56,7 +56,7 @@ class PostgresServerEventServiceTest {
         insertUser(CREATOR_ID, "creator");
         insertUser(MEMBER_ID, "member");
         insertGuildAndChannels();
-        service = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC), event -> Set.of(MEMBER_ID));
     }
 
     @Test
@@ -94,6 +94,25 @@ class PostgresServerEventServiceTest {
     }
 
     @Test
+    void createAndCancelProduceDistinctPersistentRecipientNotifications() throws Exception {
+        ServerEvent event = service.createEvent(command(STAGE_CHANNEL_ID), true);
+        service.cancelEvent(GUILD_ID, event.id(), CREATOR_ID, "canceled");
+
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
+            SELECT source_id FROM notification_items WHERE user_id = ? AND kind = 'SERVER' ORDER BY created_at
+            """)) {
+            statement.setObject(1, MEMBER_ID);
+            try (var result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                UUID createdSignal = result.getObject(1, UUID.class);
+                assertThat(result.next()).isTrue();
+                assertThat(result.getObject(1, UUID.class)).isNotEqualTo(createdSignal);
+                assertThat(result.next()).isFalse();
+            }
+        }
+    }
+
+    @Test
     void rejectsCreateWithoutPermissionOrInvalidTimeRange() {
         assertThatThrownBy(() -> service.createEvent(command(STAGE_CHANNEL_ID), false))
             .isInstanceOf(SecurityException.class)
@@ -108,6 +127,23 @@ class PostgresServerEventServiceTest {
         ), true))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("event end must be after start");
+    }
+
+    @Test
+    void notificationFailureRollsBackCreateAndCancelWithTheirSignals() {
+        var failing = new JdbcServerEventService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC),
+            event -> Set.of(UUID.randomUUID()));
+        assertThatThrownBy(() -> failing.createEvent(command(STAGE_CHANNEL_ID), true))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(service.visibleEvents(GUILD_ID, Set.of(STAGE_CHANNEL_ID))).isEmpty();
+        assertThat(service.signals()).isEmpty();
+
+        ServerEvent event = service.createEvent(command(STAGE_CHANNEL_ID), true);
+        assertThatThrownBy(() -> failing.cancelEvent(GUILD_ID, event.id(), CREATOR_ID, "must roll back"))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(service.event(GUILD_ID, event.id()).status()).isEqualTo(ServerEventStatus.SCHEDULED);
+        assertThat(service.signals()).extracting(ServerEventSignal::type)
+            .containsExactly(ServerEventSignalType.EVENT_CREATED);
     }
 
     private static CreateServerEventCommand command(UUID channelId) {

@@ -11,6 +11,7 @@ const contractScript = readFileSync(new URL('./openapi-contract.mjs', import.met
 assert.equal(spec.openapi, '3.1.0')
 assert.equal(spec.info.title, 'Discord Clone API')
 assert.ok(spec.components.schemas.ApiErrorResponse)
+assert.ok(spec.components.schemas.NotificationItem.properties.eventId)
 assert.deepEqual(Object.keys(spec.components.schemas.ApiErrorResponse.properties).sort(), [
   'code',
   'message',
@@ -28,7 +29,11 @@ for (const path of [
   '/api/guilds/{guildId}/message-reports/{reportId}/resolve',
   '/api/voice/channels/{channelId}/join',
   '/api/gateway/sessions/{sessionId}/events',
-  '/api/security/csp-report'
+  '/api/security/csp-report',
+  '/api/notifications',
+  '/api/social/dms/{targetUserId}/messages',
+  '/api/guilds/{guildId}/events',
+  '/api/guilds/{guildId}/events/{eventId}'
 ]) {
   assert.ok(spec.paths[path], `${path} must be part of the OpenAPI contract`)
 }

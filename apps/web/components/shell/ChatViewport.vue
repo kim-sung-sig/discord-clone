@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AttachmentPreview from './AttachmentPreview.vue'
 import ReactionBar from './ReactionBar.vue'
 import TypingIndicator from './TypingIndicator.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
-import { useShellStore } from '../../stores/shell'
+import { useShellStore, type ShellMessage } from '../../stores/shell'
 
 const shell = useShellStore()
 const auth = useAuthStore()
 const preferences = usePreferencesStore()
 const composerReady = ref(false)
+const messageListRef = ref<HTMLElement | null>(null)
+let readObserver: IntersectionObserver | null = null
+let readGeneration = 0
 const activeChannelLabel = computed(() => {
   const activeChannel = shell.activeChannel
 
@@ -29,6 +32,49 @@ const canLoadOlderMessages = computed(() => Boolean(auth.accessToken && shell.ac
 
 onMounted(() => {
   composerReady.value = true
+})
+
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+  const generation = ++readGeneration
+  readObserver?.disconnect()
+  readObserver = null
+  if (!auth.accessToken || !shell.backendWorkspace || typeof IntersectionObserver === 'undefined') {
+    return
+  }
+  const latest = shell.activeMessages.reduce<ShellMessage | null>(
+    (current, message) => !current || message.sequence > current.sequence ? message : current, null
+  )
+  if (!latest || latest.sequence <= (shell.presence.readMarkers[latest.channelId]?.lastReadSequence ?? 0)) {
+    return
+  }
+  await nextTick()
+  if (generation !== readGeneration) return
+  const element = Array.from(messageListRef.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])
+    .find((candidate) => candidate.dataset.messageId === latest.id)
+  if (!element) {
+    return
+  }
+  let pending = false
+  const observer = new IntersectionObserver(async (entries) => {
+    if (generation !== readGeneration || document.visibilityState === 'hidden'
+        || !entries.some((entry) => entry.isIntersecting) || pending || !auth.accessToken
+        || shell.activeChannelId !== latest.channelId) {
+      return
+    }
+    pending = true
+    const saved = await shell.markBackendChannelRead(latest.channelId, latest.sequence, auth.accessToken)
+    pending = false
+    if (saved) {
+      observer.disconnect()
+    }
+  })
+  readObserver = observer
+  observer.observe(element)
+}, { flush: 'post', immediate: true })
+
+onBeforeUnmount(() => {
+  ++readGeneration
+  readObserver?.disconnect()
 })
 
 async function submitMessage() {
@@ -50,7 +96,7 @@ async function loadOlderMessages() {
       <h2 data-testid="active-channel">{{ activeChannelLabel }}</h2>
       <p>{{ preferences.t('editor.channelDescription') }}</p>
     </header>
-    <div class="message-list" data-testid="message-list" aria-live="polite">
+    <div ref="messageListRef" class="message-list" data-testid="message-list" aria-live="polite">
       <button
         v-if="canLoadOlderMessages"
         class="load-older-messages"
@@ -73,6 +119,7 @@ async function loadOlderMessages() {
       <article
         v-for="message in shell.activeMessages"
         :key="message.id"
+        :data-message-id="message.id"
         class="message"
         :class="{ 'message-deleted': message.deleted }"
       >

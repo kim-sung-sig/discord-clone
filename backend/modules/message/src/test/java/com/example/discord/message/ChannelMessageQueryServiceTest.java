@@ -70,6 +70,7 @@ class ChannelMessageQueryServiceTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             UUID.randomUUID(),
+            1L,
             UUID.randomUUID(),
             content,
             List.of(),
@@ -82,6 +83,10 @@ class ChannelMessageQueryServiceTest {
     }
 
     private static final class RecordingReadModels implements ChannelMessageReadModelPort {
+        @Override
+        public long sequenceOf(UUID messageId) {
+            return 1;
+        }
         private final List<MessageReadModel> page;
         private final String nextCursor;
         private final List<MessageReadModel> search;

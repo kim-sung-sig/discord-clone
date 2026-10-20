@@ -81,6 +81,7 @@ class JdbcMessageStoreTest {
             statement.executeUpdate("DELETE FROM channels");
             statement.executeUpdate("DELETE FROM guild_roles");
             statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM premium_entitlements");
             statement.executeUpdate("DELETE FROM guilds");
             statement.executeUpdate("DELETE FROM auth_accounts");
             statement.executeUpdate("DELETE FROM users");
@@ -328,6 +329,7 @@ class JdbcMessageStoreTest {
             .singleElement()
             .satisfies(readModel -> {
                 assertThat(readModel.id()).isEqualTo(message.id());
+                assertThat(readModel.sequence()).isPositive().isEqualTo(readModels.sequenceOf(message.id()));
                 assertThat(readModel.content()).isEqualTo("hello searchable");
                 assertThat(readModel.mentions()).containsExactly(roleId.toString(), "here");
             });
@@ -359,6 +361,11 @@ class JdbcMessageStoreTest {
         assertThat(firstPage.nextCursor()).isNotBlank();
         assertThat(secondPage.messages()).extracting(Message::id).containsExactly(first.id());
         assertThat(secondPage.nextCursor()).isNull();
+        MessageReadPage readPage = readModels.readModels(target(), null, 2);
+        assertThat(readPage.messages()).extracting(MessageReadModel::sequence)
+            .containsExactly(readModels.sequenceOf(third.id()), readModels.sequenceOf(second.id()));
+        assertThat(readModels.readModels(target(), readPage.nextCursor(), 2).messages())
+            .extracting(MessageReadModel::sequence).containsExactly(readModels.sequenceOf(first.id()));
     }
 
     @Test

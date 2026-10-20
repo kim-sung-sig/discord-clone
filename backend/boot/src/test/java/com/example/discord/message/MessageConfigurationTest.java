@@ -11,15 +11,22 @@ import com.example.discord.permission.AuthorizationWatermarkAdvanced;
 import com.example.discord.permission.Permission;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.gateway.InMemoryGatewayService;
+import com.example.discord.notification.MessageMentionProjector;
+import com.example.discord.notification.MessageMentionRecipientResolver;
+import com.example.discord.notification.MentionNotificationCommand;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.ObjectProvider;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MessageConfigurationTest {
     @Test
@@ -96,12 +103,39 @@ class MessageConfigurationTest {
 
         new MessageConfiguration().messagePublishedDispatcher(
             gateway,
-            (target, id) -> message
+            (target, id) -> message,
+            mock(ObjectProvider.class)
         ).dispatch(published);
 
         assertThat(gateway.poll(session.id(), ownerId, 0).stream()
             .map(com.example.discord.gateway.GatewayEvent::busEventId))
             .contains(sourceEventId.toString());
+    }
+
+    @Test
+    void localDispatcherProjectsPublishedMention() {
+        UUID authorId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        InMemoryGuildService guilds = new InMemoryGuildService();
+        var guild = guilds.createGuild("mentions", authorId);
+        guilds.addMember(guild.id(), recipientId);
+        var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
+        InMemoryGatewayService gateway = new InMemoryGatewayService(guilds, Clock.systemUTC(), Duration.ofSeconds(30));
+        Message message = new Message(UUID.randomUUID(), new UserMessageAuthor(authorId),
+            new ChannelMessageTarget(guild.id(), channel.id()), new MessageContent("<@" + recipientId + ">"),
+            List.of(new UserMentionTarget(recipientId)), false, false, List.of(), Instant.EPOCH, Instant.EPOCH);
+        MessagePublished event = new MessagePublished(UUID.randomUUID(), message.id(), message.author(), message.target(),
+            message.mentions(), "correlation", Instant.EPOCH);
+        List<MentionNotificationCommand> recorded = new ArrayList<>();
+        MessageMentionProjector projector = new MessageMentionProjector((target, id) -> message,
+            new MessageMentionRecipientResolver(guilds), id -> 7L, recorded::add);
+        ObjectProvider<MessageMentionProjector> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(projector);
+
+        new MessageConfiguration().messagePublishedDispatcher(gateway, (target, id) -> message, provider).dispatch(event);
+
+        assertThat(recorded).hasSize(1);
+        assertThat(recorded.getFirst().mentionedUserIds()).containsExactly(recipientId);
     }
 
     private record DecisionStore(AuthorizationDecision decision) implements AuthorizationProjectionStore {

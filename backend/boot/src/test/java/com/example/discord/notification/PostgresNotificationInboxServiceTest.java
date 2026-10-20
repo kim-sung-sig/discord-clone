@@ -1,6 +1,7 @@
 package com.example.discord.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.discord.channel.ChannelType;
 import java.sql.Timestamp;
@@ -28,6 +29,7 @@ class PostgresNotificationInboxServiceTest {
     private static final UUID AUTHOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000434");
     private static final UUID VISIBLE_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000435");
     private static final UUID HIDDEN_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000436");
+    private static final UUID DM_CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000437");
     private static final Instant NOW = Instant.parse("2026-05-18T00:00:00Z");
 
     private JdbcNotificationInboxService service;
@@ -40,6 +42,7 @@ class PostgresNotificationInboxServiceTest {
         try (var connection = dataSource.getConnection();
              var statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM notification_items");
+            statement.executeUpdate("DELETE FROM channel_read_markers");
             statement.executeUpdate("DELETE FROM notification_preferences");
             statement.executeUpdate("DELETE FROM premium_entitlements");
             statement.executeUpdate("DELETE FROM channel_role_overwrites");
@@ -55,6 +58,13 @@ class PostgresNotificationInboxServiceTest {
         insertUser(VISIBLE_USER_ID, "visible");
         insertUser(HIDDEN_USER_ID, "hidden");
         insertGuildAndChannel();
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement(
+            "INSERT INTO dm_channels(id, first_user_id, second_user_id) VALUES (?, ?, ?)")) {
+            statement.setObject(1, DM_CHANNEL_ID);
+            statement.setObject(2, AUTHOR_ID);
+            statement.setObject(3, VISIBLE_USER_ID);
+            statement.executeUpdate();
+        }
         service = new JdbcNotificationInboxService(dataSource, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -77,6 +87,20 @@ class PostgresNotificationInboxServiceTest {
         assertThat(service.inbox(HIDDEN_USER_ID)).isEmpty();
         assertThat(service.inbox(AUTHOR_ID)).isEmpty();
         assertThat(service.unreadCount(VISIBLE_USER_ID)).isEqualTo(1L);
+    }
+
+    @Test
+    void mentionProjectionRollsBackAllRecipientsWhenOneInsertFails() throws Exception {
+        Set<UUID> recipientIds = Set.of(UUID.randomUUID(), UUID.randomUUID());
+        MentionNotificationCommand command = new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, UUID.randomUUID(), 1L, AUTHOR_ID,
+            recipientIds, recipientIds, "mention"
+        );
+        UUID firstRecipient = command.mentionedUserIds().iterator().next();
+        insertUser(firstRecipient, "first_recipient");
+
+        assertThatThrownBy(() -> service.recordMention(command)).isInstanceOf(IllegalStateException.class);
+        assertThat(service.inbox(firstRecipient)).isEmpty();
     }
 
     @Test
@@ -121,6 +145,79 @@ class PostgresNotificationInboxServiceTest {
             .filteredOn(NotificationItem::read)
             .extracting(NotificationItem::sequence)
             .containsExactly(11L);
+    }
+
+    @Test
+    void pagesVisibleInboxWithoutLeakingHiddenChannelCount() {
+        service.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, MESSAGE_ID, 1L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "mention"
+        ));
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "dm one");
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "dm two");
+
+        var first = service.page(VISIBLE_USER_ID, Set.of(), null, 1);
+        var second = service.page(VISIBLE_USER_ID, Set.of(), first.get(0).id(), 1);
+
+        assertThat(first).hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(second).hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(second.get(0).id()).isNotEqualTo(first.get(0).id());
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isEqualTo(2);
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of(CHANNEL_ID))).isEqualTo(3);
+    }
+
+    @Test
+    void fillsPageWhenNewestNotificationIsFromHiddenChannel() {
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "visible dm");
+        JdbcNotificationInboxService later = new JdbcNotificationInboxService(
+            dataSource, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC)
+        );
+        later.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, UUID.randomUUID(), 2L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "hidden mention"
+        ));
+
+        assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 1))
+            .hasSize(1).extracting(NotificationItem::kind).containsExactly(NotificationKind.DM);
+        assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isEqualTo(1);
+    }
+
+    @Test
+    void delayedMentionProjectionStartsReadWhenMarkerAlreadyAdvanced() throws Exception {
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
+            INSERT INTO channel_read_markers(user_id, channel_id, last_read_sequence) VALUES (?, ?, 10)
+            """)) {
+            statement.setObject(1, VISIBLE_USER_ID);
+            statement.setObject(2, CHANNEL_ID);
+            statement.executeUpdate();
+        }
+        service.recordMention(new MentionNotificationCommand(
+            GUILD_ID, CHANNEL_ID, MESSAGE_ID, 10L, AUTHOR_ID,
+            Set.of(VISIBLE_USER_ID), Set.of(VISIBLE_USER_ID), "delayed mention"
+        ));
+        assertThat(service.inbox(VISIBLE_USER_ID)).extracting(NotificationItem::read).containsExactly(true);
+    }
+
+    @Test
+    void excludesBlockedAndNonParticipantDmsFromPageAndUnread() throws Exception {
+        service.recordDirectMessage(VISIBLE_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "private dm");
+        service.recordDirectMessage(HIDDEN_USER_ID, DM_CHANNEL_ID, UUID.randomUUID(), 1L, "not a participant");
+        assertThat(service.page(HIDDEN_USER_ID, Set.of(), null, 50)).isEmpty();
+        assertThat(service.unreadCount(HIDDEN_USER_ID, Set.of())).isZero();
+        assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 50)).hasSize(1);
+        for (UUID[] pair : new UUID[][] {{AUTHOR_ID, VISIBLE_USER_ID}, {VISIBLE_USER_ID, AUTHOR_ID}}) {
+            try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement(
+                "INSERT INTO social_blocks(blocker_id, blocked_id) VALUES (?, ?)")) {
+                statement.setObject(1, pair[0]);
+                statement.setObject(2, pair[1]);
+                statement.executeUpdate();
+            }
+            assertThat(service.page(VISIBLE_USER_ID, Set.of(), null, 50)).isEmpty();
+            assertThat(service.unreadCount(VISIBLE_USER_ID, Set.of())).isZero();
+            try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+                statement.executeUpdate("DELETE FROM social_blocks");
+            }
+        }
     }
 
     private void insertUser(UUID id, String username) throws Exception {

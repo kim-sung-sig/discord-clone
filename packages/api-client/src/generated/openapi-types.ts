@@ -16,9 +16,20 @@ export type ApiPath =
   | '/api/guilds'
   | '/api/guilds/{guildId}/channels'
   | '/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports'
+  | '/api/guilds/{guildId}/events'
+  | '/api/guilds/{guildId}/events/{eventId}'
+  | '/api/guilds/{guildId}/events/{eventId}/cancel'
   | '/api/guilds/{guildId}/message-reports'
   | '/api/guilds/{guildId}/message-reports/{reportId}/resolve'
+  | '/api/notifications'
+  | '/api/notifications/{itemId}/read'
+  | '/api/notifications/channel-unread'
+  | '/api/notifications/unread-count'
+  | '/api/presence/channels/{channelId}/read'
   | '/api/security/csp-report'
+  | '/api/social/dms'
+  | '/api/social/dms/{targetUserId}/messages'
+  | '/api/social/dms/{targetUserId}/read'
   | '/api/users/@me/guilds'
   | '/api/voice/channels/{channelId}/join'
 
@@ -78,6 +89,26 @@ export const apiOperations = [
   },
   {
     "method": "GET",
+    "path": "/api/guilds/{guildId}/events",
+    "operationId": "listServerEvents"
+  },
+  {
+    "method": "POST",
+    "path": "/api/guilds/{guildId}/events",
+    "operationId": "createServerEvent"
+  },
+  {
+    "method": "GET",
+    "path": "/api/guilds/{guildId}/events/{eventId}",
+    "operationId": "getServerEvent"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/guilds/{guildId}/events/{eventId}/cancel",
+    "operationId": "cancelServerEvent"
+  },
+  {
+    "method": "GET",
     "path": "/api/guilds/{guildId}/message-reports",
     "operationId": "listMessageReports"
   },
@@ -87,9 +118,64 @@ export const apiOperations = [
     "operationId": "resolveMessageReport"
   },
   {
+    "method": "GET",
+    "path": "/api/notifications",
+    "operationId": "listNotifications"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/{itemId}/read",
+    "operationId": "markServerNotificationRead"
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/channel-unread",
+    "operationId": "countUnreadChannelMessages"
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/unread-count",
+    "operationId": "countUnreadNotifications"
+  },
+  {
+    "method": "GET",
+    "path": "/api/presence/channels/{channelId}/read",
+    "operationId": "getChannelReadMarker"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/presence/channels/{channelId}/read",
+    "operationId": "markChannelRead"
+  },
+  {
     "method": "POST",
     "path": "/api/security/csp-report",
     "operationId": "submitCspReport"
+  },
+  {
+    "method": "POST",
+    "path": "/api/social/dms",
+    "operationId": "openDirectMessage"
+  },
+  {
+    "method": "GET",
+    "path": "/api/social/dms/{targetUserId}/messages",
+    "operationId": "listDirectMessages"
+  },
+  {
+    "method": "POST",
+    "path": "/api/social/dms/{targetUserId}/messages",
+    "operationId": "sendDirectMessage"
+  },
+  {
+    "method": "GET",
+    "path": "/api/social/dms/{targetUserId}/read",
+    "operationId": "getDirectMessageReadMarker"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/social/dms/{targetUserId}/read",
+    "operationId": "markDirectMessageRead"
   },
   {
     "method": "GET",

@@ -37,6 +37,8 @@ public class InMemoryMessageService
 
     private final Clock clock;
     private final Map<UUID, Message> messages = new LinkedHashMap<>();
+    private final Map<UUID, Long> messageSequences = new LinkedHashMap<>();
+    private final Map<ChannelKey, Long> lastSequences = new LinkedHashMap<>();
     private final Map<ChannelKey, NavigableSet<MessageOrder>> messagesByChannel = new LinkedHashMap<>();
     private final Map<IdempotencyScope, UUID> messageIdsByIdempotency = new LinkedHashMap<>();
     private final Map<UUID, MessagePublished> pendingPublications = new LinkedHashMap<>();
@@ -258,7 +260,7 @@ public class InMemoryMessageService
     public synchronized MessageReadPage readModels(ChannelMessageTarget target, String beforeCursor, int limit) {
         MessagePage page = read(target, beforeCursor, limit);
         return new MessageReadPage(
-            page.messages().stream().map(MessageReadModel::from).toList(),
+            page.messages().stream().map(message -> MessageReadModel.from(message, messageSequences.get(message.id()))).toList(),
             page.nextCursor()
         );
     }
@@ -332,8 +334,17 @@ public class InMemoryMessageService
     @Override
     public synchronized List<MessageReadModel> searchModels(ChannelMessageTarget target, String query, int limit) {
         return search(target, query, limit).stream()
-            .map(MessageReadModel::from)
+            .map(message -> MessageReadModel.from(message, messageSequences.get(message.id())))
             .toList();
+    }
+
+    @Override
+    public synchronized long sequenceOf(UUID messageId) {
+        Long sequence = messageSequences.get(messageId);
+        if (sequence == null) {
+            throw new MessageNotFoundException();
+        }
+        return sequence;
     }
 
     public synchronized List<Message> search(UUID guildId, Set<UUID> allowedChannelIds, String query, int limit) {
@@ -377,6 +388,12 @@ public class InMemoryMessageService
     private void upsertMessage(Message message) {
         Objects.requireNonNull(message, "message must not be null");
         Message previous = messages.put(message.id(), message);
+        if (previous == null) {
+            ChannelKey channel = ChannelKey.from(message);
+            long sequence = lastSequences.getOrDefault(channel, 0L) + 1;
+            lastSequences.put(channel, sequence);
+            messageSequences.put(message.id(), sequence);
+        }
         if (previous != null) {
             removeFromChannelIndex(previous);
         }

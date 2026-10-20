@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import UnreadBadge from './UnreadBadge.vue'
+import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
+const auth = useAuthStore()
 const preferences = usePreferencesStore()
 const isHydrated = ref(false)
 
 onMounted(() => {
   isHydrated.value = true
 })
+
+function selectChannel(channelId: string) {
+  if (auth.accessToken) {
+    void shell.selectBackendChannel(channelId, auth.accessToken)
+  } else {
+    shell.selectChannel(channelId)
+  }
+}
 </script>
 
 <template>
@@ -40,7 +50,7 @@ onMounted(() => {
         :disabled="!isHydrated"
         :aria-describedby="!isHydrated ? 'channel-hydration-status' : undefined"
         :aria-current="channel.id === shell.activeChannelId ? 'page' : undefined"
-        @click="shell.selectChannel(channel.id)"
+        @click="selectChannel(channel.id)"
       >
         <span>{{ channel.type === 'GUILD_TEXT' ? '#' : channel.type === 'GUILD_FORUM' ? preferences.t('channel.kind.forum') : preferences.t('channel.kind.voice') }}</span>
         <span>{{ channel.name }}</span>

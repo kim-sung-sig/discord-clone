@@ -33,6 +33,28 @@
         },
         "description": "Channel response."
       },
+      "DirectMessage": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Persisted 1:1 DM receipt."
+      },
+      "DirectMessageChannel": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "1:1 DM channel."
+      },
       "Forbidden": {
         "content": {
           "application/json": {
@@ -130,6 +152,28 @@
         },
         "description": "404 error."
       },
+      "ReadMarker": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Persisted read marker."
+      },
+      "ServerEvent": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          }
+        },
+        "description": "Server event response."
+      },
       "Unauthorized": {
         "content": {
           "application/json": {
@@ -139,6 +183,53 @@
           }
         },
         "description": "401 error."
+      },
+      "UnreadCount": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "byKind": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "DM": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "MENTION": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "SERVER": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "MENTION",
+                    "DM",
+                    "SERVER"
+                  ],
+                  "type": "object"
+                },
+                "unreadCount": {
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "unreadCount",
+                "byKind"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "description": "Unread notification count."
       },
       "UserGuildList": {
         "content": {
@@ -189,6 +280,14 @@
         ],
         "type": "object"
       },
+      "CancelServerEventRequest": {
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CreateChannelRequest": {
         "properties": {
           "name": {
@@ -230,11 +329,86 @@
           },
           "idempotencyKey": {
             "type": "string"
+          },
+          "mentions": {
+            "items": {
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "USER",
+                    "EVERYONE"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
           "content",
           "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "CreateServerEventRequest": {
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "endsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "channelId",
+          "title",
+          "startsAt",
+          "endsAt"
+        ],
+        "type": "object"
+      },
+      "DirectMessageRequest": {
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "FriendTargetRequest": {
+        "properties": {
+          "targetUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetUserId"
         ],
         "type": "object"
       },
@@ -251,6 +425,106 @@
         "required": [
           "email",
           "password"
+        ],
+        "type": "object"
+      },
+      "MessageResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sequence": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "sequence"
+        ],
+        "type": "object"
+      },
+      "NotificationItem": {
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "eventId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "guildId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "MENTION",
+              "DM",
+              "SERVER"
+            ],
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "sequence": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "sourceId",
+          "sequence",
+          "kind",
+          "read",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "ReadMarkerRequest": {
+        "properties": {
+          "lastReadSequence": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lastReadSequence"
         ],
         "type": "object"
       },
@@ -855,6 +1129,273 @@
         ]
       }
     },
+    "/api/guilds/{guildId}/events": {
+      "get": {
+        "operationId": "listServerEvents",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Server events."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "List visible server events.",
+        "tags": [
+          "events"
+        ]
+      },
+      "post": {
+        "operationId": "createServerEvent",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServerEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ServerEvent"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Create a server event and recipient notifications.",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/events/{eventId}": {
+      "get": {
+        "operationId": "getServerEvent",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerEvent"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get a visible server event by ID.",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/events/{eventId}/cancel": {
+      "put": {
+        "operationId": "cancelServerEvent",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelServerEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerEvent"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Cancel a server event and notify visible members.",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/api/guilds/{guildId}/message-reports": {
       "get": {
         "operationId": "listMessageReports",
@@ -994,6 +1535,357 @@
         ]
       }
     },
+    "/api/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationItem"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Notification items."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Page visible notifications.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/{itemId}/read": {
+      "put": {
+        "operationId": "markServerNotificationRead",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marked read."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Mark a visible server notification read.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/channel-unread": {
+      "get": {
+        "operationId": "countUnreadChannelMessages",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unread count by channel ID."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Count unread messages by visible channel.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "countUnreadNotifications",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/UnreadCount"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Count visible unread notifications.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/presence/channels/{channelId}/read": {
+      "get": {
+        "operationId": "getChannelReadMarker",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReadMarker"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get the persisted channel read marker.",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "put": {
+        "operationId": "markChannelRead",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "channelId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadMarkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReadMarker"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Advance a channel read marker.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/api/security/csp-report": {
       "post": {
         "operationId": "submitCspReport",
@@ -1039,6 +1931,329 @@
         "summary": "Submit sanitized CSP violation telemetry.",
         "tags": [
           "security"
+        ]
+      }
+    },
+    "/api/social/dms": {
+      "post": {
+        "operationId": "openDirectMessage",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/DirectMessageChannel"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Open a persistent 1:1 DM channel.",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/social/dms/{targetUserId}/messages": {
+      "get": {
+        "operationId": "listDirectMessages",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetUserId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "beforeSequence",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Direct messages."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Page a 1:1 DM conversation.",
+        "tags": [
+          "social"
+        ]
+      },
+      "post": {
+        "operationId": "sendDirectMessage",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetUserId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/DirectMessage"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Persist a 1:1 DM and recipient notification.",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/social/dms/{targetUserId}/read": {
+      "get": {
+        "operationId": "getDirectMessageReadMarker",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetUserId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReadMarker"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get the persisted DM read sequence.",
+        "tags": [
+          "social"
+        ]
+      },
+      "put": {
+        "operationId": "markDirectMessageRead",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "targetUserId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadMarkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReadMarker"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Advance a DM read marker.",
+        "tags": [
+          "social"
         ]
       }
     },
@@ -1170,6 +2385,15 @@
     },
     {
       "name": "security"
+    },
+    {
+      "name": "notifications"
+    },
+    {
+      "name": "social"
+    },
+    {
+      "name": "events"
     }
   ]
 }
