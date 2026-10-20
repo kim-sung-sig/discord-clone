@@ -72,7 +72,7 @@ flowchart TD
 ```
 
 ## Invariants And Boundaries
-- Auth/security: 변경 없음. Listener는 loopback에서만 접근한다.
+- Auth/security: CI backend listener는 `127.0.0.1`에만 bind한다.
 - Transactions/idempotency: 해당 없음.
 - Error handling: 기존 startup retry와 backend 로그 수집을 유지한다.
 - Generated contracts: 변경 없음.
@@ -80,12 +80,12 @@ flowchart TD
 
 ## Implementation Steps
 - `qa/ci-workflow.contract.ps1`: 먼저 runtime job의 포트 출력·전달 조건과 `:8080` 부재를 검사한다.
-- `.github/workflows/ci.yml`: 선택된 포트로 backend를 시작하고 동일 포트를 health probe와 smoke step에 전달한다.
+- `.github/workflows/ci.yml`: loopback 주소와 선택된 포트로 backend를 시작하고 동일 포트를 health probe와 smoke step에 전달한다.
 
 ## Verification Gates
-- Focused tests: `pwsh qa/ci-workflow.contract.ps1`.
-- Contract checks: runtime job에서 backend port가 동적으로 할당되고 세 경로에서 동일하게 사용됨을 검사한다.
-- Runtime checks: 실제 GitHub Actions `qa-runtime`에서 확인한다. 이전 실행은 smoke 도중 취소되어 이 변경의 runtime 통과 증거로 사용할 수 없다.
+- Push 전 게이트: `pwsh qa/ci-workflow.contract.ps1`, `pwsh qa/real-backend-e2e.contract.ps1`, workflow YAML parse, `git diff --check`.
+- Contract checks: runtime job에서 loopback bind와 backend port의 동적 할당, backend/health/smoke 간 동일 포트 사용을 검사한다.
+- Push 후 수용 게이트: 이 commit의 GitHub Actions `qa-runtime` 성공을 확인한다. 이전 실행은 smoke 도중 취소되어 이 변경의 runtime 통과 증거로 사용할 수 없다.
 
 ## Review Score Preset
 - Preset: Implementation Review

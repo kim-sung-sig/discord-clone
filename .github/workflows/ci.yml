@@ -111,7 +111,7 @@ jobs:
           printf '%s' 'identity-2026-07' > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/key-id
           printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-private.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/private-key-location
           printf '%s' "file:$GITHUB_WORKSPACE/backend/modules/identity/src/test/resources/identity/ed25519-public.pem" > qa/artifacts/real-backend-e2e/ci/discord-config/discord/auth/jwt/public-key-locations/identity-2026-07
-          SERVER_PORT="$backend_port" ./gradlew :backend:boot:bootRun \
+          SERVER_ADDRESS="127.0.0.1" SERVER_PORT="$backend_port" ./gradlew :backend:boot:bootRun \
             > qa/artifacts/real-backend-e2e/ci/backend-bootRun.log \
             2> qa/artifacts/real-backend-e2e/ci/backend-bootRun.err.log &
           echo "$!" > qa/artifacts/real-backend-e2e/ci/backend.pid
