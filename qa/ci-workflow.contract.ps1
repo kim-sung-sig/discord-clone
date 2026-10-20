@@ -41,7 +41,7 @@ $requiredSnippets = @(
   'pwsh qa/real-backend-e2e.contract.ps1',
   'Start backend for runtime QA',
   './gradlew :backend:boot:bootRun',
-  'pwsh qa/real-backend-e2e.ps1 -BackendUrl http://127.0.0.1:8080 -SkipServiceStart',
+  'pwsh qa/real-backend-e2e.ps1 -BackendUrl "$BACKEND_URL" -SkipServiceStart',
   'Stop runtime backend',
   'pwsh qa/security-gate.contract.ps1',
   'pwsh qa/security-gate.ps1',
@@ -61,6 +61,17 @@ $requiredSnippets = @(
 foreach ($snippet in $requiredSnippets) {
   Assert ($content.Contains($snippet)) "CI workflow is missing required snippet: $snippet"
 }
+
+$runtimeBlock = [regex]::Match($content, '(?ms)^  qa-runtime:\r?\n(?<body>.*?)^  qa-security:').Groups['body'].Value
+Assert (-not [string]::IsNullOrWhiteSpace($runtimeBlock)) 'CI workflow is missing the qa-runtime job block'
+Assert ($runtimeBlock.Contains('id: start-backend')) 'qa-runtime backend startup step must expose its selected port'
+Assert ($runtimeBlock.Contains('socket.socket')) 'qa-runtime must select a free port with Python socket'
+Assert ($runtimeBlock.Contains('("127.0.0.1", 0)')) 'qa-runtime port selection must bind loopback port 0'
+Assert ($runtimeBlock.Contains('echo "port=$backend_port" >> "$GITHUB_OUTPUT"')) 'qa-runtime must expose the selected port as a step output'
+Assert ($runtimeBlock.Contains('SERVER_PORT="$backend_port" ./gradlew :backend:boot:bootRun')) 'qa-runtime backend must bind the selected port'
+Assert ($runtimeBlock.Contains('http://127.0.0.1:$backend_port/actuator/health')) 'qa-runtime health probe must use the selected port'
+Assert ($runtimeBlock.Contains('BACKEND_URL: http://127.0.0.1:${{ steps.start-backend.outputs.port }}')) 'qa-runtime smoke must consume the backend startup port output'
+Assert (-not $runtimeBlock.Contains('127.0.0.1:8080')) 'qa-runtime must not hard-code backend port 8080'
 
 $qaScriptMatches = [regex]::Matches($content, 'qa/[A-Za-z0-9_.-]+\.ps1')
 foreach ($match in $qaScriptMatches) {
