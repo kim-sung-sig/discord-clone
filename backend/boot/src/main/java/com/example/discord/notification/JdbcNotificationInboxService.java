@@ -215,10 +215,14 @@ class JdbcNotificationInboxService {
     }
 
     long unreadCount(UUID userId, Set<UUID> visibleChannelIds) {
+        return unreadByKind(userId, visibleChannelIds).values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    Map<NotificationKind, Long> unreadByKind(UUID userId, Set<UUID> visibleChannelIds) {
         Objects.requireNonNull(userId, "userId must not be null");
         try (Connection connection = dataSource.getConnection();
              var statement = connection.prepareStatement("""
-                 SELECT COUNT(*) FROM notification_items
+                 SELECT kind, COUNT(*) FROM notification_items
                  WHERE user_id = ? AND read = FALSE
                    AND ((guild_id IS NOT NULL AND channel_id = ANY(?)) OR (kind = 'DM' AND EXISTS (
                        SELECT 1 FROM dm_channels dm
@@ -230,12 +234,19 @@ class JdbcNotificationInboxService {
                                 OR (block.blocker_id = dm.second_user_id AND block.blocked_id = dm.first_user_id)
                          )
                    )))
+                 GROUP BY kind
                  """)) {
             statement.setObject(1, userId);
             statement.setArray(2, connection.createArrayOf("uuid", visibleChannelIds.toArray()));
             try (var result = statement.executeQuery()) {
-                result.next();
-                return result.getLong(1);
+                Map<NotificationKind, Long> counts = new java.util.EnumMap<>(NotificationKind.class);
+                for (NotificationKind kind : NotificationKind.values()) {
+                    counts.put(kind, 0L);
+                }
+                while (result.next()) {
+                    counts.put(NotificationKind.valueOf(result.getString(1)), result.getLong(2));
+                }
+                return Map.copyOf(counts);
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to count visible notifications", exception);

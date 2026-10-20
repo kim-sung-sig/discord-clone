@@ -55,6 +55,23 @@ class ServerEventController {
         return events.visibleEvents(guildId, visibleChannels(guildId, userId));
     }
 
+    @GetMapping("/{eventId}")
+    ServerEvent get(
+        @PathVariable UUID guildId,
+        @PathVariable UUID eventId,
+        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
+        UUID userId = users.requireUserId(authorization);
+        if (!guilds.guildIdsForMember(userId).contains(guildId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "guild membership required");
+        }
+        ServerEvent event = events.event(guildId, eventId);
+        if (!guilds.canViewChannel(guildId, event.channelId(), userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "view channel permission required");
+        }
+        return event;
+    }
+
     @PostMapping
     ResponseEntity<ServerEvent> create(
         @PathVariable UUID guildId,

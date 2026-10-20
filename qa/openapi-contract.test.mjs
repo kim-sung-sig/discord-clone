@@ -32,7 +32,8 @@ for (const path of [
   '/api/security/csp-report',
   '/api/notifications',
   '/api/social/dms/{targetUserId}/messages',
-  '/api/guilds/{guildId}/events'
+  '/api/guilds/{guildId}/events',
+  '/api/guilds/{guildId}/events/{eventId}'
 ]) {
   assert.ok(spec.paths[path], `${path} must be part of the OpenAPI contract`)
 }

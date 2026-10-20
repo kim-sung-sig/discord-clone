@@ -30,6 +30,8 @@ const bottomPanelOpen = ref(false)
 const searchQuery = ref('')
 const backendDmDraft = ref('')
 const backendDmSection = ref<HTMLElement | null>(null)
+const inboxHasMore = ref(false)
+const inboxLoadingMore = ref(false)
 let backendDmReadObserver: IntersectionObserver | null = null
 let backendDmReadGeneration = 0
 const browserNotificationsEnabled = ref(false)
@@ -130,7 +132,37 @@ function setWorkbenchView(view: WorkbenchView) {
   activeWorkbenchView.value = view
   bottomPanelOpen.value = false
   if (view === 'inbox' && auth.accessToken) {
-    void shell.loadBackendNotifications(auth.accessToken)
+    void loadInboxNotifications(auth.accessToken)
+  }
+}
+
+async function loadInboxNotifications(bearerToken: string) {
+  const generation = shell.accountGeneration
+  const items = await shell.loadBackendNotifications(bearerToken)
+  if (items && generation === shell.accountGeneration) {
+    inboxHasMore.value = items.length === 50
+  }
+}
+
+async function loadMoreInboxNotifications() {
+  const lastItem = shell.backendNotifications.at(-1)
+  const bearerToken = auth.accessToken
+  if (!inboxHasMore.value || inboxLoadingMore.value || !lastItem || !bearerToken) return
+  const generation = shell.accountGeneration
+  inboxLoadingMore.value = true
+  try {
+    const items = await shell.loadBackendNotificationPage(bearerToken, lastItem.id)
+    if (!items || generation !== shell.accountGeneration || shell.backendNotifications.at(-1)?.id !== lastItem.id) return
+    const existingIds = new Set(shell.backendNotifications.map((item) => item.id))
+    const newItems = items.filter((item) => {
+      if (existingIds.has(item.id)) return false
+      existingIds.add(item.id)
+      return true
+    })
+    shell.backendNotifications.push(...newItems)
+    inboxHasMore.value = items.length === 50
+  } finally {
+    if (generation === shell.accountGeneration) inboxLoadingMore.value = false
   }
 }
 
@@ -326,6 +358,14 @@ async function runRealBackendSmoke() {
 definePageMeta({
   path: '/',
   alias: ['/app']
+})
+
+watch(() => [auth.user?.id, auth.accessToken, shell.accountGeneration] as const, ([userId, bearerToken]) => {
+  inboxHasMore.value = false
+  inboxLoadingMore.value = false
+  if (activeWorkbenchView.value === 'inbox' && userId && bearerToken) {
+    void loadInboxNotifications(bearerToken)
+  }
 })
 
 onMounted(() => {
@@ -639,6 +679,15 @@ onBeforeUnmount(() => {
             <strong v-if="!item.read">●</strong>
           </article>
         </section>
+        <button
+          v-if="auth.accessToken && inboxHasMore"
+          type="button"
+          data-testid="workbench-inbox-load-more"
+          :disabled="inboxLoadingMore"
+          @click="loadMoreInboxNotifications"
+        >
+          {{ preferences.t('view.inbox.loadMore') }}
+        </button>
         <section v-if="auth.accessToken && shell.backendDmTargetUserId" ref="backendDmSection" data-testid="workbench-inbox-dm-conversation">
           <h3>{{ preferences.t('view.inbox.directMessage') }}</h3>
           <p v-for="message in shell.backendDmMessages" :key="message.id" :data-dm-message-id="message.id">{{ message.content }}</p>

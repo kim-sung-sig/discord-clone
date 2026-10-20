@@ -17,6 +17,7 @@ export type ApiPath =
   | '/api/guilds/{guildId}/channels'
   | '/api/guilds/{guildId}/channels/{channelId}/messages/{messageId}/reports'
   | '/api/guilds/{guildId}/events'
+  | '/api/guilds/{guildId}/events/{eventId}'
   | '/api/guilds/{guildId}/events/{eventId}/cancel'
   | '/api/guilds/{guildId}/message-reports'
   | '/api/guilds/{guildId}/message-reports/{reportId}/resolve'
@@ -95,6 +96,11 @@ export const apiOperations = [
     "method": "POST",
     "path": "/api/guilds/{guildId}/events",
     "operationId": "createServerEvent"
+  },
+  {
+    "method": "GET",
+    "path": "/api/guilds/{guildId}/events/{eventId}",
+    "operationId": "getServerEvent"
   },
   {
     "method": "PUT",

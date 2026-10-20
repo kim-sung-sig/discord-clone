@@ -57,7 +57,8 @@ class NotificationController {
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
     ) {
         UUID userId = users.requireUserId(authorization);
-        return new UnreadCountResponse(inbox.unreadCount(userId, visibleChannels(userId)));
+        Map<NotificationKind, Long> byKind = inbox.unreadByKind(userId, visibleChannels(userId));
+        return new UnreadCountResponse(byKind.values().stream().mapToLong(Long::longValue).sum(), byKind);
     }
 
     @GetMapping("/channel-unread")
@@ -86,7 +87,7 @@ class NotificationController {
             .collect(java.util.stream.Collectors.toSet());
     }
 
-    record UnreadCountResponse(long unreadCount) {
+    record UnreadCountResponse(long unreadCount, Map<NotificationKind, Long> byKind) {
     }
 
     record NotificationResponse(

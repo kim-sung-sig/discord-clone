@@ -147,6 +147,11 @@ const spec = {
         requestBody: jsonBody({ $ref: '#/components/schemas/CreateServerEventRequest' }),
         responses: { 201: { $ref: '#/components/responses/ServerEvent' } } })
     },
+    '/api/guilds/{guildId}/events/{eventId}': {
+      get: operation({ operationId: 'getServerEvent', tags: ['events'], summary: 'Get a visible server event by ID.',
+        parameters: [authHeader, { name: 'guildId', in: 'path', required: true, schema: uuid }, { name: 'eventId', in: 'path', required: true, schema: uuid }],
+        responses: { 200: { $ref: '#/components/responses/ServerEvent' } } })
+    },
     '/api/guilds/{guildId}/events/{eventId}/cancel': {
       put: operation({ operationId: 'cancelServerEvent', tags: ['events'], summary: 'Cancel a server event and notify visible members.',
         parameters: [authHeader, { name: 'guildId', in: 'path', required: true, schema: uuid }, { name: 'eventId', in: 'path', required: true, schema: uuid }],
@@ -402,6 +407,19 @@ for (const [name, description] of [
   spec.components.responses[name] = {
     description,
     content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } }
+  }
+}
+
+spec.components.responses.UnreadCount.content['application/json'].schema = {
+  type: 'object', required: ['unreadCount', 'byKind'],
+  properties: {
+    unreadCount: { type: 'integer', format: 'int64', minimum: 0 },
+    byKind: {
+      type: 'object', required: ['MENTION', 'DM', 'SERVER'], additionalProperties: false,
+      properties: Object.fromEntries(['MENTION', 'DM', 'SERVER'].map((kind) => [kind, {
+        type: 'integer', format: 'int64', minimum: 0
+      }]))
+    }
   }
 }
 

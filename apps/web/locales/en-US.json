@@ -46,6 +46,7 @@
   "view.calls.title": "Voice rooms",
   "view.inbox.description": "Review mentions, unread channels, and direct messages from one focused queue.",
   "view.inbox.directMessage": "Direct message",
+  "view.inbox.loadMore": "Load more",
   "view.inbox.title": "Notification inbox",
   "view.search.description": "Filter channels and unread work without leaving the current workspace.",
   "view.search.input": "Search query",

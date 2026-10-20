@@ -87,6 +87,23 @@ class PostgresChannelReadServiceTest {
     }
 
     @Test
+    void readingChannelMessagesLeavesUnopenedServerNotificationsUnread() throws Exception {
+        try (var connection = dataSource.getConnection(); var statement = connection.prepareStatement("""
+            INSERT INTO notification_items(id, user_id, guild_id, channel_id, source_id, sequence, kind, summary, read, created_at)
+            VALUES (?, ?, ?, ?, ?, 0, 'SERVER', 'event created', FALSE, NOW())
+            """)) {
+            statement.setObject(1, UUID.randomUUID());
+            statement.setObject(2, OWNER);
+            statement.setObject(3, GUILD);
+            statement.setObject(4, CHANNEL);
+            statement.setObject(5, UUID.randomUUID());
+            statement.executeUpdate();
+        }
+        service.markRead(CHANNEL, OWNER, 1);
+        assertThat(unreadNotifications()).isEqualTo(1);
+    }
+
+    @Test
     void rejectsSequenceBeyondPersistedMessagesWithoutChangingState() {
         assertThatThrownBy(() -> service.markRead(CHANNEL, OWNER, 2)).isInstanceOf(IllegalArgumentException.class);
         assertThat(service.readMarker(CHANNEL, OWNER).lastReadSequence()).isZero();

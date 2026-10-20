@@ -46,6 +46,7 @@
   "view.calls.title": "음성 룸",
   "view.inbox.description": "멘션, 읽지 않은 채널, 다이렉트 메시지를 한 큐에서 확인합니다.",
   "view.inbox.directMessage": "다이렉트 메시지",
+  "view.inbox.loadMore": "더 불러오기",
   "view.inbox.title": "알림 받은함",
   "view.search.description": "현재 워크스페이스를 벗어나지 않고 채널과 읽지 않은 작업을 필터링합니다.",
   "view.search.input": "검색어",

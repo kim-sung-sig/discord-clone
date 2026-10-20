@@ -1656,10 +1656,9 @@ export const useShellStore = defineStore('shell', {
     ): Promise<BackendServerEvent | null> {
       const generation = this.accountGeneration
       const event = await this.withBackendRequest(async (client, requestId) => {
-        const events = await client.get<BackendServerEvent[]>(
-          discordApiPaths.event.list(guildId), { bearerToken, requestId }
+        return client.get<BackendServerEvent>(
+          discordApiPaths.event.detail(guildId, eventId), { bearerToken, requestId }
         )
-        return events.find((candidate) => candidate.id === eventId) ?? null
       })
       if (event && generation === this.accountGeneration && await this.markBackendServerNotificationRead(itemId, bearerToken)
           && generation === this.accountGeneration) {
@@ -2009,6 +2008,7 @@ export const useShellStore = defineStore('shell', {
       const auth = useAuthStore()
       const generation = this.accountGeneration
       const token = auth.accessToken
+      if (!token) return null
       const userId = auth.user?.id
       const isCurrent = () => generation === this.accountGeneration && token === auth.accessToken && userId === auth.user?.id
       const stale = new Error('Account changed during request')
@@ -2021,7 +2021,7 @@ export const useShellStore = defineStore('shell', {
         const client = createDiscordRestClient({
           baseUrl: config.public.apiBaseUrl,
           fetcher: (input, init) => {
-            if (!isCurrent() || (token && new Headers(init?.headers).get('Authorization') !== `Bearer ${token}`)) {
+            if (!isCurrent() || new Headers(init?.headers).get('Authorization') !== `Bearer ${token}`) {
               throw stale
             }
             return globalThis.fetch(input, init)

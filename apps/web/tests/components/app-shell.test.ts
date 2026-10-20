@@ -103,8 +103,8 @@ describe('Discord app shell', () => {
         return jsonResponse([{ id: 'dm-message', sequence: 1, senderId: 'friend-id', content: 'Saved DM' }])
       }
       if (path.endsWith('/api/social/dms/friend-id/read')) return jsonResponse({ lastReadSequence: 0 })
-      if (path.endsWith('/api/guilds/guild-id/events')) {
-        return jsonResponse([{ id: 'event-id', channelId: 'channel-id', title: 'Saved event', startsAt: '2026-10-01T10:00:00Z' }])
+      if (path.endsWith('/api/guilds/guild-id/events/event-id')) {
+        return jsonResponse({ id: 'event-id', channelId: 'channel-id', title: 'Saved event', startsAt: '2026-10-01T10:00:00Z' })
       }
       if (path.endsWith('/api/notifications/event-item/read')) return new Response(null, { status: 204 })
       return jsonResponse({}, 404)
@@ -116,7 +116,157 @@ describe('Discord app shell', () => {
     await vi.waitFor(() => expect(wrapper.get('[data-testid="workbench-inbox-dm-conversation"]').text()).toContain('Saved DM'))
     await wrapper.get('[data-testid="workbench-inbox-server-event-item"] button').trigger('click')
     await vi.waitFor(() => expect(wrapper.get('[data-testid="workbench-inbox-event-detail"]').text()).toContain('Saved event'))
+    expect(requests.some((request) => request.endsWith('/api/guilds/guild-id/events/event-id'))).toBe(true)
+    expect(requests.findIndex((request) => request.endsWith('/api/guilds/guild-id/events/event-id')))
+      .toBeLessThan(requests.findIndex((request) => request.endsWith('/api/notifications/event-item/read')))
     expect(requests.some((request) => request.startsWith('PUT ') && request.endsWith('/api/notifications/event-item/read'))).toBe(true)
+  })
+
+  it('loads another inbox page and ignores it after the account generation changes', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    shell.backendWorkspace = true
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({
+      id: `item-${index}`, guildId: 'guild-id', channelId: 'channel-id', sourceId: `source-${index}`,
+      kind: 'SERVER' as const, summary: `Item ${index}`, sequence: index, read: false, eventId: `event-${index}`
+    }))
+    let resolveNextPage!: (response: Response) => void
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      requests.push(path)
+      if (path.includes('/api/notifications?before=')) {
+        return await new Promise<Response>((resolve) => { resolveNextPage = resolve })
+      }
+      if (path.endsWith('/api/notifications')) return jsonResponse(firstPage)
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 50 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="workbench-inbox-load-more"]').exists()).toBe(true))
+    await wrapper.get('[data-testid="workbench-inbox-load-more"]').trigger('click')
+    await vi.waitFor(() => expect(requests.some((request) => request.includes('before=item-49'))).toBe(true)
+      && expect(resolveNextPage).toBeTypeOf('function'))
+    expect(requests.some((request) => request.includes('/api/notifications?before=item-49'))).toBe(true)
+
+    shell.accountGeneration++
+    shell.backendNotifications = [{
+      id: 'new-account-item', guildId: 'guild-id', channelId: 'channel-id', sourceId: 'new-source',
+      kind: 'SERVER', summary: 'New account item', sequence: 1, read: false, eventId: 'new-event'
+    }]
+    resolveNextPage(jsonResponse([{ ...firstPage[0], id: 'stale-item', summary: 'Stale item' }]))
+    await flushPromises()
+
+    expect(shell.backendNotifications.map((item) => item.id)).toEqual(['new-account-item'])
+  })
+
+  it('deduplicates a short final inbox page and hides the load-more button', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    shell.backendWorkspace = true
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({
+      id: `item-${index}`, guildId: 'guild-id', channelId: 'channel-id', sourceId: `source-${index}`,
+      kind: 'SERVER' as const, summary: `Item ${index}`, sequence: index, read: false, eventId: `event-${index}`
+    }))
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.includes('/api/notifications?before=')) {
+        return jsonResponse([firstPage[0], { ...firstPage[0], id: 'last-item', summary: 'Last item' }])
+      }
+      if (path.endsWith('/api/notifications')) return jsonResponse(firstPage)
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 50 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="workbench-inbox-load-more"]').exists()).toBe(true))
+    await wrapper.get('[data-testid="workbench-inbox-load-more"]').trigger('click')
+    await vi.waitFor(() => expect(shell.backendNotifications.some((item) => item.id === 'last-item')).toBe(true))
+
+    expect(shell.backendNotifications).toHaveLength(51)
+    expect(wrapper.find('[data-testid="workbench-inbox-load-more"]').exists()).toBe(false)
+  })
+
+  it('discards a pending inbox page when a same-account refresh changes the cursor boundary', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    shell.backendWorkspace = true
+    const page = (prefix: string) => Array.from({ length: 50 }, (_, index) => ({
+      id: `${prefix}-${index}`, guildId: 'guild-id', channelId: 'channel-id', sourceId: `${prefix}-source-${index}`,
+      kind: 'SERVER' as const, summary: `${prefix} ${index}`, sequence: index, read: false, eventId: `${prefix}-event-${index}`
+    }))
+    let listLoads = 0
+    let resolveNextPage!: (response: Response) => void
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.includes('/api/notifications?before=')) {
+        return await new Promise<Response>((resolve) => { resolveNextPage = resolve })
+      }
+      if (path.endsWith('/api/notifications')) return jsonResponse(listLoads++ === 0 ? page('initial') : page('refresh'))
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 50 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="workbench-inbox-load-more"]').exists()).toBe(true))
+    await wrapper.get('[data-testid="workbench-inbox-load-more"]').trigger('click')
+    await vi.waitFor(() => expect(resolveNextPage).toBeTypeOf('function'))
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    await vi.waitFor(() => expect(shell.backendNotifications[49]?.id).toBe('refresh-49'))
+
+    resolveNextPage(jsonResponse([{ ...page('initial')[0], id: 'stale-boundary-item' }]))
+    await flushPromises()
+
+    expect(shell.backendNotifications.map((item) => item.id)).not.toContain('stale-boundary-item')
+    expect(shell.backendNotifications[49]?.id).toBe('refresh-49')
+    expect(wrapper.find('[data-testid="workbench-inbox-load-more"]').exists()).toBe(true)
+  })
+
+  it('reloads the inbox for a new account while the inbox view stays open', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    auth.user = { id: 'old-user', username: 'old', displayName: 'Old user' }
+    shell.backendWorkspace = true
+    let pageLoads = 0
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.endsWith('/api/notifications')) {
+        const isNewAccount = pageLoads++ > 0
+        return jsonResponse([{
+          id: isNewAccount ? 'new-account-item' : 'old-account-item', guildId: 'guild-id', channelId: 'channel-id',
+          sourceId: isNewAccount ? 'new-source' : 'old-source', kind: 'SERVER',
+          summary: isNewAccount ? 'New account item' : 'Old account item', sequence: 1, read: false,
+          eventId: isNewAccount ? 'new-event' : 'old-event'
+        }])
+      }
+      if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 1 })
+      if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+      return jsonResponse({}, 404)
+    })
+
+    await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
+    auth.accessToken = 'new-account-token'
+    auth.user = { id: 'new-user', username: 'new', displayName: 'New user' }
+
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="workbench-inbox-server-new-account-item"]').exists()).toBe(true))
+    expect(wrapper.get('[data-testid="workspace"]').attributes('data-active-workbench-view')).toBe('inbox')
+    expect(shell.backendNotifications.map((item) => item.id)).toEqual(['new-account-item'])
   })
 
 enableAutoUnmount(afterEach)
@@ -521,6 +671,9 @@ enableAutoUnmount(afterEach)
 
   it('reports and resolves messages through the backend when a bearer token is available', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const shell = useShellStore()
     shell.$reset()
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
@@ -585,6 +738,9 @@ enableAutoUnmount(afterEach)
 
   it('applies real-backend guild, channel, message, voice, and stage responses after API success', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ input, init })
@@ -665,6 +821,9 @@ enableAutoUnmount(afterEach)
 
   it('hydrates the user workspace from authenticated guild bootstrap response', async () => {
     const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ input, init })
@@ -715,6 +874,9 @@ enableAutoUnmount(afterEach)
 
   it('opens a mention channel from another authenticated guild', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const shell = useShellStore()
     shell.$reset()
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
@@ -1082,6 +1244,9 @@ enableAutoUnmount(afterEach)
 
   it('does not mutate shell state when a real-backend action is rejected', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'bad-token'
     vi.stubGlobal('fetch', async () => jsonResponse({ message: 'forbidden' }, 403))
     const shell = useShellStore()
     shell.$reset()

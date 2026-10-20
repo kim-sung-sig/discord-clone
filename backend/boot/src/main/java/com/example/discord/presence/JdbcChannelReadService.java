@@ -46,7 +46,7 @@ class JdbcChannelReadService {
                         ReadMarker marker = new ReadMarker(channelId, userId, result.getLong(1), result.getTimestamp(2).toInstant());
                         try (var update = connection.prepareStatement("""
                             UPDATE notification_items SET read = TRUE, updated_at = NOW()
-                            WHERE user_id = ? AND channel_id = ? AND sequence <= ? AND read = FALSE
+                            WHERE user_id = ? AND channel_id = ? AND kind = 'MENTION' AND sequence <= ? AND read = FALSE
                             """)) {
                             update.setObject(1, userId);
                             update.setObject(2, channelId);

@@ -126,7 +126,8 @@ const socialPaths = {
 } as const
 
 const eventPaths = {
-  list: (guildId: string) => `/api/guilds/${segment(guildId)}/events`
+  list: (guildId: string) => `/api/guilds/${segment(guildId)}/events`,
+  detail: (guildId: string, eventId: string) => `/api/guilds/${segment(guildId)}/events/${segment(eventId)}`
 } as const
 
 export const discordApiPaths = {

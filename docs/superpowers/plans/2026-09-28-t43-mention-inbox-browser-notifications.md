@@ -10,11 +10,17 @@
 
 ---
 
-**Approval Status: Approved.** 사용자 2026-10-05 개선 및 MR 지시를 근거로 아래 승인된 개선 절을 적용한다. 독립 계획 검수는 96/100, P0/P1 0으로 통과했다. 구현 스펙·품질/보안 검수와 검증은 각각 별도 게이트다.
+**Approval Status: 사용자 제품 범위·Task 9 계획 승인; 구현 독립 검수 93/100(P0/P1/P2 0); 전체 검증 통과. 최종 보안 검수와 push/PR gate 진행 중.** 기존 94점은 Task 9 추가 전 revision에만 적용된다.
+
+**승인 설계 식별자:** `docs/superpowers/specs/2026-09-28-t43-mention-inbox-browser-notifications-design.md`, blob SHA `81bcff60f1f92d9de5ef3e9cdbab6fb4c667d8ad` (설계 기록 commit `97ebd5d10c93949b921e3df0d9e4bf9ed2a48369`). 이전 SHA `2b31191`은 멘션 전용 초기 설계이므로 현재 범위의 승인 근거로 사용하지 않는다.
 
 **이전 승인 이력:** 멘션에서 DM·서버 일정까지 확장된 뒤 이전 승인 SHA `2b31191`을 승인 근거로 사용하지 않았다. 확대 범위의 재검수가 끝나기 전 작업 보존 WIP 커밋만 사용자 요청으로 생성했다.
 
-**2026-10-05 작업 보존 예외:** 사용자가 현재 미커밋 변경의 커밋을 명시적으로 요청했다. 현재 T43 변경은 로컬 WIP 커밋으로 보존하며, 이 요청은 설계·구현 승인이나 푸시·병합 gate 통과를 뜻하지 않는다. `./gradlew test checkstyleMain checkstyleTest`, 웹 테스트(143 통과·8 skip), 웹 build, OpenAPI 검사, frontend lint는 성공했다. PostgreSQL 집중 테스트 18개는 `127.0.0.1:15432` 연결 거부로 실패했다. 독립 리뷰에서 차단 후 DM 조회·읽음 허용과 로그아웃·계정 변경 후 이전 사용자 알림/DM 상태 잔존을 발견했다. 두 결함 수정, 실제 DB 검증, 새 독립 리뷰 및 `docs/03-analysis/task_T43-merge-review.md`의 승인 근거가 필요하다.
+**2026-10-05 작업 보존 기록 (당시 상태):** 사용자가 당시 미커밋 변경의 로컬 WIP 커밋을 요청했다. 이는 설계·구현 승인이나 푸시·병합 gate 통과를 뜻하지 않았다. 당시 일반 테스트와 웹 검증은 성공했지만 PostgreSQL 집중 테스트 18개는 `127.0.0.1:15432` 연결 거부로 실행되지 않았고, 독립 리뷰에서 차단 후 DM 조회·읽음 허용 및 계정 경계 결함이 보고됐다. 아래 후속 변경에서 두 결함을 수정하고 실제 PostgreSQL 검증을 다시 실행했다.
+
+**2026-10-15 기존 검증 기록:** 당시 `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test :backend:modules:notification:test :backend:modules:message:test checkstyleMain checkstyleTest`, 웹 테스트(151 통과·8 skip), 웹 build, frontend lint, OpenAPI 검사, diff check가 통과했다. 아래 2026-10-20 재검증으로 갱신한다.
+
+**2026-10-20 현재 검증:** 같은 backend/PostgreSQL/checkstyle 명령 통과. `npm run test -w apps/web -- --run` 155 passed·8 skipped, `npm run build -w apps/web`, `npm run lint:frontend`, `npm run openapi:check`, `git diff --check` 통과. 8개 skip은 환경 조건부 테스트다. 독립 구현 검수는 93/100(P0/P1/P2 0)으로 통과했다. 최신 작업 트리 보완을 포함한 보안 diff 검수와 push/PR은 남아 있다.
 
 **Branch:** `task_T43-notification-inbox`. 기존 미추적 `docs/superpowers/plans/2026-09-23-*.md` 3개는 작업 범위 밖이다.
 
@@ -92,150 +98,39 @@ sequenceDiagram
 
 **남은 모호성:** 없음. 현재 웹에는 실제 사용자 ID가 붙은 member 선택기가 없으므로 첫 구현의 직접 멘션 입력은 `<@uuid>`로 한정한다. 자유 텍스트 `@이름`은 알림 멘션으로 승격하지 않는다. `@everyone`은 독립 토큰일 때만 `EVERYONE`으로 보낸다. 사용자명 자동완성은 별도 제품 개선이다.
 
-### Task 1: 저장 sequence와 영속 읽음 위치
+### 구현 상태
 
-**Files:** 기존 migration `V18__channel_read_markers.sql`; `MessageReadModel.java`; `InMemoryMessageService.java`; `JdbcMessageStore.java`; `MessageController.java`; `PresenceController.java`; `JdbcNotificationInboxService.java`; tests `PostgresNotificationInboxServiceTest.java`, `PresenceControllerTest.java`, `MessageControllerTest.java`, `ChannelMessageQueryServiceTest.java`.
+| Task | 현재 상태 | 남은 작업 |
+|---|---|---|
+| 1. 메시지 sequence·영속 읽음 위치 | 구현 완료 | 실제 PostgreSQL에서 단조 marker, 실제 sequence 상한, `MENTION`만 읽음 처리 검증 |
+| 2. 멘션 투영 | 기존 projector/resolver/Kafka·로컬 dispatcher 구현 완료 | 누락된 회귀만 보강. 새 projector, consumer group, dispatcher는 만들지 않음 |
+| 3. 인증 알림 API | 페이지·가시성 필터·별도 unread API 구현 완료 | 가시성 필터가 SQL `LIMIT` 전에 적용되고, 페이지 밖 포함 unread와 `byKind` 계약 검증 |
+| 4. 웹 Inbox·읽음 | 구현 완료 | 인증·계정 전환, 실제 UI 경로, 50건 이후 페이지 탐색 회귀 검증 |
+| 5. 브라우저 알림 | 구현 완료 | 명시적 권한, hidden 탭, 중복 억제, polling 수명 검증 |
+| 6. DM 영속성·조회·읽음·알림 | PostgreSQL 구현 완료 | 양방향 차단, transaction rollback, 설정 및 계정 경계 검증 |
+| 7. 서버 일정 알림 | PostgreSQL 구현 완료 | 생성/취소 rollback, 권한 회수, 읽지 않은 `SERVER` 유지, 첫 100건 밖 일정 열기 검증 |
+| 8. 전체 검증·독립 리뷰 | 진행 중 | 리뷰 P2 보완, 검증 후 새 revision에서 독립 재검수 |
 
-- [ ] **Step 1: 부족한 회귀 테스트 작성.** Postgres 테스트에서 sequence 7을 읽고 5를 다시 보내도 7 유지, adapter 재생성 후에도 7 조회, sequence 7 이하 알림만 읽음, 타인 채널 403, 실제 마지막 sequence보다 큰 값 400, 메시지 응답 `sequence`를 확인한다. 기존 테스트에 있으면 재사용한다. fixture 정리 시 `channel_read_markers`를 채널보다 먼저 지운다.
-- [ ] **Step 2: RED 확인.** 로컬 Postgres가 `127.0.0.1:15432`에서 실행 중일 때 `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test --tests com.example.discord.notification.PostgresNotificationInboxServiceTest --tests com.example.discord.presence.PresenceControllerTest --tests com.example.discord.message.MessageControllerTest`로 새 회귀 단언의 실패를 확인한다. 이미 통과하면 그 결과를 근거로 남긴다. Postgres 테스트 skip은 통과로 인정하지 않는다.
-- [ ] **Step 3: 부족한 동작만 보강.** 기존 `V18__channel_read_markers.sql`과 DB `messages.sequence` 매핑을 확인한다. 읽음 API는 실제 채널 최대 sequence를 검사하고 marker upsert와 `notification_items.read` update를 단일 transaction에서 실행한다. `!postgres` 경로는 기존 메모리 read 동작을 유지한다. 이미 배포된 migration을 수정하거나 같은 테이블을 재생성하지 않는다.
+DM과 일정의 저장소, API, transaction은 구현 완료 범위다. 남은 계획에는 이를 재구현하는 작업을 두지 않는다. `limit=1`에서 가장 최신 항목이 숨겨져도 다음 가시 항목을 반환해야 하며, unread 합계와 `byKind`는 페이지와 독립된 전체 가시 집계여야 한다.
 
-- [ ] **Step 4: GREEN 확인.** 같은 집중 명령 → PASS, skip 0 확인. `./gradlew :backend:modules:message:test`와 `git diff --check` → PASS.
-- [ ] **Step 5: task 소유 파일만 커밋.** `git add`에 위 실제 변경 경로만 지정하고 `git diff --cached --name-only`를 확인한 뒤 `git commit -m "feat: persist notification read markers"`.
+### Task 9: 독립 구현 검수 P2 두 건 보완
 
-### Task 2: 기존 발행 이벤트 멘션 투영 보강
+**Files:** `apps/web/pages/app.vue`, `apps/web/stores/shell.ts`, `apps/web/locales/{ko-KR,en-US}.json`, `apps/web/services/discord-api.ts`, 기존 `apps/web/tests/components/app-shell.test.ts`; `backend/boot/src/main/java/com/example/discord/event/ServerEventController.java`, 기존 `backend/boot/src/test/java/com/example/discord/notification/PostgresNotificationFlowControllerTest.java`, `qa/openapi-contract.mjs`, `qa/openapi-contract.test.mjs`, 생성물 `docs/api/openapi.json` 및 `packages/api-client/src/generated/openapi-types.ts`.
 
-**Files:** 기존 `MessageMentionProjector.java`, `MessageMentionRecipientResolver.java`, `KafkaMessageMentionConsumer.java`, `NotificationProjectionConfiguration.java`, `JdbcNotificationInboxService.java`; tests 기존 `PostgresNotificationInboxServiceTest.java`, `MessageMentionProjectorTest.java`, `KafkaMessageMentionConsumerTest.java`, `NotificationProjectionConfigurationTest.java`.
+- [x] **Inbox 페이지 이어 보기:** 첫 페이지가 50건이면 `before`를 마지막 알림 ID로 사용해 다음 페이지를 가져오는 버튼을 표시한다. 성공한 결과만 현재 목록 뒤에 중복 없이 붙이고, 50건보다 적게 받은 페이지 뒤에는 버튼을 숨긴다. 로그아웃·계정 전환 중 시작한 요청은 현재 계정 목록을 변경하지 못해야 한다. 같은 계정 새로고침으로 cursor 경계가 바뀐 경우에도 진행 중 페이지를 버린다. 기존 API와 페이지 크기 50을 재사용하며 새 endpoint나 저장소를 만들지 않는다.
+- [x] **100건 이후 일정 알림 열기:** `GET /api/guilds/{guildId}/events/{eventId}`를 추가한다. 순서는 bearer 확인 → guild membership 확인 → 기존 `JdbcServerEventService.event(guildId, eventId)`로 guild 소유 이벤트를 조회 → 반환된 channel에 `canViewChannel` 확인 → 응답이다. 웹은 알림의 저장된 `eventId`로 이 endpoint를 사용하고, 조회 및 계정 세대 확인이 성공한 뒤에만 기존 읽음 API를 호출한다. 일정 전체 목록 크기를 늘리거나 새 저장/조회 추상화를 추가하지 않는다.
+- [x] **RED 확인:** 웹 회귀 테스트가 기존 페이지 이어 보기, 정확한 일정 경로, 동시 새로고침 경계 보호에서 실패하는 것을 확인했다. 새 계정 Inbox 자동 갱신과 PostgreSQL 상세 API도 추가 동작 전 실패를 확인했다. PostgreSQL 테스트는 인증·guild membership·channel visibility 및 첫 100건에서 빠진 일정 ID 직접 조회를 검증한다.
+- [x] **GREEN·계약 확인:** app-shell 54개와 PostgreSQL controller 흐름 및 101개 일정 경계 테스트가 통과했다. 전체 web/backend, build, lint, OpenAPI 계약도 통과했다. 독립 구현 검수는 93/100(P0/P1/P2 0)이다. 최종 보안 검수와 푸시/PR만 남았다.
 
-- [ ] **Step 1: 실패 테스트 작성.** 직접 멘션+`@everyone` 수신자 중복 제거, 작성자 제외, 숨긴 채널 제외, `HERE`/`ROLE` 제외, 재전달 시 한 건, 읽음 위치가 이벤트보다 앞선 경우 처음부터 읽음, 권한 조회 실패 시 레코드 미공개를 검증한다.
+### Task 8: 통합 검증과 리뷰 근거 — 완료
 
-```java
-projector.project(eventFor(messageWithMentions(USER_TARGET, EVERYONE)));
-projector.project(eventFor(messageWithMentions(USER_TARGET, EVERYONE)));
-assertThat(inbox.inbox(USER_TARGET)).hasSize(1);
-assertThat(inbox.inbox(AUTHOR)).isEmpty();
-assertThat(inbox.inbox(HIDDEN_MEMBER)).isEmpty();
-```
-
-- [ ] **Step 2: RED 확인.** 기존 `MessageMentionProjectorTest`에 부족한 사례만 추가하고 집중 실행해 실패를 확인한다. 이미 통과하는 사례는 기존 테스트를 근거로 남긴다.
-- [ ] **Step 3: 최소 보강.** 기존 resolver의 직접 멘션/`EVERYONE` 가시 수신자 계산, projector의 DB sequence 조회, Kafka `notification-service-v1` consumer group과 `!kafka` dispatcher 연결을 재사용한다. 부족한 경우에만 `JdbcNotificationInboxService`의 한 이벤트 삽입 transaction과 먼저 읽은 sequence 처리, 권한 조회 실패 시 재시도 경로를 보강한다. 같은 consumer·dispatcher를 새로 만들지 않는다.
-
-```java
-Set<UUID> recipients = new LinkedHashSet<>(directUserIds);
-if (mentions.contains(new SpecialMentionTarget(SpecialMentionKind.EVERYONE))) {
-    guildService.guild(guildId).members().stream().map(GuildMember::userId).forEach(recipients::add);
-}
-recipients.remove(authorId);
-recipients.removeIf(id -> !guildService.canViewChannel(guildId, channelId, id));
-```
-
-- [ ] **Step 4: GREEN 확인.** 집중 projector/consumer/configuration 테스트 → PASS; Postgres 테스트는 `DISCORD_RUN_POSTGRES_TESTS=true`로 실행해 skip 0 확인; `git diff --check` → 출력 없음.
-- [ ] **Step 5: task 소유 파일만 커밋.** `git commit -m "feat: project published mentions into inbox"`.
-
-### Task 3: 인증된 세 종류 알림 조회 API와 계약
-
-**Files:** 기존 `NotificationController.java`, `JdbcNotificationInboxService.java`; `qa/openapi-contract.mjs`; 생성물 `docs/api/openapi.json`, `packages/api-client/src/generated/openapi-types.ts`; 기존 `backend/boot/src/test/java/com/example/discord/notification/PostgresNotificationFlowControllerTest.java`, `PostgresNotificationInboxServiceTest.java`.
-
-- [ ] **Step 1: 실패 테스트 작성.** 무토큰 401, 타인 식별자 접근 불가, 숨긴 채널 항목·개수 제외, 본인 목록 최신순·cursor 다음 페이지, 채널 unread에서 자기 메시지 제외를 검증한다. 특히 `limit=1`에서 최신 항목이 숨긴 채널이고 다음 항목이 가시 채널인 경우 가시 항목 1건이 반환되어야 한다. 다음 페이지와 별도 unread 개수에는 페이지 밖의 가시 항목도 포함한다. `DM`은 참여자만, `SERVER`는 현재 일정 채널을 볼 수 있는 사용자만 조회되는지 검증한다.
-
-```java
-mockMvc.perform(get("/api/notifications?limit=1").header(AUTHORIZATION, bearer(USER_ID)))
-    .andExpect(status().isOk())
-    .andExpect(jsonPath("$.length()").value(1));
-mockMvc.perform(get("/api/notifications/unread-count").header(AUTHORIZATION, bearer(USER_ID)))
-    .andExpect(status().isOk())
-    .andExpect(jsonPath("$.unreadCount").value(2));
-```
-
-- [ ] **Step 2: RED 확인.** 기존 집중 테스트에 누락된 사례만 추가하고 실패를 확인한다. 이미 통과하면 현재 구현을 근거로 기록한다.
-- [ ] **Step 3: 최소 보강.** 기존 `GET /api/notifications?limit=50&before=<itemId>`와 `GET /api/notifications/unread-count`를 유지한다. `limit`은 1..100, 정렬/cursor는 `(createdAt,id)`를 사용한다. 현재 가시 채널과 DM 참여자 조건을 SQL 페이지 조회의 `LIMIT`보다 먼저 적용하거나, 가시 항목으로 `limit`을 채울 때까지 안정적으로 다음 batch를 읽는다. cursor는 마지막 **반환한 가시 항목**을 기준으로 하며 중복·누락이 없어야 한다. 전체 가시 unread 개수는 페이지와 독립된 쿼리로 계산한다. 채널 unread는 저장된 메시지 sequence > marker, 작성자 != 본인 조건으로 계산한다. 기존 REST path/DTO와 메시지 응답 `sequence`를 OpenAPI에 반영한다.
-
-```java
-UUID userId = authenticatedUserResolver.requireUserId(authorization);
-return service.page(userId, visibleChannels(userId), before, limit);
-```
-
-- [ ] **Step 4: GREEN·계약 확인.** 집중 테스트 → PASS; `npm run openapi:write && npm run openapi:check` → PASS. 생성물은 수동 편집하지 않는다.
-- [ ] **Step 5: task 소유 파일만 커밋.** 변경이 있을 때만 `git commit -m "fix: keep notification pages visibility complete"`.
-
-### Task 4: 웹의 구조화 멘션, 세 종류의 서버 Inbox와 읽음 연결
-
-**Files:** `apps/web/stores/shell.ts`, `apps/web/pages/app.vue`, `apps/web/services/discord-api.ts`, `apps/web/locales/ko-KR.json`, `apps/web/locales/en-US.json`; tests `apps/web/tests/components/app-shell.test.ts`, `apps/web/tests/e2e/app-shell.spec.ts`.
-
-- [ ] **Step 1: 실패 웹 테스트 작성.** 작성창의 `<@uuid> @everyone` 전송 요청에 `mentions: [{type:'USER',id:<uuid>},{type:'EVERYONE'}]`가 포함되고, Inbox는 로컬 `messages`가 아니라 서버의 `MENTION`·`DM`·`SERVER` 결과를 표시한다. 각 알림 클릭 시 채널·DM 대화·일정으로 이동한다. 채널과 DM은 열기만 해서는 읽음 요청이 없고 최신 메시지가 보인 뒤 각 읽음 API 성공 시에만 배지가 사라지는 사례를 검증한다. 서버 일정은 항목 열기 후 본인/가시성 검사에 성공해야 읽음으로 표시한다.
-
-```ts
-expect(sendBody.mentions).toEqual([
-  { type: 'USER', id: mentionedUserId },
-  { type: 'EVERYONE' }
-])
-expect(screen.getByTestId('workbench-inbox-mention-server-message-id')).toBeVisible()
-```
-
-- [ ] **Step 2: RED 확인.** `npm run test -w apps/web -- app-shell.test.ts` → 새 단언 실패.
-- [ ] **Step 3: 최소 구현.** 작성창의 `<@uuid>`를 실제 사용자 ID로 구조화하고, `@everyone`은 공백·문장 경계로 분리된 토큰일 때만 포함한다. 이미 있는 `sendBackendMessage` body에 `mentions`를 넣는다. 인증된 bootstrap/Inbox 진입 시 기존 알림 API의 세 종류 항목과 별도 unread 개수를 읽고, 채널·DM·일정별 이동 대상을 연결한다. 채널/DM의 최신 메시지가 viewport에서 보일 때 각각 저장된 `sequence`로 읽음 API를 호출한다. 서버 일정은 항목 열기 후 개별 읽음 API를 호출한다. 성공 응답으로만 store를 갱신한다. 로컬 seeded 데모 경로는 인증이 없을 때만 유지한다.
-
-```ts
-await client.post(discordApiPaths.channel.messages(channelId), {
-  content: body,
-  idempotencyKey: clientEventId,
-  mentions: mentionTargets
-}, { bearerToken, requestId })
-```
-
-- [ ] **Step 4: GREEN 확인.** `npm run test -w apps/web -- app-shell.test.ts`와 `npm run e2e -w apps/web -- app-shell.spec.ts --grep "notification inbox"` → PASS.
-- [ ] **Step 5: task 소유 파일만 커밋.** `git commit -m "feat: connect web inbox and read state"`.
-
-### Task 5: 명시적 브라우저 권한과 백그라운드 알림
-
-**Files:** `apps/web/pages/app.vue`, `apps/web/stores/shell.ts`, `apps/web/locales/ko-KR.json`, `apps/web/locales/en-US.json`; tests `apps/web/tests/components/app-shell.test.ts`, `apps/web/tests/e2e/app-shell.spec.ts`.
-
-- [ ] **Step 1: 실패 테스트 작성.** 설정 클릭 전 권한 요청 0회, 클릭 후 1회, `denied`/미지원 상태 문구, foreground 0건, hidden+granted 상태에서 새로 생긴 미읽음 멘션·DM·일정 알림, 기존 미읽음 항목 0건, 같은 알림 ID의 `tag` 사용, 알림 클릭 시 종류별 이동을 검증한다.
-
-```ts
-expect(requestPermission).not.toHaveBeenCalled()
-await user.click(screen.getByTestId('settings-browser-notifications-enable'))
-expect(requestPermission).toHaveBeenCalledTimes(1)
-```
-
-- [ ] **Step 2: RED 확인.** `npm run test -w apps/web -- app-shell.test.ts` → 새 단언 실패.
-- [ ] **Step 3: 최소 구현.** 설정 버튼의 사용자 제스처에서만 `Notification.requestPermission()`을 호출한다. 허용되면 브라우저별 선택을 localStorage에 보관한다. 현재 웹에는 실행 중 Gateway WebSocket 연결이 없으므로 hidden 탭에서만 10초 간격으로 인증된 Inbox API를 조회한다. 시작 시 기존 항목 ID를 기준 집합으로 잡아 과거 미읽음을 다시 알리지 않고, 이후 새로 생긴 세 종류의 미읽음/가시 항목에만 `new Notification(title, { body: '', tag: item.id })`을 호출한다. `visibilitychange`/로그아웃/unmount 시 polling을 정리하고 클릭하면 채널·DM·일정의 기존 이동 경로를 호출한다. `Notification` 미지원 또는 `denied`면 버튼 상태와 설명만 바꾼다.
-
-```ts
-if (enabled && Notification.permission === 'granted' && document.visibilityState === 'hidden' && item && !item.read) {
-  new Notification(`${item.kind} · ${item.summary}`, { body: '', tag: item.id })
-}
-```
-
-- [ ] **Step 4: GREEN 확인.** 웹 component 테스트와 Playwright notification mock smoke → PASS; `npm run build -w apps/web` → PASS.
-- [ ] **Step 5: task 소유 파일만 커밋.** `git commit -m "feat: add opted-in browser mention notifications"`.
-
-### Task 6: DM 저장·조회·읽음과 알림
-
-**Files:** 기존 `V19__direct_messages.sql`, `JdbcDirectMessageService.java`, `SocialController.java`, `JdbcNotificationInboxService.java`, `qa/openapi-contract.mjs`; tests 기존 `PostgresDirectMessageServiceTest.java`, `SocialControllerTest.java`, `PostgresNotificationFlowControllerTest.java`.
-
-- [ ] **Step 1: 부족한 회귀 테스트 작성.** 기존 친구·차단 정책을 통과한 1:1 전송이 영수증·본문·대화별 단조 sequence·수신자 `DM` 알림을 저장하고, 재조회·읽음 위치가 재시작 후 유지되는지 확인한다. 타인/차단된 사용자와 그룹 DM 경로는 조회·읽음 권한이 없어야 한다. 수신자 설정이 꺼지면 알림만 생략한다. 저장 또는 알림 삽입 실패 시 원본과 알림이 함께 rollback되는지 PostgreSQL에서 검증한다.
-- [ ] **Step 2: 집중 RED 확인.** `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test --tests com.example.discord.social.PostgresDirectMessageServiceTest --tests com.example.discord.social.SocialControllerTest`를 실행한다. 이미 통과하는 기존 동작은 근거로 남기고 부족한 사례만 실패시킨다.
-- [ ] **Step 3: 최소 보강.** 기존 `POST /api/social/dms/{targetUserId}/messages`, `GET /api/social/dms/{targetUserId}/messages`, `GET|PUT /api/social/dms/{targetUserId}/read`와 `JdbcDirectMessageService`를 재사용한다. 참여자·차단 정책을 각 조회/읽음에서도 검사하고, 읽음 sequence를 실제 저장 범위로 검증한다. DM 원본과 알림 삽입, DM marker와 `DM` 알림 읽음 변경은 각각 동일 connection/transaction으로 처리한다. 기존 `V19`를 다시 만들지 않는다.
-- [ ] **Step 4: GREEN·계약 확인.** 같은 집중 테스트가 skip 없이 통과하고 DM API/DTO가 `qa/openapi-contract.mjs`와 생성 계약에 반영되는지 확인한다.
-
-### Task 7: 서버 일정 생성·취소 알림
-
-**Files:** 기존 `JdbcServerEventService.java`, `ServerEventController.java`, `NotificationController.java`, `JdbcNotificationInboxService.java`, `qa/openapi-contract.mjs`; tests 기존 `PostgresServerEventServiceTest.java`, `PostgresNotificationFlowControllerTest.java`.
-
-- [ ] **Step 1: 부족한 회귀 테스트 작성.** `EVENT_CREATED`와 `EVENT_CANCELED`의 서로 다른 signal ID로 각 1건만 기록하고 행위자·숨긴 채널 구성원을 제외한다. RSVP 변경은 알림을 만들지 않는다. 관리 권한 없는 생성·취소와 열람 권한 없는 목록은 거부하며, 권한 회수 뒤 알림·unread에서 제외한다. 일정/신호/알림 중 하나가 실패하면 전부 rollback되는지 PostgreSQL에서 검증한다.
-- [ ] **Step 2: 집중 RED 확인.** `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test --tests com.example.discord.event.PostgresServerEventServiceTest --tests com.example.discord.notification.PostgresNotificationFlowControllerTest`를 실행한다. 이미 충족한 사례는 기존 테스트를 근거로 남긴다.
-- [ ] **Step 3: 최소 보강.** 기존 `GET|POST /api/guilds/{guildId}/events`, `PUT /api/guilds/{guildId}/events/{eventId}/cancel`과 `JdbcServerEventService`를 재사용한다. 생성·취소 각각 일정 원본, signal, 가시 수신자별 `SERVER` 알림을 한 transaction에 묶는다. 현재 가시성을 조회·개별 읽음 때 다시 확인하고 기존 알림 설정을 적용한다. 별도 이벤트 버스나 중복 API를 만들지 않는다.
-- [ ] **Step 4: GREEN·계약 확인.** 같은 집중 테스트가 skip 없이 통과하고 일정 API/DTO가 OpenAPI에 반영되는지 확인한다.
-
-### Task 8: 통합 검증과 리뷰 근거
 
 **Files:** 변경된 테스트와 `docs/03-analysis/T43-notification-inbox.analysis.md` (검증 근거가 필요할 때만 생성).
 
-- [ ] **Step 1: 환경 확인.** `./gradlew --version` → wrapper/Java 21 확인; `git status --short` → T43 외 경로가 staged되지 않음.
-- [ ] **Step 2: 전체 게이트.** `DISCORD_RUN_POSTGRES_TESTS=true ./gradlew :backend:boot:test :backend:modules:notification:test :backend:modules:message:test`, `npm run test -w apps/web`, `npm run build -w apps/web`, `npm run openapi:check`, `git diff --check` → 전부 PASS/skip 0. DM 저장·조회·읽음·rollback, 일정 생성·취소·rollback, 권한 회수, PostgreSQL adapter 재생성·이벤트 재전달을 실제 DB 통합 테스트로 확인한다. Playwright smoke는 격리된 포트에서 실행한다. 새 migration이 있으면 `pwsh qa/migration-guard.contract.ps1`로 확인한다.
-- [ ] **Step 3: 요구사항 대조.** 직접 멘션/`@everyone`, DM 저장·조회·읽음, 일정 생성·취소와 signal별 알림, 종류별 설정, 가시성, 중복 방지, 단조 읽음, 재시작 유지, 인증 API, 세 종류의 서버 Inbox, 가시 페이지·독립 unread 개수, 명시적 브라우저 권한, hidden 탭만 알림, `@here`·역할 멘션·RSVP 제외를 현 설계의 각 절과 대조한다.
-- [ ] **Step 4: 리뷰.** 고정 SHA·diff 범위·테스트 결과를 기록하고 프로젝트 review-loop의 P0/P1 0 기준으로 spec 및 품질/보안 검수를 완료한다. 실패하면 수정 후 새 SHA에서 다시 검수한다. 리뷰 전에는 push/merge하지 않는다.
+- [x] **Step 1: 환경 확인.** Wrapper와 Java 21을 사용했고, 현재 작업 트리의 미추적 QA 계획 3개는 T43 범위 밖으로 제외한다.
+- [x] **Step 2: 전체 게이트.** Backend/PostgreSQL/checkstyle, 웹(155 passed·8 skipped), build, frontend lint, OpenAPI, diff check 통과. Playwright smoke 및 migration guard는 변경 범위상 실행하지 않았다.
+- [x] **Step 3: 요구사항 대조.** 멘션/`@everyone`, DM, 서버 일정, 종류별 알림·읽음·가시성, 브라우저 권한 및 제외 동작을 설계와 구현/테스트에서 대조했다.
+- [x] **Step 4: 리뷰.** 독립 계획 검수 92/100 및 구현 검수 93/100, 각각 P0/P1 0. 최종 보안 diff 검수는 정확한 commit 범위로 진행 중이다.
 
 ## 계획 자체의 검증 게이트
 
@@ -243,13 +138,15 @@ if (enabled && Notification.permission === 'granted' && document.visibilityState
 - `backend/AGENTS.md`와 `.agents/rules/backend/{architecture,logging}.md`를 구현 시작 시 읽는다.
 - Wiki used: `index.md`, `wiki/Agent Development Guide.md`, `wiki/Backend Architecture.md`, `wiki/Frontend Client Architecture.md`, `wiki/QA Infra Operations.md`, `wiki/Current Roadmap And Risks.md`.
 
-## 2026-10-05 승인된 개선 및 MR 게이트
+## 2026-10-05 사용자 승인 보완 및 MR 게이트
 
 ### Approval Gate
-- Status: Approved
-- Approver: 사용자 (2026-10-05, 개선 진행 및 MR 요청, 각 리뷰 90점 이상·P0/P1 전부 해결)
-- Blocking ambiguity: 없음. 원래 T43 제품 범위와 아래 보완을 대상으로 한다.
-- 앞의 작업 보존 기록은 이전 revision의 결과이며 현재 승인/검증 결과를 대체하지 않는다.
+- Status: 사용자 제품 범위 승인; 계획 검수 92/100, 구현 검수 93/100, 전체 런타임 게이트 통과; 최종 보안 검수 및 push/PR 전
+- Approver: 사용자 (T43 범위와 구현 진행 승인). 이 승인은 현재 구현 revision의 검수 통과를 뜻하지 않는다.
+- Design basis: `docs/superpowers/specs/2026-09-28-t43-mention-inbox-browser-notifications-design.md`, blob SHA `81bcff60f1f92d9de5ef3e9cdbab6fb4c667d8ad`.
+- Review evidence: Task 9 계획 검수 92/100(P0/P1 0), 구현 독립 검수 93/100(P0/P1/P2 0). 두 차례 구현 검수에서 발견된 cursor 경계 변경과 계정 전환 Inbox 재조회 결함을 수정하고 회귀 테스트를 추가했다. 전체 Backend/PostgreSQL, web, build, lint, OpenAPI 검증이 통과했다.
+- Blocking gate: 최종 보안 diff 검수가 90/100 이상이고 P0/P1 0이어야 한다. 정확한 commit SHA에서 보안 검수 완료 후 feature branch를 push하고 main 대상 PR을 연다.
+- 앞의 작업 보존 기록과 승인 SHA `2b31191`은 초기 멘션 전용 설계 revision이므로 현재 설계/구현 승인이나 검증 근거를 대체하지 않는다.
 
 ### 결함과 최소 수정
 1. DM: 모든 조회·읽음·전송 경로에서 기존 `requireNotBlocked`를 사용한다. 차단 방향에 관계없이 차단 후 양쪽 사용자 요청을 403으로 거부한다. Inbox 페이지·unread도 차단된 DM을 제외한다.
@@ -257,6 +154,7 @@ if (enabled && Notification.permission === 'granted' && document.visibilityState
 3. 읽음 observer: 각 observer가 자체 pending 상태와 수명을 소유한다. 이전 채널/DM 요청이 새로운 observer를 해제할 수 없다. DOM 갱신·계정 전환·unmount 후 stale callback을 무효화한다. 숨긴 탭에서 읽음 처리하지 않는다.
 4. 브라우저 polling: unmount/로그아웃/계정 전환 때 generation을 증가시켜 지연 응답·알림 클릭을 무효화한다. interval 요청 중첩과 과거 알림 재표시를 회귀 테스트로 검사한다.
 5. 검증: 기존 Docker/로컬 PostgreSQL 실행 수단을 재사용하고, 새 schema/dependency 없이 실제 DB rollback·가시성·재생성·단조 읽음 경계를 검사한다.
+6. 독립 검수 보완: 채널 읽음은 `MENTION`만 갱신하고 열지 않은 `SERVER` 항목을 보존한다. 로그아웃 후 null 인증 상태에서 이전 token으로 시작한 후속 요청도 공유 진입점에서 거부한다. unread-count는 기존 합계와 가시성·차단 필터를 유지하며 `byKind`에 세 종류별 개수를 제공한다. 혼합 알림 PostgreSQL 회귀, HTTP 종류별 집계 및 logout continuation 회귀로 검사한다.
 
 ### 참여 경계
 - `SocialController → JdbcDirectMessageService → requireNotBlocked`: 인증 주체 기반 1:1 DM 정책.
@@ -318,11 +216,11 @@ if (enabled && Notification.permission === 'granted' && document.visibilityState
 - `backend/modules/notification/src/main/java/com/example/discord/notification/MentionNotificationCommand.java`
 - `backend/services/message/src/test/java/com/example/discord/messageservice/JdbcMessagePublicationOutboxPostgresTest.java`
 - `docs/api/openapi.json`
+- `packages/api-client/src/generated/openapi-types.ts`
 - `docs/superpowers/plans/2026-09-28-t43-mention-inbox-browser-notifications.md`
 - `docs/superpowers/plans/2026-09-29-t43-design2-persistence.md`
 - `docs/superpowers/plans/2026-09-29-t43-mention-projection-slice.md`
 - `docs/superpowers/specs/2026-09-28-t43-mention-inbox-browser-notifications-design.md`
-- `packages/api-client/src/generated/openapi-types.ts`
 - `qa/openapi-contract.mjs`
 - `qa/openapi-contract.test.mjs`
 

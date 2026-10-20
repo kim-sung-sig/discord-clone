@@ -188,7 +188,43 @@
         "content": {
           "application/json": {
             "schema": {
-              "additionalProperties": true,
+              "properties": {
+                "byKind": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "DM": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "MENTION": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "SERVER": {
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "MENTION",
+                    "DM",
+                    "SERVER"
+                  ],
+                  "type": "object"
+                },
+                "unreadCount": {
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "unreadCount",
+                "byKind"
+              ],
               "type": "object"
             }
           }
@@ -1217,6 +1253,70 @@
           }
         },
         "summary": "Create a server event and recipient notifications.",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/guilds/{guildId}/events/{eventId}": {
+      "get": {
+        "operationId": "getServerEvent",
+        "parameters": [
+          {
+            "description": "Safe request correlation id. Unsafe incoming values are replaced by the backend.",
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bearer access token where authentication is required.",
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "guildId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerEvent"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get a visible server event by ID.",
         "tags": [
           "events"
         ]

@@ -121,6 +121,43 @@ describe('Discord shell API and Gateway contracts', () => {
     expect(shell.messages).toEqual([])
   })
 
+  it('rejects old bearer tokens when a DM action continues after logout', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    const shell = useShellStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.acceptSession({ accessToken: 'token-a', user: { id: 'user-a', username: 'a', displayName: 'A' } })
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input)
+      if (path.endsWith('/logout')) return new Response(null, { status: 204 })
+      return new Response(JSON.stringify(path.endsWith('/messages')
+        ? [{ id: 'private-a', sequence: 1, senderId: 'friend-a', content: 'private A' }]
+        : { lastReadSequence: 0 }))
+    })
+    vi.stubGlobal('fetch', fetch)
+    let loggedOut = false
+    const unsubscribe = shell.$onAction(({ name, after }) => {
+      if (name !== 'withBackendRequest') return
+      after(() => {
+        if (loggedOut) return
+        loggedOut = true
+        void auth.logout()
+      })
+    })
+    try {
+      await shell.sendBackendDm('friend-a', 'hello', 'token-a')
+      expect(auth.accessToken).toBeNull()
+      expect(shell.backendDmMessages).toEqual([])
+      expect(fetch.mock.calls).toHaveLength(2)
+      await expect(shell.openBackendDm('friend-a', 'token-a')).resolves.toBeNull()
+      expect(fetch.mock.calls).toHaveLength(2)
+      expect(shell.apiError).toBeNull()
+    } finally {
+      unsubscribe()
+      wrapper.unmount()
+    }
+  })
+
   it('builds stable REST paths for auth, guild, channel, invite, and gateway calls', () => {
     expect(discordApiPaths.authLogin()).toBe('/api/auth/login')
     expect(discordApiPaths.auth.refresh()).toBe('/api/auth/refresh')
@@ -317,6 +354,9 @@ describe('Discord shell API and Gateway contracts', () => {
 
   it('sends only resolved user and standalone everyone mentions', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const shell = useShellStore()
     shell.$reset()
     const userId = '123e4567-e89b-12d3-a456-426614174000'
@@ -337,6 +377,9 @@ describe('Discord shell API and Gateway contracts', () => {
 
   it('reconciles REST message success with the matching Gateway echo without duplicating state', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     const shell = useShellStore()
     shell.$reset()
@@ -392,6 +435,9 @@ describe('Discord shell API and Gateway contracts', () => {
 
   it('rolls back failed optimistic message mutations and keeps an accessible error', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const shell = useShellStore()
     shell.$reset()
     vi.stubGlobal('fetch', async () =>
@@ -458,6 +504,9 @@ describe('Discord shell API and Gateway contracts', () => {
 
   it('clears realtime resync state after a bounded channel message refetch', async () => {
     await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
     const shell = useShellStore()
     shell.$reset()
     shell.resyncRequired = true
