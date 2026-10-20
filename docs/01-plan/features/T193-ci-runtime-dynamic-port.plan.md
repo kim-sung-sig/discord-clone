@@ -16,10 +16,12 @@
 ## Participating Code
 - `.github/workflows/ci.yml`: 포트를 한 번 선택하고 backend 실행, health probe, smoke URL에 같은 값을 전달한다.
 - `qa/ci-workflow.contract.ps1`: 동적 포트 전달 및 runtime 구간의 고정 8080 회귀를 검사한다.
+- `qa/real-backend-browser-smoke-default.contract.ps1`: workflow smoke URL이 동적 backend URL을 전달하는지 확인한다.
 
 ## Expected Changed Files
 - `docs/01-plan/features/T193-ci-runtime-dynamic-port.plan.md`: 승인된 범위와 검증 기준. Confidence: high.
 - `qa/ci-workflow.contract.ps1`: runtime 포트 계약 회귀 검사. Confidence: high.
+- `qa/real-backend-browser-smoke-default.contract.ps1`: 기존 기본 runtime URL 계약을 동적 URL 전달 계약으로 갱신한다. Confidence: high.
 - `.github/workflows/ci.yml`: 포트 선택, backend 환경변수, step output, 후속 smoke URL. Confidence: high.
 
 ## Tier And Layer Responsibilities
@@ -79,7 +81,7 @@ flowchart TD
 - Platform boundaries: Ubuntu GitHub Actions의 Python 3 표준 `socket` 모듈로 사용 가능한 포트를 선택한다. 포트 선택 후 backend bind 사이의 극히 짧은 재할당 가능성은 OS port reservation을 backend에 넘길 수 없는 현재 실행 방식의 한계다.
 
 ## Implementation Steps
-- `qa/ci-workflow.contract.ps1`: 먼저 runtime job의 포트 출력·전달 조건과 `:8080` 부재를 검사한다.
+- `qa/ci-workflow.contract.ps1` 및 `qa/real-backend-browser-smoke-default.contract.ps1`: 먼저 runtime job의 포트 출력·전달 조건과 `:8080` 부재를 검사한다.
 - `.github/workflows/ci.yml`: loopback 주소와 선택된 포트로 backend를 시작하고 동일 포트를 health probe와 smoke step에 전달한다.
 
 ## Verification Gates

@@ -59,7 +59,7 @@ $workflowSnippets = @(
   'npx playwright install --with-deps chromium',
   'pwsh qa/real-backend-browser-smoke-default.contract.ps1',
   'pwsh qa/real-backend-e2e.contract.ps1',
-  'pwsh qa/real-backend-e2e.ps1 -BackendUrl http://127.0.0.1:8080 -SkipServiceStart',
+  'pwsh qa/real-backend-e2e.ps1 -BackendUrl "$BACKEND_URL" -SkipServiceStart',
   'qa/artifacts/real-backend-e2e'
 )
 foreach ($snippet in $workflowSnippets) {
