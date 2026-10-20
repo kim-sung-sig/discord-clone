@@ -1,0 +1,9 @@
+// Local-only: adds the identity service's test runtime classpath (H2) to :backend:services:identity:bootRun.
+// Production dependencies are unchanged; H2 stays a test dependency. Runtime arguments (ports, origin, JDBC URL,
+// keys) are passed by the caller via --args; this script changes the classpath only.
+gradle.projectsEvaluated {
+    def identity = gradle.rootProject.project(':backend:services:identity')
+    identity.tasks.named('bootRun') {
+        classpath += identity.sourceSets.test.runtimeClasspath
+    }
+}

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>로컬 MFA 연결 확인</title>
+  <script type="module" src="/mfa-webauthn.js"></script>
+</head>
+<body>
+  <main>
+    <h1>로컬 MFA 연결 확인: 로그인 → TOTP → 패스키 → 보호 API</h1>
+    <p>이 identity 서비스의 <code>http://localhost:포트</code>에서 여세요. 로그인은 로컬 boot 서버(<code>legacy-auth</code> 프로필)의 실제 <code>/api/auth/login</code>을 사용하고, 토큰은 이 페이지 메모리에만 있으며 새로고침하면 사라집니다. 운영 계정·운영 토큰을 넣지 마세요.</p>
+    <p id="token-state" aria-live="polite">토큰 없음 (로그인 필요)</p>
+
+    <section aria-labelledby="login-heading">
+      <h2 id="login-heading">1. 로그인 (실제 legacy-auth 발급자)</h2>
+      <form id="login-form" autocomplete="off">
+        <label for="login-base">로그인 서버 주소 (loopback만 허용)</label>
+        <input id="login-base" type="url" value="http://127.0.0.1:18092" spellcheck="false" autocomplete="off">
+        <label for="email">이메일</label>
+        <input id="email" type="email" autocomplete="off" spellcheck="false">
+        <label for="password">비밀번호 (요청 직후 입력창을 비웁니다)</label>
+        <input id="password" type="password" autocomplete="off">
+        <label for="username">사용자 이름 (회원가입에만 사용)</label>
+        <input id="username" type="text" autocomplete="off" spellcheck="false">
+        <label for="display-name">표시 이름 (회원가입에만 사용)</label>
+        <input id="display-name" type="text" autocomplete="off" maxlength="64">
+        <p>
+          <button id="signup" type="button" data-action="signup">회원가입</button>
+          <button id="login" type="button" data-action="login">로그인</button>
+        </p>
+      </form>
+      <p>boot 계정 저장소가 in-memory이면 boot를 재시작할 때 계정이 사라집니다. 로그인은 분당 2회로 제한됩니다.</p>
+    </section>
+
+    <section aria-labelledby="totp-heading">
+      <h2 id="totp-heading">2. TOTP 등록과 추가 인증</h2>
+      <p>
+        <button id="enroll" type="button" data-action="enroll">TOTP 등록 시작</button>
+      </p>
+      <div id="secret-panel" hidden>
+        <p>인증 앱에 등록할 secret (이 화면에서만 표시, 확인 성공·추가 인증·로그인·지우기 때 지움. 확인 없이 5분이 지나면 서버에서 무효가 되며 재시작 API는 없음):</p>
+        <p><code id="secret"></code></p>
+        <p><code id="otpauth"></code></p>
+      </div>
+      <label for="code">인증 앱의 6자리 코드</label>
+      <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7">
+      <p>
+        <button id="confirm" type="button" data-action="confirm">등록 확인</button>
+        <button id="step-up-totp" type="button" data-action="challenge">TOTP로 추가 인증</button>
+        <button id="unlock-totp" type="button" data-action="unlock">패스키로 TOTP 잠금 해제</button>
+        <button id="reset-totp" type="button" data-action="reset">패스키로 TOTP 재설정</button>
+      </p>
+      <p>등록 확인에 쓴 코드는 재사용할 수 없습니다. 추가 인증에는 다음 30초 코드가 필요합니다. 이미 등록된 계정이면 등록 시작은 409로 거부되며 바로 추가 인증으로 진행합니다. 잠금 해제와 재설정은 최근 5분 내 패스키 인증이 필요합니다. 복구 코드는 제공하지 않습니다.</p>
+    </section>
+
+    <section aria-labelledby="passkey-heading">
+      <h2 id="passkey-heading">3. 패스키 등록과 추가 인증</h2>
+      <label for="label">패스키 이름</label>
+      <input id="label" maxlength="64" value="내 로컬 기기" autocomplete="off">
+      <p>
+        <button id="register" type="button" data-action="register">패스키 등록 (최근 5분 내 MFA 토큰 필요)</button>
+        <button id="authenticate" type="button" data-action="authenticate">패스키로 추가 인증</button>
+      </p>
+      <p>등록 후 인증 options를 요청하기 전 10초를 기다리세요. PIN·생체 확인을 취소하면 다시 시작해야 합니다.</p>
+    </section>
+
+    <section aria-labelledby="manage-heading">
+      <h2 id="manage-heading">3-1. 내 패스키 목록과 삭제</h2>
+      <p>
+        <button id="credentials" type="button" data-action="credentials">패스키 목록 새로고침</button>
+      </p>
+      <p id="credential-empty" hidden>등록된 패스키가 없습니다.</p>
+      <ul id="credential-list" aria-live="polite"></ul>
+      <p>목록은 이 계정의 패스키 이름·등록/마지막 사용 시각·id 앞부분만 보여 줍니다(공개키·attestation은 서버가 보내지 않음). 삭제에는 최근 5분 내 MFA 토큰이 필요합니다. 마지막 패스키는 활성 TOTP가 있고 실패 횟수가 5 미만일 때만 삭제할 수 있습니다. 삭제는 서버에서 즉시 반영되고 되돌릴 수 없습니다.</p>
+    </section>
+
+    <section aria-labelledby="check-heading">
+      <h2 id="check-heading">4. 같은 사용자의 보호 API 확인</h2>
+      <p>
+        <button id="profile" type="button" data-action="profile">보호 API 확인 (identity + 로그인 서버 /api/users/@me)</button>
+        <button id="clear" type="button" data-action="clear">토큰 지우기</button>
+      </p>
+    </section>
+
+    <p id="status" role="status" aria-live="polite">브라우저 지원을 확인하고 있습니다.</p>
+    <details>
+      <summary>개발자 도구에서 눈여겨볼 것</summary>
+      <ul>
+        <li>로그인·회원가입 요청은 <code>credentials: omit</code>이라 로그인 서버의 refresh 쿠키가 저장되지 않습니다. 이 페이지는 refresh를 사용하지 않습니다.</li>
+        <li>identity 요청에는 Authorization 헤더가 있고, WebAuthn options와 complete는 같은 세션 쿠키(진행 중 ceremony 결속 전용)를 사용합니다.</li>
+        <li>등록은 <code>navigator.credentials.create</code>, 인증은 <code>navigator.credentials.get</code>이며 options의 <code>rp.id = localhost</code>, <code>userVerification = required</code>를 확인하세요.</li>
+        <li>토큰·비밀번호·코드·secret은 상태 문구에 출력하지 않습니다. Network 내보내기에는 포함되므로 공유하지 마세요.</li>
+      </ul>
+    </details>
+  </main>
+</body>
+</html>
