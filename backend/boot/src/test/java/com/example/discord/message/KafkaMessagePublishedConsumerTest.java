@@ -244,8 +244,10 @@ class KafkaMessagePublishedConsumerTest {
         assertThat(processed).containsExactly(eventId);
         assertThat(sent).hasSize(1);
         assertThat(sent.getFirst().payload()).containsEntry("content", "before edit");
-        assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter().count())
+        assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "processed").counter().count())
             .isEqualTo(1);
+        assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter())
+            .isNull();
     }
 
     @Test

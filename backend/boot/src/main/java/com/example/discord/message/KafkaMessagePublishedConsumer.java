@@ -56,24 +56,13 @@ final class KafkaMessagePublishedConsumer {
                     record.eventId(), record.correlationId());
                 return;
             }
+            // The Gateway side effect may already exist when inbox completion failed after the append. Re-publishing
+            // would rebuild the payload from the current (possibly edited) message and conflict with the logged event.
             if (gateway.hasAppended(record.eventId())) {
-                completeAlreadyPublished(record);
-                return;
-            }
-            ChannelMessageTarget target = new ChannelMessageTarget(record.guildId(), record.channelId());
-            Message message = messages.requireMessage(target, record.messageId());
-            try {
-                gateway.publish(
-                    record.eventId(),
-                    "MESSAGE_CREATE",
-                    record.guildId(),
-                    record.channelId(),
-                    gatewayPayload(message)
-                );
-            } catch (GatewayEventConflictException alreadyPublished) {
-                // A concurrent delivery appended this event ID first from an older message state.
-                completeAlreadyPublished(record);
-                return;
+                log.info("Gateway event already appended; completing inbox eventId={} correlationId={}",
+                    record.eventId(), record.correlationId());
+            } else {
+                publishToGateway(record);
             }
             inbox.markProcessed(record.eventId());
             count("processed");
@@ -93,13 +82,22 @@ final class KafkaMessagePublishedConsumer {
         }
     }
 
-    // The Gateway side effect already happened (e.g. inbox completion failed after the append); re-publishing
-    // would rebuild the payload from the current message state and conflict with the logged event.
-    private void completeAlreadyPublished(MessagePublishedRecord record) {
-        inbox.markProcessed(record.eventId());
-        count("duplicate");
-        log.info("Completed message publication already in gateway log eventId={} correlationId={}",
-            record.eventId(), record.correlationId());
+    private void publishToGateway(MessagePublishedRecord record) {
+        ChannelMessageTarget target = new ChannelMessageTarget(record.guildId(), record.channelId());
+        Message message = messages.requireMessage(target, record.messageId());
+        try {
+            gateway.publish(
+                record.eventId(),
+                "MESSAGE_CREATE",
+                record.guildId(),
+                record.channelId(),
+                gatewayPayload(message)
+            );
+        } catch (GatewayEventConflictException alreadyAppended) {
+            // A concurrent delivery appended this event ID first from an older message state.
+            log.info("Gateway event appended concurrently; completing inbox eventId={} correlationId={}",
+                record.eventId(), record.correlationId());
+        }
     }
 
     private void count(String outcome) {
