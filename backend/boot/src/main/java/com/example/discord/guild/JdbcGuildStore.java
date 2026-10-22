@@ -39,7 +39,7 @@ class JdbcGuildStore implements GuildStore {
 
     @Override
     public Guild get(UUID guildId) {
-        return transact(connection -> loadGuild(connection, guildId, false));
+        return readSnapshot(connection -> loadGuild(connection, guildId, false));
     }
 
     @Override
@@ -106,7 +106,7 @@ class JdbcGuildStore implements GuildStore {
 
     private static Guild loadGuild(Connection connection, UUID guildId, boolean write) throws SQLException {
         try (var statement = connection.prepareStatement(
-            "SELECT id,name,owner_id FROM guilds WHERE id = ?" + (write ? " FOR UPDATE" : " FOR SHARE"))) {
+            "SELECT id,name,owner_id FROM guilds WHERE id = ?" + (write ? " FOR UPDATE" : ""))) {
             statement.setObject(1, guildId);
             try (var rows = statement.executeQuery()) {
                 if (!rows.next()) {
@@ -136,6 +136,39 @@ class JdbcGuildStore implements GuildStore {
         long version = nextPermissionVersion(connection, guild.id());
         appendAuthorizationOutbox(connection, guild, version);
         appendAuthorizationWatermarks(connection, guild, version);
+    }
+
+    // Reads span several tables; a REPEATABLE READ snapshot keeps them consistent without a guild row lock, so
+    // permission reads neither wait for writers' FOR UPDATE nor block them. Read-only snapshots never fail serialization.
+    private <T> T readSnapshot(SqlAction<T> action) {
+        try (Connection connection = dataSource.getConnection()) {
+            int isolation = connection.getTransactionIsolation();
+            boolean readOnly = connection.isReadOnly();
+            connection.setAutoCommit(false);
+            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            connection.setReadOnly(true);
+            try {
+                T result = action.apply(connection);
+                connection.commit();
+                restore(connection, isolation, readOnly);
+                return result;
+            } catch (SQLException | RuntimeException exception) {
+                try {
+                    connection.rollback();
+                    restore(connection, isolation, readOnly);
+                } catch (SQLException cleanupFailure) {
+                    exception.addSuppressed(cleanupFailure);
+                }
+                throw exception;
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to read guild state", exception);
+        }
+    }
+
+    private static void restore(Connection connection, int isolation, boolean readOnly) throws SQLException {
+        connection.setReadOnly(readOnly);
+        connection.setTransactionIsolation(isolation);
     }
 
     private <T> T transact(SqlAction<T> action) {

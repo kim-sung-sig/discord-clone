@@ -87,7 +87,15 @@ final class JdbcModerationService implements ModerationService {
     public AutoModDecision evaluateMessage(UUID guild, UUID channel, UUID author, String content) {
         require(channel, "channelId");
         require(author, "authorId");
-        // ponytail: guild lock serializes evaluation/retention; split policy reads if measured throughput requires it.
+        // Most messages match no rule, so decide them without the guild row lock that alert/audit retention needs.
+        // A match is only a candidate: the block is decided again under the lock against the then-active rules.
+        boolean candidate = read(guild, connection -> {
+            requireGuild(connection, guild);
+            return rules(connection, guild).stream().anyMatch(rule -> rule.matches(content));
+        });
+        if (!candidate) {
+            return AutoModDecision.allowed();
+        }
         return write(guild, "message_evaluate", connection -> {
             for (AutoModRule rule : rules(connection, guild)) {
                 if (rule.matches(content)) {
@@ -339,6 +347,17 @@ final class JdbcModerationService implements ModerationService {
         } catch (SQLException exception) {
             log.warn("moderation_read_failed guildId={} sqlState={}", guild, exception.getSQLState());
             throw new IllegalStateException("failed to read moderation state", exception);
+        }
+    }
+
+    private static void requireGuild(Connection connection, UUID guild) throws SQLException {
+        try (var statement = connection.prepareStatement("SELECT 1 FROM guilds WHERE id=?")) {
+            statement.setObject(1, guild);
+            try (var rows = statement.executeQuery()) {
+                if (!rows.next()) {
+                    throw new IllegalArgumentException("guild not found");
+                }
+            }
         }
     }
 

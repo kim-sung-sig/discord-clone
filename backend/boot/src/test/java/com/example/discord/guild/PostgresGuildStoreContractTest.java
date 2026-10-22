@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -166,6 +171,65 @@ class PostgresGuildStoreContractTest {
 
         assertThat(service().guild(guild.id()).channels()).extracting(Channel::name)
             .containsExactlyInAnyOrder("one", "two");
+    }
+
+    @Test
+    void readDoesNotWaitForAConcurrentGuildWriterAndSeesOnlyCommittedState() throws Exception {
+        UUID owner = insertUser();
+        Guild guild = service().createGuild("committed-name", owner);
+        try (Connection held = dataSource.getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+            held.setAutoCommit(false);
+            try (var statement = held.prepareStatement("UPDATE guilds SET name='uncommitted-name' WHERE id=?")) {
+                statement.setObject(1, guild.id());
+                assertThat(statement.executeUpdate()).isEqualTo(1);
+            }
+            try {
+                Guild read = executor.submit(() -> service().guild(guild.id())).get(2, TimeUnit.SECONDS);
+                assertThat(read.name()).isEqualTo("committed-name");
+            } finally {
+                held.rollback();
+            }
+        }
+    }
+
+    @Test
+    void readUsesARepeatableReadReadOnlySnapshotAndRestoresTheConnection() throws Exception {
+        UUID owner = insertUser();
+        Guild guild = service().createGuild("snapshot", owner);
+        List<String> observed = new ArrayList<>();
+        DataSource recording = recordingDataSource(observed);
+
+        new GuildService(new JdbcGuildStore(recording)).guild(guild.id());
+
+        assertThat(observed).containsSubsequence(
+            "isolation=" + Connection.TRANSACTION_REPEATABLE_READ, "readOnly=true",
+            "close isolation=" + Connection.TRANSACTION_READ_COMMITTED + " readOnly=false");
+    }
+
+    private DataSource recordingDataSource(List<String> observed) {
+        return (DataSource) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {DataSource.class},
+            (proxy, method, args) -> {
+                Object result = method.invoke(dataSource, args);
+                if (!"getConnection".equals(method.getName())) {
+                    return result;
+                }
+                Connection connection = (Connection) result;
+                return Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {Connection.class},
+                    (connectionProxy, call, callArgs) -> {
+                        switch (call.getName()) {
+                            case "setTransactionIsolation" -> observed.add("isolation=" + callArgs[0]);
+                            case "setReadOnly" -> observed.add("readOnly=" + callArgs[0]);
+                            case "close" -> observed.add("close isolation=" + connection.getTransactionIsolation()
+                                + " readOnly=" + connection.isReadOnly());
+                            default -> { }
+                        }
+                        try {
+                            return call.invoke(connection, callArgs);
+                        } catch (InvocationTargetException failure) {
+                            throw failure.getCause();
+                        }
+                    });
+            });
     }
 
     @Test
