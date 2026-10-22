@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -20,7 +21,7 @@ public class GuildService {
     private final EffectivePermissionCalculator calculator = new EffectivePermissionCalculator();
 
     public GuildService(GuildStore store) {
-        this.store = java.util.Objects.requireNonNull(store, "store must not be null");
+        this.store = Objects.requireNonNull(store, "store must not be null");
     }
 
     public Guild createGuild(String name, UUID ownerId) {
@@ -138,7 +139,10 @@ public class GuildService {
     }
 
     public List<Channel> visibleChannels(UUID guildId, UUID memberId) {
-        Guild guild = guild(guildId);
+        return visibleChannels(guild(guildId), memberId);
+    }
+
+    public List<Channel> visibleChannels(Guild guild, UUID memberId) {
         GuildMember member = guild.member(memberId);
         PermissionSet everyonePermissions = guild.everyoneRole().permissions();
 
@@ -174,6 +178,21 @@ public class GuildService {
             return false;
         }
         return isGuildMemberOrOwner(guild(guildId), memberId);
+    }
+
+    public boolean isGuildMemberOrOwner(Guild guild, UUID memberId) {
+        if (memberId == null) {
+            return false;
+        }
+        if (guild.ownerId().equals(memberId)) {
+            return true;
+        }
+        try {
+            guild.member(memberId);
+            return true;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     public boolean canManageRoles(UUID guildId, UUID requesterId) {
@@ -243,9 +262,13 @@ public class GuildService {
         return canUseChannelPermission(guildId, channelId, memberId, Permission.VIEW_CHANNEL);
     }
 
+    public boolean canViewChannel(Guild guild, UUID channelId, UUID memberId) {
+        return canUseChannelPermission(guild, channelId, memberId, Permission.VIEW_CHANNEL);
+    }
+
     /** Filters fan-out candidates against one guild snapshot instead of re-reading the guild per recipient. */
     public Set<UUID> channelViewers(Guild guild, UUID channelId, Collection<UUID> candidateIds) {
-        java.util.Objects.requireNonNull(guild, "guild must not be null");
+        Objects.requireNonNull(guild, "guild must not be null");
         Set<UUID> viewers = new LinkedHashSet<>();
         for (UUID candidateId : candidateIds) {
             if (canUseChannelPermission(guild, channelId, candidateId, Permission.VIEW_CHANNEL)) {
@@ -275,8 +298,12 @@ public class GuildService {
     }
 
     public boolean channelBelongsToGuild(UUID guildId, UUID channelId) {
+        return channelBelongsToGuild(guild(guildId), channelId);
+    }
+
+    public boolean channelBelongsToGuild(Guild guild, UUID channelId) {
         try {
-            guild(guildId).channel(channelId);
+            guild.channel(channelId);
             return true;
         } catch (IllegalArgumentException ignored) {
             return false;
@@ -292,18 +319,6 @@ public class GuildService {
         }
         try {
             return guildPermissions(guild, requesterId).allows(permission);
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
-    }
-
-    private boolean isGuildMemberOrOwner(Guild guild, UUID memberId) {
-        if (guild.ownerId().equals(memberId)) {
-            return true;
-        }
-        try {
-            guild.member(memberId);
-            return true;
         } catch (IllegalArgumentException ignored) {
             return false;
         }

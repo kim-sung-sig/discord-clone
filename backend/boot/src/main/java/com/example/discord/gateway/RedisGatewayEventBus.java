@@ -120,6 +120,11 @@ final class RedisGatewayEventBus implements GatewayEventBus {
     }
 
     @Override
+    public boolean tracksSubscriptions() {
+        return true;
+    }
+
+    @Override
     public void subscribeGuild(UUID guildId) {
         if (guildId != null) {
             subscribe("gateway:guild:" + guildId);

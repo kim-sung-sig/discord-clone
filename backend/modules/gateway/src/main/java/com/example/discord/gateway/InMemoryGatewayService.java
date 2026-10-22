@@ -1,5 +1,6 @@
 package com.example.discord.gateway;
 
+import com.example.discord.guild.Guild;
 import com.example.discord.guild.GuildService;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import com.example.discord.permission.AuthorizationResourceType;
@@ -7,12 +8,14 @@ import com.example.discord.permission.Permission;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class InMemoryGatewayService {
     static final int MAX_RETAINED_EVENTS = 1_000;
@@ -28,6 +31,10 @@ public final class InMemoryGatewayService {
     private final boolean authorizationProjectionEnabled;
     private final java.util.Set<String> notifiedEventIds = new java.util.HashSet<>();
     private final List<Consumer<GatewayEvent>> listeners = new ArrayList<>();
+    // Guild snapshots shared by one outermost operation, including listener-driven nested polls.
+    // Guarded by this monitor; without it every session and event re-read the guild from its store.
+    private Map<UUID, Guild> guildSnapshots;
+    private int guildSnapshotDepth;
 
     public InMemoryGatewayService(GuildService guildService, Clock clock, Duration heartbeatTimeout) {
         this(guildService, clock, heartbeatTimeout, new InMemoryGatewayEventBus(clock));
@@ -109,6 +116,10 @@ public final class InMemoryGatewayService {
     }
 
     public synchronized GatewayIdentifyResult identify(UUID userId) {
+        return withGuildSnapshots(() -> identifyInRound(userId));
+    }
+
+    private GatewayIdentifyResult identifyInRound(UUID userId) {
         Objects.requireNonNull(userId, "userId must not be null");
         Set<UUID> guildIds = Set.copyOf(guildService.guildIdsForMember(userId));
         GatewayEvent ready = controlEvent(
@@ -165,13 +176,20 @@ public final class InMemoryGatewayService {
         Map<String, Object> payload
     ) {
         Objects.requireNonNull(guildId, "guildId must not be null");
-        if (channelId != null && !guildService.channelBelongsToGuild(guildId, channelId)) {
-            throw new IllegalArgumentException("channel does not belong to guild");
-        }
-        GatewayBusEvent busEvent = eventBus.publish(new GatewayBusPublishCommand(
-            type, guildId, channelId, payload, sourceEventId == null ? null : sourceEventId.toString()
-        ));
-        return appendBusEvent(busEvent);
+        return withGuildSnapshots(() -> {
+            if (channelId != null && !guildService.channelBelongsToGuild(guildSnapshot(guildId), channelId)) {
+                throw new IllegalArgumentException("channel does not belong to guild");
+            }
+            GatewayBusEvent busEvent = eventBus.publish(new GatewayBusPublishCommand(
+                type, guildId, channelId, payload, sourceEventId == null ? null : sourceEventId.toString()
+            ));
+            return appendBusEvent(busEvent);
+        });
+    }
+
+    /** Whether an event published with this source ID is already in the durable Gateway event log. */
+    public synchronized boolean hasAppended(UUID sourceEventId) {
+        return eventLog.contains(Objects.requireNonNull(sourceEventId, "sourceEventId must not be null").toString());
     }
 
     public synchronized void addEventListener(Consumer<GatewayEvent> listener) {
@@ -179,11 +197,13 @@ public final class InMemoryGatewayService {
     }
 
     public synchronized List<GatewayEvent> poll(UUID sessionId, UUID userId, long afterSequence) {
-        GatewaySession session = requireOwnedSession(sessionId, userId);
-        registerSubscriptions(session);
-        List<GatewayEvent> deliverable = deliverableEvents(session, afterSequence, true);
-        updateLastDelivered(session, deliverable);
-        return deliverable;
+        return withGuildSnapshots(() -> {
+            GatewaySession session = requireOwnedSession(sessionId, userId);
+            registerSubscriptions(session);
+            List<GatewayEvent> deliverable = deliverableEvents(session, afterSequence, true);
+            updateLastDelivered(session, deliverable);
+            return deliverable;
+        });
     }
 
     public synchronized GatewaySessionCursor acknowledge(UUID sessionId, UUID userId, long sequence) {
@@ -209,6 +229,10 @@ public final class InMemoryGatewayService {
     }
 
     public synchronized GatewayResumeResult resume(UUID sessionId, UUID userId, long lastSequence) {
+        return withGuildSnapshots(() -> resumeInRound(sessionId, userId));
+    }
+
+    private GatewayResumeResult resumeInRound(UUID sessionId, UUID userId) {
         GatewaySession session = requireOwnedSession(sessionId, userId);
         GatewaySessionCursor current = cursorStore.find(sessionId, userId).orElse(null);
         if (current == null) {
@@ -286,21 +310,29 @@ public final class InMemoryGatewayService {
                 return authorizationProjections.decide(event.guildId(), userId, AuthorizationResourceType.CHANNEL,
                     event.channelId(), Permission.VIEW_CHANNEL).allowed();
             }
-            return guildService.canViewChannel(event.guildId(), event.channelId(), userId);
+            return guildService.canViewChannel(guildSnapshot(event.guildId()), event.channelId(), userId);
         }
-        return guildService.isGuildMemberOrOwner(event.guildId(), userId);
+        return guildService.isGuildMemberOrOwner(guildSnapshot(event.guildId()), userId);
     }
 
     private void registerSubscriptions(GatewaySession session) {
+        if (!eventBus.tracksSubscriptions()) {
+            return;
+        }
         for (UUID guildId : session.guildIds()) {
             eventBus.subscribeGuild(guildId);
-            guildService.visibleChannels(guildId, session.userId())
+            guildService.visibleChannels(guildSnapshot(guildId), session.userId())
                 .forEach(channel -> eventBus.subscribeChannel(channel.id()));
         }
     }
 
     private synchronized GatewayEvent appendBusEvent(GatewayBusEvent busEvent) {
-        if (busEvent.channelId() != null && !guildService.channelBelongsToGuild(busEvent.guildId(), busEvent.channelId())) {
+        return withGuildSnapshots(() -> appendBusEventInRound(busEvent));
+    }
+
+    private GatewayEvent appendBusEventInRound(GatewayBusEvent busEvent) {
+        if (busEvent.channelId() != null
+            && !guildService.channelBelongsToGuild(guildSnapshot(busEvent.guildId()), busEvent.channelId())) {
             throw new IllegalArgumentException("channel does not belong to guild");
         }
         long highestSessionSequence = sessionRegistry.sessions().stream()
@@ -317,6 +349,23 @@ public final class InMemoryGatewayService {
             }
         }
         return event;
+    }
+
+    private <T> T withGuildSnapshots(Supplier<T> operation) {
+        if (guildSnapshotDepth++ == 0) {
+            guildSnapshots = new HashMap<>();
+        }
+        try {
+            return operation.get();
+        } finally {
+            if (--guildSnapshotDepth == 0) {
+                guildSnapshots = null;
+            }
+        }
+    }
+
+    private Guild guildSnapshot(UUID guildId) {
+        return guildSnapshots.computeIfAbsent(guildId, guildService::guild);
     }
 
     private GatewaySession requireOwnedSession(UUID sessionId, UUID userId) {

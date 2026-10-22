@@ -32,6 +32,7 @@
 - Guild wiring/test: `backend/boot/src/test/java/com/example/discord/guild/GuildRuntimeConfigurationTest.java`, `backend/modules/guild/src/test/java/com/example/discord/guild/GuildServicePermissionSnapshotTest.java`.
 - 2026-10-22 리뷰 반영: `backend/boot/src/main/java/com/example/discord/message/MessagePublicationSchedulingConfiguration.java`, `backend/boot/src/test/java/com/example/discord/message/MessagePublicationSchedulingConfigurationTest.java`, `backend/boot/src/test/java/com/example/discord/event/ServerEventRecipientResolverTest.java`, `backend/boot/src/test/java/com/example/discord/notification/MessageMentionRecipientResolverTest.java`, `docs/04-report/2026-10-22-kafka-runtime-code-review.html`.
 - 이 blueprint 자체: `docs/03-analysis/runtime-persistence-remediation.blueprint.md`.
+- 2026-10-22 pre-merge 리뷰 반영(Gateway hot path): `backend/modules/gateway/src/main/java/com/example/discord/gateway/GatewayEventBus.java`, `GatewayEventLog.java`, `InMemoryGatewayEventLog.java`, `InMemoryGatewayService.java`, `backend/boot/src/main/java/com/example/discord/gateway/RedisGatewayEventBus.java`, `JdbcGatewayEventLog.java`, `backend/modules/gateway/src/test/java/com/example/discord/gateway/InMemoryGatewayServiceGuildReadTest.java`, `InMemoryGatewayServiceTest.java`, `backend/boot/src/main/java/com/example/discord/message/KafkaMessagePublishedConsumer.java`, `backend/boot/src/test/java/com/example/discord/message/KafkaMessagePublishedConsumerTest.java`, `MessageKafkaConfigurationTest.java`, `MessagePublicationFailureIntegrationTest.java`.
 
 ## Invariants
 - Production-like profiles continue to require `postgres`.
@@ -75,3 +76,14 @@
 - P2-2 수정: `GuildConfiguration.inMemoryGuildService`를 `@Profile("test & !postgres")`로 제한했다. `test,postgres` 조합에서 JDBC `GuildService` 하나만 등록된다(`ModerationConfiguration`의 test fake와 같은 조건). RED/GREEN: `GuildRuntimeConfigurationTest.testAndPostgresProfilesSelectOnlyDatabaseGuildService`.
 - P2-3 수정: `GuildService.channelViewers(Guild, UUID, Collection<UUID>)`를 추가해 하나의 guild snapshot에서 채널 열람 권한을 일괄 판정한다. `ServerEventRecipientResolver`와 `MessageMentionRecipientResolver`는 fan-out마다 guild를 한 번만 읽는다(기존: 수신자마다 `canViewChannel`이 guild 전체를 재조회). 멘션이 없거나 author 자신만 멘션한 메시지는 guild를 읽지 않는다. guild가 없으면 기존처럼 `IllegalArgumentException("guild not found")`이 전파된다. RED/GREEN: `GuildServicePermissionSnapshotTest.channelViewersAreDecidedFromTheGivenSnapshotWithoutRereading`, `ServerEventRecipientResolverTest`, `MessageMentionRecipientResolverTest.everyoneMentionReadsTheGuildOnceRegardlessOfMemberCount`(멤버 50명에서 read 1회).
 - 잔여: 대형 guild의 실제 JDBC 쿼리 수·지연 측정은 수행하지 않았다. snapshot 1회 조회 자체의 비용(멤버·채널·overwrite 전체 로드)은 남는다.
+
+## 2026-10-22 Pre-merge 리뷰 반영 (content `be1c9a9` 대상)
+- Quality P1-1 수정
+  - 문제: `GuildService`가 연산마다 JDBC snapshot을 읽게 되면서 `InMemoryGatewayService`에 부하가 몰렸다. `poll`, `canDeliver`, `registerSubscriptions`, `channelBelongsToGuild` 모두 이벤트·세션마다 guild 전체를 다시 읽었다. 이 읽기는 gateway monitor와 Kafka listener thread 위에서 직렬로 실행됐다. `discord.authz.projection-enabled`의 기본값이 `false`라 운영 기본 경로가 바로 이 경로다.
+  - 수정 1: 가장 바깥 synchronized 연산(`identify`, `publish`, `poll`, `resume`, bus event append) 동안 `Map<UUID, Guild>` snapshot을 공유한다. listener가 중첩해서 호출하는 `poll`도 같은 snapshot을 쓴다. `GuildService`에는 `Guild` snapshot을 받는 `canViewChannel`, `isGuildMemberOrOwner`, `visibleChannels`, `channelBelongsToGuild` overload를 추가했다.
+  - 수정 2: `GatewayEventBus.tracksSubscriptions()`를 추가했다(기본 `false`, `RedisGatewayEventBus`만 `true`). 구독 라우팅을 하지 않는 bus에서는 `registerSubscriptions`가 guild를 읽지 않는다.
+  - RED/GREEN: `InMemoryGatewayServiceGuildReadTest`로 확인했다. 세션 5개가 연결된 상태에서 publish 1회의 guild read가 13회에서 1회로, backlog 20건 poll의 read가 21회에서 1회로 줄었다. 구독 추적 bus에서도 visible channel 구독이 유지되고 read는 1회다.
+- 이관(후속 task, 미수정)
+  - Quality P2-2: 메시지마다 `JdbcModerationService.evaluateMessage`가 guild 행 `FOR UPDATE`를 잡는다. 이 lock이 모든 권한 읽기의 `JdbcGuildStore.get` `FOR SHARE`와 경합해, guild 단위로 쓰기와 읽기가 직렬화된다. 수정 방향: 규칙 평가는 lock 없이 하고 차단이 확정될 때만 lock을 잡는다. 읽기는 `REPEATABLE READ READ ONLY`로 바꾼다.
+  - Quality P3(rollback suppressed 처리, lag null/stale 처리, moderation INFO 로그 양, socketTimeout=1, no-op update의 authz publish, `moderation_answers.id` UNIQUE, FQN·import 스타일), Spec P3-3(아래 Verification Evidence의 테스트 수는 당시 값이다. 2026-10-22 기준 GuildRuntimeConfiguration 4, GuildServicePermissionSnapshot 6, ModerationRuntimeConfiguration 3), Spec P3-4(profile 미지정 로컬 실행은 지원하지 않는다. `GuildService`/`ModerationService` bean이 없어 기동에 실패하며, guard 메시지는 없다).
+  - 대형 guild의 snapshot 1회 로드 비용(쿼리 `5 + 채널 수`)은 남아 있다.

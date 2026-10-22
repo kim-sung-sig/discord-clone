@@ -195,6 +195,60 @@ class KafkaMessagePublishedConsumerTest {
     }
 
     @Test
+    void redeliveryAfterMessageEditCompletesInboxWithoutRepublishingTheGatewayEvent() throws Exception {
+        UUID userId = UUID.randomUUID();
+        InMemoryGuildService guilds = new InMemoryGuildService();
+        var guild = guilds.createGuild("messages", userId);
+        var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
+        List<GatewayBusEvent> sent = new ArrayList<>();
+        InMemoryGatewayService gateway = new InMemoryGatewayService(
+            guilds, CLOCK, Duration.ofSeconds(30), new InMemoryGatewayEventBus(CLOCK));
+        gateway.addEventListener(event -> sent.add(new GatewayBusEvent(
+            event.busEventId(), event.type(), event.guildId(), event.channelId(), event.payload(), event.createdAt())));
+        Message original = new Message(
+            UUID.randomUUID(), new UserMessageAuthor(userId), new ChannelMessageTarget(guild.id(), channel.id()),
+            new MessageContent("before edit"), List.of(), false, false, List.of(), CLOCK.instant(), CLOCK.instant());
+        Message edited = new Message(
+            original.id(), original.author(), original.target(), new MessageContent("after edit"),
+            List.of(), false, false, List.of(), CLOCK.instant(), CLOCK.instant().plusSeconds(5));
+        java.util.concurrent.atomic.AtomicReference<Message> current = new java.util.concurrent.atomic.AtomicReference<>(original);
+        AtomicBoolean failInboxCompletion = new AtomicBoolean(true);
+        java.util.Set<UUID> processed = new java.util.HashSet<>();
+        MessagePublicationInbox inbox = new MessagePublicationInbox() {
+            @Override
+            public boolean isProcessed(UUID id) {
+                return processed.contains(id);
+            }
+
+            @Override
+            public void markProcessed(UUID id) {
+                if (failInboxCompletion.compareAndSet(true, false)) {
+                    throw new DataAccessResourceFailureException("simulated inbox write failure");
+                }
+                processed.add(id);
+            }
+        };
+        UUID eventId = UUID.randomUUID();
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        String payload = mapper.writeValueAsString(MessagePublishedRecord.from(new MessagePublished(
+            eventId, original.id(), original.author(), original.target(), original.mentions(), "correlation", CLOCK.instant()
+        ), "payload-hash"));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(
+            mapper, (target, ignored) -> current.get(), gateway, inbox, metrics);
+
+        assertThatThrownBy(() -> consumer.consume(payload)).isInstanceOf(DataAccessResourceFailureException.class);
+        current.set(edited);
+        consumer.consume(payload);
+
+        assertThat(processed).containsExactly(eventId);
+        assertThat(sent).hasSize(1);
+        assertThat(sent.getFirst().payload()).containsEntry("content", "before edit");
+        assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter().count())
+            .isEqualTo(1);
+    }
+
+    @Test
     void countsMalformedEventsAsFailed() {
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(

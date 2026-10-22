@@ -495,6 +495,11 @@ class InMemoryGatewayServiceTest {
         }
 
         @Override
+        public boolean tracksSubscriptions() {
+            return true;
+        }
+
+        @Override
         public void subscribeGuild(UUID guildId) {
             subscribedGuilds.add(guildId);
         }

@@ -1,6 +1,7 @@
 package com.example.discord.message;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -127,6 +128,23 @@ class MessageKafkaConfigurationTest {
         assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "dead_letter").counter())
             .isNull();
         assertThat(metrics.find("discord.message.publication.consumer.retries").counter()).isNull();
+    }
+
+    @Test
+    void invalidMessagePublicationRecordSkipsRetriesButOtherListenersKeepRetrying() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), new SimpleMeterRegistry(), "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", "{}");
+        ConsumerRecord<String, String> other = new ConsumerRecord<>("discord.authz.events", 0, 0L, "key", "{}");
+        IllegalArgumentException notFound = new IllegalArgumentException("guild not found");
+
+        assertThat(handler.handleOne(notFound, message, mock(), mock())).as("message topic: dead-letter at once").isTrue();
+        assertThat(handler.handleOne(notFound, other, mock(), mock())).as("other topic: first retry").isFalse();
+        assertThat(handler.handleOne(notFound, other, mock(), mock())).as("other topic: second retry").isFalse();
+        assertThat(handler.handleOne(notFound, other, mock(), mock())).as("other topic: recovered after retries").isTrue();
     }
 
     @Test

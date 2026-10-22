@@ -76,13 +76,24 @@ class MessageKafkaConfiguration {
             }
         };
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 2L));
-        handler.addNotRetryableExceptions(IllegalArgumentException.class);
+        // The handler is shared by every @KafkaListener, so only invalid message publication records skip retries.
+        handler.setBackOffFunction((record, failure) -> messageTopic.equals(record.topic())
+            && causedBy(failure, IllegalArgumentException.class) ? new FixedBackOff(0L, 0L) : null);
         handler.setRetryListeners((RetryListener) (record, failure, deliveryAttempt) -> {
             if (messageTopic.equals(record.topic())) {
                 metrics.counter("discord.message.publication.consumer.retries").increment();
             }
         });
         return handler;
+    }
+
+    private static boolean causedBy(Throwable failure, Class<? extends Throwable> type) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static String deadLetter(ObjectMapper mapper, ConsumerRecord<?, ?> record, Exception failure) {

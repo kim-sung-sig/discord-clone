@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ class GuildServicePermissionSnapshotTest {
         assertThat(service.channelViewers(snapshot, CHANNEL, List.of(MEMBER, OWNER, outsider)))
             .containsExactlyInAnyOrder(MEMBER, OWNER);
         assertThat(service.channelViewers(snapshot, UUID.randomUUID(), List.of(OWNER, MEMBER))).containsExactly(OWNER);
-        assertThat(service.channelViewers(snapshot, CHANNEL, java.util.Arrays.asList(MEMBER, null)))
+        assertThat(service.channelViewers(snapshot, CHANNEL, Arrays.asList(MEMBER, null)))
             .containsExactly(MEMBER);
         assertThat(store.reads).isEqualTo(1);
     }

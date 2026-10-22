@@ -27,6 +27,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -38,6 +39,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,7 +129,14 @@ class MessagePublicationFailureIntegrationTest {
                 .map(topic -> new NewTopic(topic, 1, (short) 1))
                 .toList();
             if (!missing.isEmpty()) {
-                admin.createTopics(missing).all().get();
+                try {
+                    admin.createTopics(missing).all().get();
+                } catch (ExecutionException exception) {
+                    // A listener subscription can auto-create the topic between listTopics and createTopics.
+                    if (!(exception.getCause() instanceof TopicExistsException)) {
+                        throw exception;
+                    }
+                }
             }
         }
         assertThat(GATEWAY_PARTITION_ASSIGNED.await(20, TimeUnit.SECONDS))
