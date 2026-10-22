@@ -302,14 +302,19 @@ class PostgresModerationServiceContractTest {
 
     private Connection lockGuild(UUID guild) throws Exception {
         Connection held = dataSource.getConnection();
-        held.setAutoCommit(false);
-        try (var statement = held.prepareStatement("SELECT id FROM guilds WHERE id=? FOR UPDATE")) {
-            statement.setObject(1, guild);
-            try (var rows = statement.executeQuery()) {
-                assertThat(rows.next()).isTrue();
+        try {
+            held.setAutoCommit(false);
+            try (var statement = held.prepareStatement("SELECT id FROM guilds WHERE id=? FOR UPDATE")) {
+                statement.setObject(1, guild);
+                try (var rows = statement.executeQuery()) {
+                    assertThat(rows.next()).isTrue();
+                }
             }
+            return held;
+        } catch (Exception | AssertionError failure) {
+            held.close();
+            throw failure;
         }
-        return held;
     }
 
     private void awaitLockWaiters(String app, long expected) throws Exception {

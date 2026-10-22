@@ -22,7 +22,7 @@
 - `backend/boot/src/main/java/com/example/discord/moderation/JdbcModerationService.java`
   - `evaluateMessage`: guild 존재 확인과 활성 규칙 조회를 lock 없이 한다. 일치하는 규칙이 있을 때만 `write`(guild `FOR UPDATE`)로 들어간다. lock 아래에서 규칙을 다시 읽어 첫 번째로 일치하는 규칙으로 차단을 확정한다. 그 사이 규칙이 비활성화됐으면 허용한다.
 - `backend/boot/src/main/java/com/example/discord/guild/JdbcGuildStore.java`
-  - `get`: `REPEATABLE READ` + `READ ONLY` 트랜잭션으로 `loadGuild`를 실행하고 행 lock은 잡지 않는다. 끝나면 connection의 isolation과 read-only 상태를 원래대로 되돌린다.
+  - `get`: 트랜잭션 첫 문장으로 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`를 실행한 뒤 `loadGuild`를 실행하고 행 lock은 잡지 않는다. 설정이 트랜잭션 범위라서 session 상태를 바꾸거나 되돌릴 필요가 없다(round trip 1회).
   - `update`: 지금처럼 `READ COMMITTED` + `FOR UPDATE`를 유지한다.
 
 ## Invariants
@@ -49,7 +49,7 @@
    - lock 대기 중 규칙이 비활성화되면 차단하지 않는다.
    - 존재하지 않는 guild는 규칙이 없어도 `guild not found`다.
    - `JdbcGuildStore.get`이 guild 행 `FOR UPDATE`를 잡은 트랜잭션을 기다리지 않고, commit 전 상태를 반환한다.
-   - `JdbcGuildStore.get`은 `REPEATABLE READ` + read-only로 실행되고 connection 상태를 복원한다. connection proxy로 확인한다.
+   - `JdbcGuildStore.get`은 첫 query가 잡은 snapshot으로 모든 테이블을 읽는다. guild 행을 읽은 뒤 commit된 channel이 결과에 보이지 않아야 한다(행동 테스트).
 2. GREEN 후 회귀
    - PostgreSQL 계약 전체(`PostgresGuildServiceTest`, `PostgresGuildStoreContractTest`, `PostgresModerationServiceContractTest`, configuration 테스트)
    - `.\gradlew.bat test checkstyleMain checkstyleTest :backend:boot:bootJar`, `npm run lint:backend`, migration guard, `git diff --check`
@@ -65,3 +65,13 @@
   - `readUsesARepeatableReadReadOnlySnapshotAndRestoresTheConnection`: isolation·read-only 설정이 없었다.
   - 차단 대기, lock 대기 중 규칙 비활성화, guild 미존재 테스트는 기존 동작을 고정하는 회귀 가드로 수정 전에도 통과했다.
 - GREEN(`discord_runtime_guild_t212_green`): GuildRuntimeConfiguration 4, PostgresGuildService 6, PostgresGuildStoreContract 7, ModerationRuntimeConfiguration 3, PostgresModerationServiceContract 12. 실패/skip 0.
+
+## 1차 리뷰 반영 (`c21f01b` 대상)
+- 1차 리뷰 결과: spec 94/100, quality/security 92/100, P0/P1/P2 0. Orca run `run_181f315a6084`.
+- P3 반영
+  - session isolation 변경(`SHOW` 1회 + `SET SESSION` 2회)을 트랜잭션 범위 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY` 1회로 바꿨다. 이로써 restore 경로, commit 후 restore 실패로 결과를 버리는 문제, isolation 기본값 가정이 모두 없어졌다.
+  - moderation read 로그에 `operation` 태그를 넣고, 거부되면 `moderation_read_rejected`를 남긴다.
+  - 테스트 helper `lockGuild`가 실패할 때 connection을 닫는다.
+  - T213 문서의 경로 수를 정정했다.
+- 행동 테스트 교체: `readLoadsEveryTableFromTheSnapshotTakenByItsFirstQuery`. guild 행 query 다음, roles query 직전에 다른 connection으로 channel을 commit한다. 그 channel이 결과에 없어야 한다. 구현을 `READ COMMITTED, READ ONLY`로 바꾼 mutant에서는 실패했고(유효성 확인), `REPEATABLE READ`로 되돌리면 통과한다.
+- GREEN(`discord_runtime_guild_t212_green2`): PG 계약과 configuration 32건, 실패/skip 0.

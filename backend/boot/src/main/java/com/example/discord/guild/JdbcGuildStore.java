@@ -140,35 +140,14 @@ class JdbcGuildStore implements GuildStore {
 
     // Reads span several tables; a REPEATABLE READ snapshot keeps them consistent without a guild row lock, so
     // permission reads neither wait for writers' FOR UPDATE nor block them. Read-only snapshots never fail serialization.
+    // SET TRANSACTION scopes this to the transaction: one round trip and no session state to restore.
     private <T> T readSnapshot(SqlAction<T> action) {
-        try (Connection connection = dataSource.getConnection()) {
-            int isolation = connection.getTransactionIsolation();
-            boolean readOnly = connection.isReadOnly();
-            connection.setAutoCommit(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
-            connection.setReadOnly(true);
-            try {
-                T result = action.apply(connection);
-                connection.commit();
-                restore(connection, isolation, readOnly);
-                return result;
-            } catch (SQLException | RuntimeException exception) {
-                try {
-                    connection.rollback();
-                    restore(connection, isolation, readOnly);
-                } catch (SQLException cleanupFailure) {
-                    exception.addSuppressed(cleanupFailure);
-                }
-                throw exception;
+        return transact(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
             }
-        } catch (SQLException exception) {
-            throw new IllegalStateException("failed to read guild state", exception);
-        }
-    }
-
-    private static void restore(Connection connection, int isolation, boolean readOnly) throws SQLException {
-        connection.setReadOnly(readOnly);
-        connection.setTransactionIsolation(isolation);
+            return action.apply(connection);
+        });
     }
 
     private <T> T transact(SqlAction<T> action) {

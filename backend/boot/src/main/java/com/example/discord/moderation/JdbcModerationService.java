@@ -89,7 +89,7 @@ final class JdbcModerationService implements ModerationService {
         require(author, "authorId");
         // Most messages match no rule, so decide them without the guild row lock that alert/audit retention needs.
         // A match is only a candidate: the block is decided again under the lock against the then-active rules.
-        boolean candidate = read(guild, connection -> {
+        boolean candidate = read(guild, "message_evaluate_precheck", connection -> {
             requireGuild(connection, guild);
             return rules(connection, guild).stream().anyMatch(rule -> rule.matches(content));
         });
@@ -338,14 +338,23 @@ final class JdbcModerationService implements ModerationService {
     }
 
     private <T> T read(UUID guild, SqlWork<T> work) {
+        return read(guild, "read", work);
+    }
+
+    private <T> T read(UUID guild, String operation, SqlWork<T> work) {
         require(guild, "guildId");
-        log.info("moderation_read_started guildId={}", guild);
+        log.info("moderation_read_started operation={} guildId={}", operation, guild);
         try (Connection connection = dataSource.getConnection()) {
             T result = work.run(connection);
-            log.info("moderation_read_completed guildId={} rows={}", guild, result instanceof List<?> list ? list.size() : 1);
+            log.info("moderation_read_completed operation={} guildId={} rows={}", operation, guild,
+                result instanceof List<?> list ? list.size() : 1);
             return result;
+        } catch (RuntimeException exception) {
+            log.warn("moderation_read_rejected operation={} guildId={} type={}", operation, guild,
+                exception.getClass().getSimpleName());
+            throw exception;
         } catch (SQLException exception) {
-            log.warn("moderation_read_failed guildId={} sqlState={}", guild, exception.getSQLState());
+            log.warn("moderation_read_failed operation={} guildId={} sqlState={}", operation, guild, exception.getSQLState());
             throw new IllegalStateException("failed to read moderation state", exception);
         }
     }

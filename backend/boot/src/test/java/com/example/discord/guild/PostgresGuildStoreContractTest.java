@@ -9,12 +9,11 @@ import com.example.discord.permission.PermissionSet;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -193,43 +192,65 @@ class PostgresGuildStoreContractTest {
     }
 
     @Test
-    void readUsesARepeatableReadReadOnlySnapshotAndRestoresTheConnection() throws Exception {
+    void readLoadsEveryTableFromTheSnapshotTakenByItsFirstQuery() throws Exception {
         UUID owner = insertUser();
         Guild guild = service().createGuild("snapshot", owner);
-        List<String> observed = new ArrayList<>();
-        DataSource recording = recordingDataSource(observed);
+        UUID lateChannel = UUID.randomUUID();
+        AtomicBoolean committed = new AtomicBoolean();
+        DataSource commitsChannelAfterGuildRow = interceptingDataSource(sql -> {
+            // Runs after the guild row query took the snapshot and before the channel table is read.
+            if (sql.contains("FROM guild_roles") && committed.compareAndSet(false, true)) {
+                insertChannel(lateChannel, guild.id());
+            }
+        });
 
-        new GuildService(new JdbcGuildStore(recording)).guild(guild.id());
+        Guild read = new GuildService(new JdbcGuildStore(commitsChannelAfterGuildRow)).guild(guild.id());
 
-        assertThat(observed).containsSubsequence(
-            "isolation=" + Connection.TRANSACTION_REPEATABLE_READ, "readOnly=true",
-            "close isolation=" + Connection.TRANSACTION_READ_COMMITTED + " readOnly=false");
+        assertThat(committed).isTrue();
+        assertThat(read.channels()).extracting(Channel::id).doesNotContain(lateChannel);
+        assertThat(service().guild(guild.id()).channels()).extracting(Channel::id).contains(lateChannel);
     }
 
-    private DataSource recordingDataSource(List<String> observed) {
+    private DataSource interceptingDataSource(SqlHook beforePrepare) {
         return (DataSource) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {DataSource.class},
             (proxy, method, args) -> {
-                Object result = method.invoke(dataSource, args);
+                Object result = invoke(method, dataSource, args);
                 if (!"getConnection".equals(method.getName())) {
                     return result;
                 }
                 Connection connection = (Connection) result;
                 return Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {Connection.class},
                     (connectionProxy, call, callArgs) -> {
-                        switch (call.getName()) {
-                            case "setTransactionIsolation" -> observed.add("isolation=" + callArgs[0]);
-                            case "setReadOnly" -> observed.add("readOnly=" + callArgs[0]);
-                            case "close" -> observed.add("close isolation=" + connection.getTransactionIsolation()
-                                + " readOnly=" + connection.isReadOnly());
-                            default -> { }
+                        if ("prepareStatement".equals(call.getName())) {
+                            beforePrepare.accept((String) callArgs[0]);
                         }
-                        try {
-                            return call.invoke(connection, callArgs);
-                        } catch (InvocationTargetException failure) {
-                            throw failure.getCause();
-                        }
+                        return invoke(call, connection, callArgs);
                     });
             });
+    }
+
+    private static Object invoke(java.lang.reflect.Method method, Object target, Object[] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException failure) {
+            throw failure.getCause();
+        }
+    }
+
+    private void insertChannel(UUID channelId, UUID guildId) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                 "INSERT INTO channels(id, guild_id, parent_id, name, type, position) VALUES (?, ?, NULL, 'late', ?, 99)")) {
+            statement.setObject(1, channelId);
+            statement.setObject(2, guildId);
+            statement.setString(3, ChannelType.GUILD_TEXT.name());
+            statement.executeUpdate();
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlHook {
+        void accept(String sql) throws Exception;
     }
 
     @Test
