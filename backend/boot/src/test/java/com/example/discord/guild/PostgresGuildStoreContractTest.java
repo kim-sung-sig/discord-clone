@@ -6,10 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -166,6 +170,87 @@ class PostgresGuildStoreContractTest {
 
         assertThat(service().guild(guild.id()).channels()).extracting(Channel::name)
             .containsExactlyInAnyOrder("one", "two");
+    }
+
+    @Test
+    void readDoesNotWaitForAConcurrentGuildWriterAndSeesOnlyCommittedState() throws Exception {
+        UUID owner = insertUser();
+        Guild guild = service().createGuild("committed-name", owner);
+        try (Connection held = dataSource.getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+            held.setAutoCommit(false);
+            try (var statement = held.prepareStatement("UPDATE guilds SET name='uncommitted-name' WHERE id=?")) {
+                statement.setObject(1, guild.id());
+                assertThat(statement.executeUpdate()).isEqualTo(1);
+            }
+            try {
+                Guild read = executor.submit(() -> service().guild(guild.id())).get(2, TimeUnit.SECONDS);
+                assertThat(read.name()).isEqualTo("committed-name");
+            } finally {
+                held.rollback();
+            }
+        }
+    }
+
+    @Test
+    void readLoadsEveryTableFromTheSnapshotTakenByItsFirstQuery() throws Exception {
+        UUID owner = insertUser();
+        Guild guild = service().createGuild("snapshot", owner);
+        UUID lateChannel = UUID.randomUUID();
+        AtomicBoolean committed = new AtomicBoolean();
+        DataSource commitsChannelAfterGuildRow = interceptingDataSource(sql -> {
+            // Runs after the guild row query took the snapshot and before the channel table is read.
+            if (sql.contains("FROM guild_roles") && committed.compareAndSet(false, true)) {
+                insertChannel(lateChannel, guild.id());
+            }
+        });
+
+        Guild read = new GuildService(new JdbcGuildStore(commitsChannelAfterGuildRow)).guild(guild.id());
+
+        assertThat(committed).isTrue();
+        assertThat(read.channels()).extracting(Channel::id).doesNotContain(lateChannel);
+        assertThat(service().guild(guild.id()).channels()).extracting(Channel::id).contains(lateChannel);
+    }
+
+    private DataSource interceptingDataSource(SqlHook beforePrepare) {
+        return (DataSource) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {DataSource.class},
+            (proxy, method, args) -> {
+                Object result = invoke(method, dataSource, args);
+                if (!"getConnection".equals(method.getName())) {
+                    return result;
+                }
+                Connection connection = (Connection) result;
+                return Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {Connection.class},
+                    (connectionProxy, call, callArgs) -> {
+                        if ("prepareStatement".equals(call.getName())) {
+                            beforePrepare.accept((String) callArgs[0]);
+                        }
+                        return invoke(call, connection, callArgs);
+                    });
+            });
+    }
+
+    private static Object invoke(java.lang.reflect.Method method, Object target, Object[] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException failure) {
+            throw failure.getCause();
+        }
+    }
+
+    private void insertChannel(UUID channelId, UUID guildId) throws Exception {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                 "INSERT INTO channels(id, guild_id, parent_id, name, type, position) VALUES (?, ?, NULL, 'late', ?, 99)")) {
+            statement.setObject(1, channelId);
+            statement.setObject(2, guildId);
+            statement.setString(3, ChannelType.GUILD_TEXT.name());
+            statement.executeUpdate();
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlHook {
+        void accept(String sql) throws Exception;
     }
 
     @Test

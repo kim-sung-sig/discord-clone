@@ -76,6 +76,72 @@ class PostgresModerationServiceContractTest {
     }
 
     @Test
+    void allowedMessageDoesNotWaitForTheGuildRowLock() throws Exception {
+        var f = fixture();
+        service().createAutoModRule(f.guild(), f.actor(), AutoModRuleType.KEYWORD, "spoiler", List.of("spoiler"));
+        try (Connection held = lockGuild(f.guild()); var executor = Executors.newSingleThreadExecutor()) {
+            try {
+                var decision = executor.submit(() -> service().evaluateMessage(f.guild(), f.channel(), f.actor(), "hello"))
+                    .get(2, TimeUnit.SECONDS);
+                assertThat(decision.blocked()).isFalse();
+            } finally {
+                held.commit();
+            }
+        }
+        assertThat(service().securityAlerts(f.guild())).isEmpty();
+        assertThat(count("SELECT count(*) FROM moderation_audit_logs WHERE guild_id=?", f.guild())).isEqualTo(1);
+    }
+
+    @Test
+    void blockedMessageWaitsForTheGuildRowLockAndThenRecordsAlertAndAudit() throws Exception {
+        var f = fixture();
+        var rule = service().createAutoModRule(f.guild(), f.actor(), AutoModRuleType.KEYWORD, "spoiler", List.of("spoiler"));
+        String app = "moderation-block-" + UUID.randomUUID();
+        var concurrent = new JdbcModerationService(database(app));
+        try (Connection held = lockGuild(f.guild()); var executor = Executors.newSingleThreadExecutor()) {
+            var decision = executor.submit(() -> concurrent.evaluateMessage(f.guild(), f.channel(), f.actor(), "spoiler"));
+            try {
+                awaitLockWaiters(app, 1);
+                assertThat(decision.isDone()).isFalse();
+            } finally {
+                held.commit();
+            }
+            assertThat(decision.get(15, TimeUnit.SECONDS).ruleId()).contains(rule.id());
+        }
+        assertThat(service().securityAlerts(f.guild())).hasSize(1);
+        assertThat(service().auditLogs(f.guild()).getFirst().action()).isEqualTo(AuditLogAction.AUTOMOD_MESSAGE_BLOCKED);
+    }
+
+    @Test
+    void ruleDisabledWhileTheBlockWaitsForTheLockAllowsTheMessage() throws Exception {
+        var f = fixture();
+        var rule = service().createAutoModRule(f.guild(), f.actor(), AutoModRuleType.KEYWORD, "spoiler", List.of("spoiler"));
+        String app = "moderation-recheck-" + UUID.randomUUID();
+        var concurrent = new JdbcModerationService(database(app));
+        try (Connection held = lockGuild(f.guild()); var executor = Executors.newSingleThreadExecutor()) {
+            var decision = executor.submit(() -> concurrent.evaluateMessage(f.guild(), f.channel(), f.actor(), "spoiler"));
+            try {
+                awaitLockWaiters(app, 1);
+                try (var statement = held.prepareStatement("UPDATE moderation_rules SET enabled=FALSE WHERE id=?")) {
+                    statement.setObject(1, rule.id());
+                    statement.executeUpdate();
+                }
+            } finally {
+                held.commit();
+            }
+            assertThat(decision.get(15, TimeUnit.SECONDS).blocked()).isFalse();
+        }
+        assertThat(service().securityAlerts(f.guild())).isEmpty();
+    }
+
+    @Test
+    void missingGuildIsRejectedEvenWithoutRules() {
+        assertThatThrownBy(() -> service().evaluateMessage(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "hello"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("guild not found");
+    }
+
+    @Test
     void reportsKeepCreationOrderAndResolutionAndRejectOtherGuildAndInvalidStatus() throws Exception {
         var f = fixture();
         var other = fixture();
@@ -232,6 +298,32 @@ class PostgresModerationServiceContractTest {
                 statement.execute("DROP FUNCTION " + function + "()");
             }
         };
+    }
+
+    private Connection lockGuild(UUID guild) throws Exception {
+        Connection held = dataSource.getConnection();
+        try {
+            held.setAutoCommit(false);
+            try (var statement = held.prepareStatement("SELECT id FROM guilds WHERE id=? FOR UPDATE")) {
+                statement.setObject(1, guild);
+                try (var rows = statement.executeQuery()) {
+                    assertThat(rows.next()).isTrue();
+                }
+            }
+            return held;
+        } catch (Exception | AssertionError failure) {
+            held.close();
+            throw failure;
+        }
+    }
+
+    private void awaitLockWaiters(String app, long expected) throws Exception {
+        String sql = "SELECT count(*) FROM pg_stat_activity WHERE application_name=? AND wait_event_type='Lock'";
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (count(sql, app) < expected && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
+        assertThat(count(sql, app)).isEqualTo(expected);
     }
 
     private JdbcModerationService service() {

@@ -39,7 +39,7 @@ class JdbcGuildStore implements GuildStore {
 
     @Override
     public Guild get(UUID guildId) {
-        return transact(connection -> loadGuild(connection, guildId, false));
+        return readSnapshot(connection -> loadGuild(connection, guildId, false));
     }
 
     @Override
@@ -106,7 +106,7 @@ class JdbcGuildStore implements GuildStore {
 
     private static Guild loadGuild(Connection connection, UUID guildId, boolean write) throws SQLException {
         try (var statement = connection.prepareStatement(
-            "SELECT id,name,owner_id FROM guilds WHERE id = ?" + (write ? " FOR UPDATE" : " FOR SHARE"))) {
+            "SELECT id,name,owner_id FROM guilds WHERE id = ?" + (write ? " FOR UPDATE" : ""))) {
             statement.setObject(1, guildId);
             try (var rows = statement.executeQuery()) {
                 if (!rows.next()) {
@@ -136,6 +136,18 @@ class JdbcGuildStore implements GuildStore {
         long version = nextPermissionVersion(connection, guild.id());
         appendAuthorizationOutbox(connection, guild, version);
         appendAuthorizationWatermarks(connection, guild, version);
+    }
+
+    // Reads span several tables; a REPEATABLE READ snapshot keeps them consistent without a guild row lock, so
+    // permission reads neither wait for writers' FOR UPDATE nor block them. Read-only snapshots never fail serialization.
+    // SET TRANSACTION scopes this to the transaction: one round trip and no session state to restore.
+    private <T> T readSnapshot(SqlAction<T> action) {
+        return transact(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+            }
+            return action.apply(connection);
+        });
     }
 
     private <T> T transact(SqlAction<T> action) {
