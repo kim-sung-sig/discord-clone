@@ -334,7 +334,7 @@ class MessagePublicationFailureIntegrationTest {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-cp");
-        command.add(System.getProperty("message.pipeline.test.classpath"));
+        command.add(Files.readString(Path.of(System.getProperty("message.pipeline.test.classpath.file"))).trim());
         command.add(MessagePublicationConsumerProcess.class.getName());
         command.add("--server.port=0");
         command.add("--spring.profiles.active=postgres,kafka,legacy-auth");

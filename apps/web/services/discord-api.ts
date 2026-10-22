@@ -1,3 +1,8 @@
+import { DiscordRestError } from '@discord-clone/api-client'
+
+// One error class for hand-written and generated (orval) calls while domains migrate (T213 → T215).
+export { DiscordRestError }
+
 type QueryValue = string | number | boolean | null | undefined
 
 export interface DiscordRestClientOptions {
@@ -11,16 +16,6 @@ export interface DiscordRequestOptions {
   requestId?: string
 }
 
-export class DiscordRestError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly body: unknown
-  ) {
-    super(message)
-    this.name = 'DiscordRestError'
-  }
-}
 
 const segment = (value: string): string => encodeURIComponent(value)
 

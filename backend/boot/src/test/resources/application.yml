@@ -11,3 +11,7 @@ discord:
       private-key-location: file:${user.dir}/../modules/identity/src/test/resources/identity/ed25519-private.pem
       public-key-locations:
         identity-2026-07: file:${user.dir}/../modules/identity/src/test/resources/identity/ed25519-public.pem
+
+springdoc:
+  api-docs:
+    enabled: true

@@ -20,6 +20,18 @@ const flushDashboard = async () => {
   }
 }
 
+// The global auth middleware may restore the session (POST /api/auth/refresh) while the Nuxt test app boots.
+// Answer it here so dashboard assertions only see the security API calls they stub.
+function stubDashboardFetch(handler: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).endsWith('/api/auth/refresh')
+      ? Promise.resolve(new Response(JSON.stringify({ message: 'no session' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' }
+      }))
+      : handler(input, init))
+}
+
 describe('browser security dashboard', () => {
   let pinia: ReturnType<typeof createPinia>
 
@@ -35,7 +47,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders CSP telemetry summary, top directives, and recent sanitized reports', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 3,
         byEffectiveDirective: {
@@ -76,7 +88,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders an empty state when no CSP telemetry exists', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 0,
         byEffectiveDirective: {},
@@ -94,7 +106,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders an active CSP alert banner with threshold reasons', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 12,
         byEffectiveDirective: {
@@ -134,7 +146,7 @@ describe('browser security dashboard', () => {
   it('acknowledges an active CSP alert with reason and snooze without exposing the operator token', async () => {
     const calls: Array<{ input: string, init?: RequestInit }> = []
     window.sessionStorage.setItem('dc_security_dashboard_operator_token', 'ops-token')
-    vi.stubGlobal('fetch', async (input, init) => {
+    stubDashboardFetch(async (input, init) => {
       calls.push({ input: String(input), init })
       if (String(input).includes('/api/security/csp-alert-ack')) {
         return jsonResponse({
@@ -206,7 +218,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders persisted CSP alert transition history', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 12,
         byEffectiveDirective: {
@@ -247,7 +259,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders CSP alert incident lifecycle history without exposing alert reasons', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 12,
         byEffectiveDirective: {
@@ -291,7 +303,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders CSP telemetry retention discard totals and breakdown counts', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 2,
         byEffectiveDirective: {
@@ -324,7 +336,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders a secret-safe CSP telemetry trend chart', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 4,
         byEffectiveDirective: {
@@ -366,7 +378,7 @@ describe('browser security dashboard', () => {
 
   it('renders CSP rate-limit totals for empty and non-zero states', async () => {
     let callCount = 0
-    vi.stubGlobal('fetch', async () => {
+    stubDashboardFetch(async () => {
       callCount += 1
       return jsonResponse({
         summary: {
@@ -395,7 +407,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders secret-safe CSP rate-limit subject diagnostics', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 0,
         byEffectiveDirective: {},
@@ -431,7 +443,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders privacy-reviewed CSP rate-limit subject distribution without subject identifiers', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 0,
         byEffectiveDirective: {},
@@ -467,7 +479,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders Redis CSP limiter lifecycle metrics without exposing connection secrets', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 0,
         byEffectiveDirective: {},
@@ -508,7 +520,7 @@ describe('browser security dashboard', () => {
   })
 
   it('renders CSP telemetry storage health and write failures', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 0,
         byEffectiveDirective: {},
@@ -539,7 +551,7 @@ describe('browser security dashboard', () => {
 
   it('renders dashboard guard health without exposing configured secrets', async () => {
     let callCount = 0
-    vi.stubGlobal('fetch', async () => {
+    stubDashboardFetch(async () => {
       callCount += 1
       if (callCount === 2) {
         return jsonResponse({
@@ -591,7 +603,7 @@ describe('browser security dashboard', () => {
   })
 
   it('does not render the CSP alert banner when alert state is inactive', async () => {
-    vi.stubGlobal('fetch', async () => jsonResponse({
+    stubDashboardFetch(async () => jsonResponse({
       summary: {
         total: 1,
         byEffectiveDirective: {
@@ -621,7 +633,7 @@ describe('browser security dashboard', () => {
     const auth = useAuthStore()
     auth.accessToken = 'backend-access-token'
     window.sessionStorage.setItem('dc_security_dashboard_operator_token', 'ops-token')
-    vi.stubGlobal('fetch', async (_input, init) => {
+    stubDashboardFetch(async (_input, init) => {
       calls.push(init ?? {})
       return jsonResponse({
         summary: {
@@ -647,7 +659,7 @@ describe('browser security dashboard', () => {
   it('renders operator token audit entries with token hash prefixes but not raw tokens', async () => {
     const calls: Array<{ input: string, init?: RequestInit }> = []
     window.sessionStorage.setItem('dc_security_dashboard_operator_token', 'sdo_saved-dashboard-token')
-    vi.stubGlobal('fetch', async (input, init) => {
+    stubDashboardFetch(async (input, init) => {
       calls.push({ input: String(input), init })
       if (String(input).includes('/api/security/operator-token/audit')) {
         return jsonResponse({
@@ -701,7 +713,7 @@ describe('browser security dashboard', () => {
 
   it('lets an operator save a token and retry telemetry from the dashboard', async () => {
     const calls: Array<{ input: string, init?: RequestInit }> = []
-    vi.stubGlobal('fetch', async (input, init) => {
+    stubDashboardFetch(async (input, init) => {
       calls.push({ input: String(input), init })
       if (String(input).includes('/api/security/operator-token/exchange')) {
         return jsonResponse({
@@ -752,7 +764,7 @@ describe('browser security dashboard', () => {
 
   it('exchanges a bootstrap operator token for a short-lived dashboard token without rendering either token', async () => {
     const calls: Array<{ input: string, init?: RequestInit }> = []
-    vi.stubGlobal('fetch', async (input, init) => {
+    stubDashboardFetch(async (input, init) => {
       calls.push({ input: String(input), init })
       if (String(input).includes('/api/security/operator-token/exchange')) {
         return jsonResponse({
@@ -800,7 +812,7 @@ describe('browser security dashboard', () => {
     const calls: Array<{ input: string, init?: RequestInit }> = []
     const auth = useAuthStore()
     auth.accessToken = 'backend-mfa-access-token'
-    vi.stubGlobal('fetch', async (input, init) => {
+    stubDashboardFetch(async (input, init) => {
       calls.push({ input: String(input), init })
       if (String(input).includes('/api/security/operator-token/exchange')) {
         return jsonResponse({
@@ -843,7 +855,7 @@ describe('browser security dashboard', () => {
   })
 
   it('shows a step-up MFA message when operator token exchange requires MFA', async () => {
-    vi.stubGlobal('fetch', async (input) => {
+    stubDashboardFetch(async (input) => {
       if (String(input).includes('/api/security/operator-token/exchange')) {
         return jsonResponse({ message: 'mfa_required' }, 403)
       }

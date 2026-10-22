@@ -8,8 +8,8 @@
     "packages/*"
   ],
   "scripts": {
-    "openapi:write": "node qa/openapi-contract.mjs --write",
-    "openapi:check": "node qa/openapi-contract.mjs --check && node qa/openapi-contract.test.mjs",
+    "openapi:write": "node qa/gradle-wrapper.mjs :backend:boot:test --tests com.example.discord.openapi.OpenApiContractTest -Popenapi.write=true && orval --config orval.config.mjs",
+    "openapi:check": "node qa/openapi-contract.test.mjs",
     "lint": "npm run lint:frontend && npm run lint:backend",
     "lint:frontend": "eslint \"apps/web/**/*.{ts,vue}\" \"packages/**/*.ts\"",
     "lint:backend": "node qa/gradle-wrapper.mjs checkstyleMain checkstyleTest",
@@ -32,6 +32,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-vue": "^10.6.2",
     "node-forge": "file:vendor/ci-dependency-patches/node-forge",
+    "orval": "8.44.0",
     "prettier": "^3.7.4",
     "typescript-eslint": "^8.48.0",
     "vue": "3.5.44",
