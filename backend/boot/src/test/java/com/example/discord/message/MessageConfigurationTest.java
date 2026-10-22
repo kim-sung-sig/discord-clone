@@ -37,6 +37,15 @@ class MessageConfigurationTest {
     }
 
     @Test
+    void inMemoryPublicationFallbacksAreRestrictedToTestProfile() throws Exception {
+        Method outbox = MessageConfiguration.class.getDeclaredMethod("messagePublicationOutbox");
+        Method inbox = MessageKafkaConfiguration.class.getDeclaredMethod("messagePublicationInbox");
+
+        assertThat(outbox.getAnnotation(Profile.class).value()).containsExactly("test & !postgres");
+        assertThat(inbox.getAnnotation(Profile.class).value()).containsExactly("test & !postgres");
+    }
+
+    @Test
     void postgresMessagePublishGuardUsesLocalProjectionAndFailsClosed() {
         UUID guildId = UUID.randomUUID();
         UUID channelId = UUID.randomUUID();

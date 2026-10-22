@@ -1,13 +1,14 @@
 package com.example.discord.message;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,8 +37,8 @@ class MessageController {
     private final PinMessageUseCase pinMessage;
     private final ChannelMessageQueryService messageQueries;
     private final ChannelMessageReadModelPort readModels;
-    private final InMemoryGuildService guildService;
-    private final InMemoryModerationService moderationService;
+    private final GuildService guildService;
+    private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     MessageController(
@@ -47,8 +48,8 @@ class MessageController {
         PinMessageUseCase pinMessage,
         ChannelMessageQueryService messageQueries,
         ChannelMessageReadModelPort readModels,
-        InMemoryGuildService guildService,
-        InMemoryModerationService moderationService,
+        GuildService guildService,
+        ModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.publishMessage = publishMessage;
@@ -71,13 +72,17 @@ class MessageController {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = guildIdFor(channelId);
         requireCreateRequest(request);
+        String correlationId = MDC.get("request_id");
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = UUID.randomUUID().toString();
+        }
         Message message = publishMessage.publish(new PublishMessageRequest(
             new UserMessageAuthor(requesterId),
             new ChannelMessageTarget(guildId, channelId),
             new MessageContent(request.content()),
             mentionTargetsFrom(request.mentions()),
             new IdempotencyKey(request.idempotencyKey()),
-            UUID.randomUUID().toString()
+            correlationId
         )).message();
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message, readModels.sequenceOf(message.id())));
     }

@@ -2,7 +2,7 @@ package com.example.discord.moderation;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.GuildMember;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.message.ChannelMessageTarget;
 import com.example.discord.message.MessageLookupPort;
 import java.time.Instant;
@@ -28,14 +28,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/guilds/{guildId}")
 class ModerationController {
-    private final InMemoryModerationService moderationService;
-    private final InMemoryGuildService guildService;
+    private final ModerationService moderationService;
+    private final GuildService guildService;
     private final MessageLookupPort messages;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ModerationController(
-        InMemoryModerationService moderationService,
-        InMemoryGuildService guildService,
+        ModerationService moderationService,
+        GuildService guildService,
         MessageLookupPort messages,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {

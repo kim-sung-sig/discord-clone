@@ -1,7 +1,7 @@
 package com.example.discord.notification;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.guild.Channel;
 import java.time.Instant;
 import java.util.List;
@@ -28,10 +28,10 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/notifications")
 class NotificationController {
     private final AuthenticatedUserResolver users;
-    private final InMemoryGuildService guilds;
+    private final GuildService guilds;
     private final JdbcNotificationInboxService inbox;
 
-    NotificationController(AuthenticatedUserResolver users, InMemoryGuildService guilds, JdbcNotificationInboxService inbox) {
+    NotificationController(AuthenticatedUserResolver users, GuildService guilds, JdbcNotificationInboxService inbox) {
         this.users = users;
         this.guilds = guilds;
         this.inbox = inbox;

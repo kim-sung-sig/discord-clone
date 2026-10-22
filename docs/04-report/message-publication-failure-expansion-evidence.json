@@ -1,0 +1,31 @@
+{
+  "runDate": "2026-10-22",
+  "scope": "서브에이전트 조사 후 재해 테스트 확장; 기존 실측 스냅샷은 별도 보존",
+  "artifacts": ".gradle/message-failure-expansion/",
+  "tdd": [
+    {"test": "poisonPayloadAlwaysProducesSafeDeadLetterMetadata", "red": "JSON 문법 오류 입력 3종에서 DLQ encoding IllegalStateException", "green": "JSON 파싱 실패 시 eventId 없이 안전한 메타데이터 DLQ 생성"},
+    {"test": "preservesMarkFailureWhenReleasingClaimAlsoFails", "red": "최초 markPublished 예외 대신 releaseFailed 예외가 전파됨", "green": "최초 예외를 전파하고 release 실패는 suppressed로 보존"}
+  ],
+  "suites": [
+    {"name": "MessagePublicationFailureIntegrationTest", "tests": 11, "failures": 0, "errors": 0, "skipped": 0, "seconds": 77.559, "artifact": "pipeline-expanded.xml"},
+    {"name": "MessageOutboxLeaseFailureIntegrationTest", "tests": 5, "failures": 0, "errors": 0, "skipped": 0, "seconds": 0.824, "artifact": "lease-green.xml"},
+    {"name": "MessageKafkaConfigurationTest", "tests": 18, "failures": 0, "errors": 0, "skipped": 0, "artifact": "config-green.xml"},
+    {"name": "MessageKafkaRecoveryFailureTest", "tests": 4, "failures": 0, "errors": 0, "skipped": 0, "artifact": "recovery-green.xml"},
+    {"name": "KafkaMessagePublishedConsumerTest", "tests": 5, "failures": 0, "errors": 0, "skipped": 0, "artifact": "consumer-green.xml"},
+    {"name": "DefaultMessagePublicationRelayTest", "tests": 5, "failures": 0, "errors": 0, "skipped": 0, "artifact": "relay-green.xml"}
+  ],
+  "measuredScenarios": {
+    "hardKilledConsumer": {"seconds": 22.185, "beforeKill": {"durableGatewayRows": 1, "inboxRows": 0}, "afterRestart": {"durableGatewayRows": 1, "inboxRows": 1}, "republicationByTest": false},
+    "databaseOutage": {"gatewayFailedAttempts": 3, "retryCallbacksAcrossBothGroups": 6, "deadLetterRecords": 2, "failureToDeadLetterMs": 13889, "replayToInboxMs": 198},
+    "consumerLag": {"queuedEvents": 5, "peak": 5, "afterDrain": 0},
+    "brokerConnectionFailure": {"method": "실제 Kafka producer를 테스트 전용 loopback 무응답 endpoint에 연결해 metadata timeout을 발생시킨 뒤 정상 producer로 전환", "outboxAttempts": 1, "publishedWhileFailed": false, "afterRecoveryInboxRows": 1},
+    "inboxInsertFailure": {"method": "eventId scoped PostgreSQL trigger", "gatewayRowsBeforeRecovery": 1, "inboxRowsBeforeRecovery": 0, "gatewayRowsAfterRecovery": 1, "inboxRowsAfterRecovery": 1}
+  },
+  "limits": [
+    "로컬 Kafka와 임시 PostgreSQL의 기능 검증이며 운영 SLO 측정이 아니다.",
+    "동시 consumer는 같은 Gateway service instance를 사용한다. 독립 Gateway instance 경합이나 WebSocket 전달 횟수 1회는 증명하지 않는다.",
+    "broker process를 중지하지 않고 producer의 연결 대상을 장애 endpoint로 바꿨다.",
+    "DLQ 발행 실패는 실제 DefaultErrorHandler와 실패한 I/O future의 경계 검증이다. Kafka committed offset의 실제 장애 검증은 포함하지 않는다.",
+    "API는 MockMvc, 내부 SQL과 metrics를 관측하는 통합 테스트다. 외부 HTTP만 사용하는 black-box 검증은 아니다."
+  ]
+}

@@ -1,6 +1,6 @@
 package com.example.discord.message;
 
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import com.example.discord.permission.AuthorizationResourceType;
 import com.example.discord.permission.Permission;
@@ -12,16 +12,16 @@ final class MessageAuthorizationPolicy implements
     MessagePublishGuard,
     ChannelMessageReadGuard,
     MessageMutationGuard {
-    private final InMemoryGuildService guilds;
+    private final GuildService guilds;
     private final AuthorizationProjectionStore projections;
     private final boolean projectionEnabled;
 
-    MessageAuthorizationPolicy(InMemoryGuildService guilds) {
+    MessageAuthorizationPolicy(GuildService guilds) {
         this(guilds, null, false);
     }
 
     MessageAuthorizationPolicy(
-        InMemoryGuildService guilds,
+        GuildService guilds,
         AuthorizationProjectionStore projections,
         boolean projectionEnabled
     ) {

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kafka 복구·런타임 영속화 코드 리뷰</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3, h4 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+    h4 {
+      font-size: 16px;
+      margin: 16px 0 8px;
+      display: flex;
+      align-items: center;
+    }
+    h4::before {
+      content: "•";
+      color: var(--primary);
+      font-weight: 800;
+      display: inline-block;
+      width: 1em;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+
+    .point-tag {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      background: var(--success-soft);
+      color: var(--success-text);
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .before-after, .ba-box {
+      background: var(--bg);
+      border-left: 4px solid var(--line);
+      padding: 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+
+    .highlight {
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .decision {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+      border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.94rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document"><header class="header"><h1>Kafka 복구·런타임 영속화 코드 리뷰</h1><p>2026-10-22 · 독립 리뷰 2인</p></header>
+<section class="summary-box report-section" id="summary"><span class="point-tag">판정</span><p><strong>P0/P1 0건, P2 3건. 스케줄러 격리 요구사항 미충족으로 merge 보류.</strong></p><p>이번에 핵심 테스트 68건을 새로 실행해 실패·오류·skip 없이 통과했습니다. 운영 코드 수정, commit/push/merge는 수행하지 않았습니다.</p></section>
+<section class="report-section" id="scope"><h2>1. 리뷰 범위</h2><p>브랜치 task_kafka-resilience-observability. BASE/HEAD: 661a6a20c9a2c9934e6d70796db2658b6c629ce4. HEAD 대비 tracked/untracked 작업 트리 80개 경로를 검토했습니다. 최종 SHA256: c131bc27fffe286c81b7d68cc02ad0fe15bcf81c0b28bfa6193b0347ce497866. 보고서 자체는 대상에서 제외했습니다.</p><p>Kafka 리뷰어는 message/Gateway 및 장애 테스트, persistence 리뷰어는 Guild/Moderation 및 caller 전환을 검토했습니다. 요구사항: message-publication-resilience-observability.blueprint.md, message-publication-failure-matrix.md, runtime-persistence-remediation.blueprint.md 및 Guild/Moderation 계획.</p></section>
+<section class="report-section" id="findings"><h2>2. 발견 사항</h2><h3>P2 · lag 스케줄러가 일반 예약 작업도 실행</h3><p><code>backend/boot/src/main/java/com/example/discord/message/MessageKafkaConfiguration.java:30–35</code>. 유일한 TaskScheduler bean이라 qualifier 없는 @Scheduled에도 기본 scheduler로 선택됩니다. Boot 기본 scheduler 자동설정도 backoff합니다. lag AdminClient 조회와 Outbox relay가 같은 단일 스레드를 공유해 broker/Admin 지연이 relay를 막습니다.</p><p>실제 증거: <code>.gradle/message-failure-expansion/pipeline-expanded.xml:832,835,836</code>에 relay/claim thread가 <code>message-publication-lag-1</code>로 기록돼 있습니다. 실제 Spring 7.0.9 router를 사용한 임시 Java 재현도 동일 인스턴스 선택 assertion을 통과했습니다. 현재 테스트는 annotation 값만 확인합니다.</p><p>최소 수정: 일반 작업용 기본 taskScheduler를 별도로 등록하고 lag가 차단돼도 relay가 진행되는 context 검증을 추가하십시오. 기존 blueprint/acceptance의 격리 완료 주장도 정정해야 합니다.</p><h3>P2 · test,postgres에서 GuildService 중복</h3><p><code>backend/boot/src/main/java/com/example/discord/guild/GuildConfiguration.java:18</code>. test fake와 postgres 서비스가 함께 등록돼 GuildService를 요구하는 caller의 주입이 모호해집니다. 해당 조합은 startup에 실패할 수 있습니다. 저장소에서 혼합 프로필 실사용은 찾지 못했습니다.</p><p>최소 수정: fake 조건을 <code>@Profile(&quot;test &amp; !postgres&quot;)</code>로 제한하고 혼합 프로필에서 JDBC 서비스 하나가 선택되는 테스트를 추가하십시오. Moderation fake는 이미 이 조건입니다. 이번 검수에서 혼합 프로필 startup 테스트는 새로 실행하지 않았습니다.</p><h3>P2 · 수신자별 전체 Guild 재조회</h3><p><code>backend/boot/src/main/java/com/example/discord/event/ServerEventRecipientResolver.java:23</code>, <code>backend/boot/src/main/java/com/example/discord/notification/MessageMentionRecipientResolver.java:39</code>. 수신자별 canViewChannel이 JDBC Guild 전체를 다시 읽습니다. 멤버 M명·채널 C개에서 대략 M×(C+5)의 조회가 발생할 수 있습니다. 영속화로 기존 메모리 호출의 비용이 커진 경로입니다.</p><p>권고: 큰 guild의 이벤트/@everyone fanout에서 query count와 지연을 측정하고 필요하면 한 snapshot에서 권한을 일괄 계산하십시오. 운영 처리량은 측정하지 않아 비차단 P2입니다.</p></section>
+<section class="report-section" id="assessment"><h2>3. 독립 평가</h2><table><tr><th>영역</th><th>Spec</th><th>품질·보안</th><th>판정</th></tr><tr><td>Kafka/message/Gateway</td><td>88/100</td><td>91/100</td><td>스케줄러 격리 미충족</td></tr><tr><td>Guild/Moderation</td><td>94/100</td><td>93/100</td><td>비차단 P2 명시 후 수용 가능</td></tr></table><p>Inbox 완료 순서, stable event ID 재처리, DLQ ACK 실패, malformed JSON fallback 및 relay 최초 예외 보존은 요구에 맞습니다. Guild row lock·child upsert·authorization outbox는 같은 transaction이며 startup snapshot hydration을 제거했습니다. Moderation 변경과 audit/alert 및 bounded retention도 같은 transaction에 있습니다.</p><p>merge/push 기준인 spec·quality 각 90점은 Kafka spec에서 미달합니다. 이 작업 트리 리뷰는 커밋 SHA 기반 최종 pre-merge evidence 검수를 대체하지 않습니다.</p></section>
+<section class="report-section" id="verification"><h2>4. 이번 검증</h2><ul><li><code>./gradlew --version</code>: Gradle 8.14.3 / Java 21 확인.</li><li><code>./gradlew test checkstyleMain checkstyleTest :backend:boot:bootJar</code>: 성공. 138 tasks 중 2 executed / 136 up-to-date. 전체 test가 새로 실행됐다는 의미는 아닙니다.</li><li>DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS=true, boot:test selected classes --rerun: Consumer 5 + Configuration 18 + RecoveryFailure 4 + PG lease 5 + Kafka/PG/JVM 11 = 43건, 실패·오류·skip 0.</li><li>DISCORD_RUN_POSTGRES_TESTS=true, 독립 task DB에서 boot:test selected classes --rerun: GuildService 6 + GuildStore 5 + Moderation 8 + configuration 6 = 25건, 실패·오류·skip 0.</li><li>migration-guard.contract.ps1: MIGRATION_GUARD_PASS. 최초 execution policy 차단 후 해당 프로세스에만 Bypass를 지정해 성공.</li><li><code>git diff --check</code>: 성공.</li></ul><p>Kafka는 기존 로컬 broker, PostgreSQL은 테스트 소유 컨테이너만 사용했습니다. Guild/Moderation은 독립 postgres:16-alpine의 discord_runtime_guild_review_20261022에서 실행했으며 해당 컨테이너를 종료·제거했습니다.</p><p>원본 XML·로그·scheduler 재현 소스·명령 manifest: <code>.gradle/code-review-20261022/</code>. 로컬 생성 artifact이며 Git에 포함하지 않았습니다.</p></section>
+<section class="report-section" id="limits"><h2>5. 한계와 후속 작업</h2><p>fresh PG 검증으로 기존 XML의 skipped 증거 한계를 보완했습니다. 과거 Moderation plan hash 불일치와 Guild 문서의 boot main InMemory 참조 없음 주장은 현재 acceptance 근거로 재사용하지 마십시오. GuildConfiguration에는 explicit test bean 참조가 있습니다.</p><p>실제 broker process 중단, DLQ 실패 시 실제 committed offset, 독립 Gateway 경합·WebSocket 전달 횟수, 운영 처리량·SLO는 검증하지 않았습니다. npm run lint:backend는 별도 실행하지 않았으며 대상 Checkstyle task는 위 Gradle 명령에 포함했습니다.</p><p>Blueprint alignment: Kafka No, persistence 대체로 Yes. 수정 주체: 구현(스케줄러/프로필), 이후 blueprint 수용 기록. 실제 스케줄러 격리와 혼합 프로필 regression을 추가하고 관련 테스트를 재실행한 뒤 독립 재검수가 필요합니다. 수용 전이므로 wiki accepted knowledge는 발행하지 않았습니다.</p><p>Wiki used: index.md, Backend Architecture.md, QA Infra Operations.md, Agent Development Guide.md. 적용 스킬: requesting-code-review, discord-wiki-before-development, discord-llmwiki-development-loop의 리뷰 계약, discord-backend-quality-gate. graft는 matching node가 없어 소스로 확인했습니다.</p></section></main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

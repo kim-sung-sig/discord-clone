@@ -8,12 +8,12 @@ final class InMemoryMessagePublicationInbox implements MessagePublicationInbox {
     private final Set<UUID> eventIds = new HashSet<>();
 
     @Override
-    public synchronized boolean claim(UUID eventId) {
-        return eventIds.add(eventId);
+    public synchronized boolean isProcessed(UUID eventId) {
+        return eventIds.contains(eventId);
     }
 
     @Override
-    public synchronized void release(UUID eventId) {
-        eventIds.remove(eventId);
+    public synchronized void markProcessed(UUID eventId) {
+        eventIds.add(eventId);
     }
 }

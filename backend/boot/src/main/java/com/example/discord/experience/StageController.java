@@ -2,9 +2,9 @@ package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.gateway.InMemoryGatewayService;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,16 +27,16 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class StageController {
     private final InMemoryExperienceService experienceService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final InMemoryGatewayService gatewayService;
-    private final InMemoryModerationService moderationService;
+    private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     StageController(
         InMemoryExperienceService experienceService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         InMemoryGatewayService gatewayService,
-        InMemoryModerationService moderationService,
+        ModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;

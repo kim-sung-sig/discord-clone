@@ -29,4 +29,9 @@ public record AutoModRule(
             .map(keyword -> keyword.toLowerCase().trim())
             .toList();
     }
+
+    public boolean matches(String content) {
+        String normalized = content == null ? "" : content.toLowerCase();
+        return enabled && type == AutoModRuleType.KEYWORD && keywords.stream().anyMatch(normalized::contains);
+    }
 }

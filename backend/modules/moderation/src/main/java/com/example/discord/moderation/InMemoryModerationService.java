@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-public final class InMemoryModerationService {
+public final class InMemoryModerationService implements ModerationService {
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_AUDIT_LOGS_PER_GUILD = 500;
@@ -73,13 +73,9 @@ public final class InMemoryModerationService {
         require(guildId, "guildId");
         require(channelId, "channelId");
         require(authorId, "authorId");
-        String normalizedContent = content == null ? "" : content.toLowerCase();
 
         for (AutoModRule rule : autoModRulesByGuild.getOrDefault(guildId, List.of())) {
-            if (!rule.enabled()) {
-                continue;
-            }
-            if (rule.type() == AutoModRuleType.KEYWORD && containsKeyword(normalizedContent, rule.keywords())) {
+            if (rule.matches(content)) {
                 appendSecurityAlert(guildId, authorId, channelId, "AUTOMOD_BLOCK", "MEDIUM", "keyword automod block");
                 appendAudit(guildId, AuditLogAction.AUTOMOD_MESSAGE_BLOCKED, authorId, rule.id(), "keyword automod block");
                 return AutoModDecision.blocked(rule.id(), "message blocked by AutoMod");
@@ -179,19 +175,7 @@ public final class InMemoryModerationService {
         for (int i = 0; i < reports.size(); i++) {
             MessageReport current = reports.get(i);
             if (current.id().equals(reportId)) {
-                MessageReport resolved = new MessageReport(
-                    current.id(),
-                    current.guildId(),
-                    current.channelId(),
-                    current.messageId(),
-                    current.reporterId(),
-                    current.reason(),
-                    status,
-                    Optional.of(moderatorId),
-                    resolution,
-                    current.createdAt(),
-                    Instant.now()
-                );
+                MessageReport resolved = current.resolve(moderatorId, status, resolution, Instant.now());
                 reports.set(i, resolved);
                 appendAudit(guildId, AuditLogAction.MESSAGE_REPORT_RESOLVED, moderatorId, current.messageId(), "message report resolved");
                 return resolved;
@@ -255,10 +239,6 @@ public final class InMemoryModerationService {
             alert,
             MAX_SECURITY_ALERTS_PER_GUILD
         );
-    }
-
-    private static boolean containsKeyword(String normalizedContent, List<String> keywords) {
-        return keywords.stream().anyMatch(normalizedContent::contains);
     }
 
     private static void require(UUID value, String name) {

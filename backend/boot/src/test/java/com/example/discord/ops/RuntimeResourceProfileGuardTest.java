@@ -59,6 +59,25 @@ class RuntimeResourceProfileGuardTest {
     }
 
     @Test
+    void kafkaRuntimeProfileRequiresPostgresProfile() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("kafka");
+
+        assertThatThrownBy(() -> RuntimeResourceProfileGuard.validateProfiles(environment))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("kafka runtime profile requires postgres");
+    }
+
+    @Test
+    void testProfileMayUseKafkaWithInMemoryTestAdapters() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("test", "kafka");
+
+        assertThatCode(() -> RuntimeResourceProfileGuard.validateProfiles(environment))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
     void productionProfileAllowsPostgresProfile() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("production", "postgres");

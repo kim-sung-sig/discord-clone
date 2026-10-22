@@ -1,7 +1,7 @@
 package com.example.discord.presence;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -27,13 +27,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/presence")
 class PresenceController {
     private final InMemoryPresenceService presenceService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final JdbcChannelReadService jdbcChannelReadService;
 
     PresenceController(
         InMemoryPresenceService presenceService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         AuthenticatedUserResolver authenticatedUserResolver,
         ObjectProvider<JdbcChannelReadService> jdbcChannelReadService
     ) {

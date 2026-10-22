@@ -1,15 +1,15 @@
 package com.example.discord.message;
 
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 final class MessageContentModerationPolicy implements MessageContentPolicy {
-    private final InMemoryModerationService moderation;
+    private final ModerationService moderation;
 
-    MessageContentModerationPolicy(InMemoryModerationService moderation) {
+    MessageContentModerationPolicy(ModerationService moderation) {
         this.moderation = Objects.requireNonNull(moderation, "moderation must not be null");
     }
 

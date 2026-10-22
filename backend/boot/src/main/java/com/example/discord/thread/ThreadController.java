@@ -2,7 +2,7 @@ package com.example.discord.thread;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,12 +24,12 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class ThreadController {
     private final ThreadService threadService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ThreadController(
         ThreadService threadService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.threadService = threadService;

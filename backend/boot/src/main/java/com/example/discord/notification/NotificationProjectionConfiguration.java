@@ -1,6 +1,6 @@
 package com.example.discord.notification;
 
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.message.MessageLookupPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,7 +13,7 @@ class NotificationProjectionConfiguration {
     @Bean
     MessageMentionProjector messageMentionProjector(
         MessageLookupPort messages,
-        InMemoryGuildService guilds,
+        GuildService guilds,
         JdbcTemplate jdbc,
         JdbcNotificationInboxService inbox
     ) {

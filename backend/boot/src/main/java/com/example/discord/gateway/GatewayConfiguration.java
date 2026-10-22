@@ -1,6 +1,6 @@
 package com.example.discord.gateway;
 
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import java.time.Clock;
 import java.time.Duration;
@@ -38,7 +38,7 @@ class GatewayConfiguration {
 
     @Bean
     InMemoryGatewayService gatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock authClock,
         @Value("${discord.gateway.heartbeat-timeout-ms:30000}") long heartbeatTimeoutMillis,
         GatewayEventBus gatewayEventBus,

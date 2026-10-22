@@ -8,6 +8,11 @@ public interface GatewayEventBus {
 
     void addEventListener(Consumer<GatewayBusEvent> listener);
 
+    /** Buses that route by guild/channel subscription (Redis) need sessions to register their visible channels. */
+    default boolean tracksSubscriptions() {
+        return false;
+    }
+
     default void subscribeGuild(UUID guildId) {
     }
 

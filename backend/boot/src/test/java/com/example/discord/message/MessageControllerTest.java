@@ -1,6 +1,7 @@
 package com.example.discord.message;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -11,6 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import java.util.UUID;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -24,6 +29,62 @@ import org.springframework.test.web.servlet.MvcResult;
 class MessageControllerTest {
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private MessagePublicationOutboxQueue outboxQueue;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
+    private MessagePublicationRelayWorker relayWorker;
+
+    @Test
+    void exposesMessagePublicationOutboxBacklogMetric() {
+        assertThat(meterRegistry.find("discord.message.publication.outbox.backlog").gauge()).isNotNull();
+    }
+
+    @Test
+    void recordsOutboxRelayDurationAndOutcome() {
+        relayWorker.relayPendingPublications();
+
+        assertThat(meterRegistry.find("discord.message.publication.relay").tag("outcome", "published").timer())
+            .isNotNull()
+            .satisfies(timer -> assertThat(timer.count()).isPositive());
+    }
+
+    @Test
+    void propagatesRequestIdIntoMessagePublicationCorrelationId() throws Exception {
+        AuthSession owner = signup("message_correlation_owner");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+        String correlationId = "pipeline-" + UUID.randomUUID();
+
+        MvcResult result = mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .header("X-Request-Id", correlationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "trace this publication",
+                      "idempotencyKey": "trace-%s"
+                    }
+                    """.formatted(UUID.randomUUID())))
+            .andExpect(status().isCreated())
+            .andReturn();
+        UUID messageId = UUID.fromString(JsonPath.read(result.getResponse().getContentAsString(), "$.id"));
+
+        List<ClaimedMessagePublication> publications = outboxQueue.claimPendingPublications(
+            100,
+            Instant.now(),
+            Duration.ofSeconds(30)
+        );
+
+        assertThat(publications).anySatisfy(publication -> {
+            assertThat(publication.event().messageId()).isEqualTo(messageId);
+            assertThat(publication.event().correlationId()).isEqualTo(correlationId);
+        });
+    }
 
     @Test
     void rejectsCreateWithoutSendMessages() throws Exception {

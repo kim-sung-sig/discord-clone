@@ -1,7 +1,7 @@
 package com.example.discord.storage;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.message.ChannelMessageTarget;
 import com.example.discord.message.MessageLookupPort;
 import java.time.Instant;
@@ -27,13 +27,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api")
 class AttachmentController {
     private final InMemoryAttachmentService attachmentService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final MessageLookupPort messageLookup;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     AttachmentController(
         InMemoryAttachmentService attachmentService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         MessageLookupPort messageLookup,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {

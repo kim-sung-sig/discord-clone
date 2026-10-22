@@ -62,24 +62,33 @@ public final class DefaultMessagePublicationRelay implements MessagePublicationR
         )) {
             MessagePublished event = publication.event();
             try {
-                log.debug("Dispatching message publication eventId={} messageId={}", event.eventId(), event.messageId());
+                log.debug("Dispatching message publication eventId={} messageId={} correlationId={}",
+                    event.eventId(), event.messageId(), event.correlationId());
                 dispatcher.dispatch(event);
                 outbox.markPublished(event.eventId(), publication.claimToken(), clock.instant());
-                log.info("Message publication marked published eventId={} messageId={}", event.eventId(), event.messageId());
+                log.info("Message publication marked published eventId={} messageId={} correlationId={}",
+                    event.eventId(), event.messageId(), event.correlationId());
             } catch (RuntimeException exception) {
                 log.warn(
-                    "Message publication dispatch failed eventId={} messageId={}",
+                    "Message publication dispatch failed eventId={} messageId={} correlationId={}",
                     event.eventId(),
                     event.messageId(),
+                    event.correlationId(),
                     exception
                 );
-                outbox.releaseFailed(
-                    event.eventId(),
-                    publication.claimToken(),
-                    exception.getMessage(),
-                    clock.instant(),
-                    retryDelay
-                );
+                try {
+                    outbox.releaseFailed(
+                        event.eventId(),
+                        publication.claimToken(),
+                        exception.getMessage(),
+                        clock.instant(),
+                        retryDelay
+                    );
+                } catch (RuntimeException releaseFailure) {
+                    if (releaseFailure != exception) {
+                        exception.addSuppressed(releaseFailure);
+                    }
+                }
                 throw exception;
             }
             delivered++;

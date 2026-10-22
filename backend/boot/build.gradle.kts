@@ -44,6 +44,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.kafka:spring-kafka")
+    implementation("org.springframework.boot:spring-boot-kafka")
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.flywaydb:flyway-core")
@@ -57,4 +58,8 @@ dependencies {
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.3"))
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:junit-jupiter")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("message.pipeline.test.classpath", sourceSets.test.get().runtimeClasspath.asPath)
 }

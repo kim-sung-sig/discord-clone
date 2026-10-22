@@ -48,6 +48,11 @@ public final class InMemoryGatewayEventLog implements GatewayEventLog {
     }
 
     @Override
+    public synchronized boolean contains(String eventId) {
+        return byEventId.containsKey(eventId);
+    }
+
+    @Override
     public synchronized List<GatewayEvent> after(long sequence, int limit) {
         if (sequence < 0) {
             throw new IllegalArgumentException("sequence must not be negative");

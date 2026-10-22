@@ -8,6 +8,8 @@ public interface GatewayEventLog {
 
     GatewayEvent append(GatewayBusEvent event);
 
+    boolean contains(String eventId);
+
     List<GatewayEvent> after(long sequence, int limit);
 
     long oldestSequence();

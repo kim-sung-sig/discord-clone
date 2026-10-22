@@ -3,6 +3,9 @@ package com.example.discord.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.discord.channel.ChannelType;
+import com.example.discord.guild.Guild;
+import com.example.discord.guild.GuildService;
+import com.example.discord.guild.GuildStore;
 import com.example.discord.guild.InMemoryGuildService;
 import com.example.discord.message.BotMessageAuthor;
 import com.example.discord.message.ChannelMessageTarget;
@@ -15,9 +18,11 @@ import com.example.discord.message.UserMessageAuthor;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class MessageMentionRecipientResolverTest {
@@ -76,5 +81,73 @@ class MessageMentionRecipientResolverTest {
 
         assertThat(new MessageMentionRecipientResolver(guilds).resolve(message))
             .isEqualTo(Set.of(ownerId, memberId));
+    }
+
+    @Test
+    void everyoneMentionReadsTheGuildOnceRegardlessOfMemberCount() {
+        UUID authorId = UUID.randomUUID();
+        InMemoryGuildService seed = new InMemoryGuildService();
+        var guild = seed.createGuild("large", authorId);
+        List<UUID> members = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            UUID memberId = UUID.randomUUID();
+            seed.addMember(guild.id(), memberId);
+            members.add(memberId);
+        }
+        var channel = seed.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
+        SnapshotStore store = new SnapshotStore(seed.guild(guild.id()));
+        MessageMentionRecipientResolver resolver = new MessageMentionRecipientResolver(new GuildService(store));
+        Message everyone = new Message(UUID.randomUUID(), new UserMessageAuthor(authorId),
+            new ChannelMessageTarget(guild.id(), channel.id()), new MessageContent("@everyone"),
+            List.of(new UserMentionTarget(members.getFirst()), new SpecialMentionTarget(SpecialMentionKind.EVERYONE)),
+            false, false, List.of(), Instant.EPOCH, Instant.EPOCH);
+        Message plain = new Message(UUID.randomUUID(), new UserMessageAuthor(authorId),
+            new ChannelMessageTarget(guild.id(), channel.id()), new MessageContent("hello"),
+            List.of(), false, false, List.of(), Instant.EPOCH, Instant.EPOCH);
+
+        assertThat(resolver.resolve(everyone)).isEqualTo(Set.copyOf(members));
+        assertThat(store.reads).isEqualTo(1);
+        assertThat(resolver.resolve(plain)).isEmpty();
+        assertThat(store.reads).isEqualTo(1);
+        Message selfOnly = new Message(UUID.randomUUID(), new UserMessageAuthor(authorId),
+            new ChannelMessageTarget(guild.id(), channel.id()), new MessageContent("<@" + authorId + ">"),
+            List.of(new UserMentionTarget(authorId)), false, false, List.of(), Instant.EPOCH, Instant.EPOCH);
+        assertThat(resolver.resolve(selfOnly)).isEmpty();
+        assertThat(store.reads).isEqualTo(1);
+    }
+
+    private static final class SnapshotStore implements GuildStore {
+        private final Guild snapshot;
+        private int reads;
+
+        private SnapshotStore(Guild snapshot) {
+            this.snapshot = snapshot;
+        }
+
+        @Override
+        public Guild get(UUID guildId) {
+            reads++;
+            return snapshot;
+        }
+
+        @Override
+        public void create(Guild guild) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <T> T update(UUID guildId, Function<Guild, T> mutation) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<UUID> guildIdsForMember(UUID memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public UUID guildIdForChannel(UUID channelId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
