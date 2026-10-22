@@ -60,7 +60,7 @@ export const getPremiumGrantEntitlementUrl = (userId: string,) => {
 
 
 
-  return `/api/premium/users/${userId}/entitlements`
+  return `/api/premium/users/${encodeURIComponent(String(userId))}/entitlements`
 }
 
 export const premiumGrantEntitlement = async (userId: string,
@@ -96,7 +96,7 @@ export const getPremiumFeatureGateUrl = (userId: string,
 
 
 
-  return `/api/premium/users/${userId}/features/${featureKey}`
+  return `/api/premium/users/${encodeURIComponent(String(userId))}/features/${encodeURIComponent(String(featureKey))}`
 }
 
 export const premiumFeatureGate = async (userId: string,

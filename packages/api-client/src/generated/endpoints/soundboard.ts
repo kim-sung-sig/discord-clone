@@ -19,7 +19,7 @@ export const getSoundboardPlaySoundUrl = (channelId: string,
 
 
 
-  return `/api/soundboard/channels/${channelId}/sounds/${soundId}/play`
+  return `/api/soundboard/channels/${encodeURIComponent(String(channelId))}/sounds/${encodeURIComponent(String(soundId))}/play`
 }
 
 export const soundboardPlaySound = async (channelId: string,
@@ -40,7 +40,7 @@ export const getSoundboardSoundsUrl = (guildId: string,) => {
 
 
 
-  return `/api/soundboard/guilds/${guildId}/sounds`
+  return `/api/soundboard/guilds/${encodeURIComponent(String(guildId))}/sounds`
 }
 
 export const soundboardSounds = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<SoundboardSoundResponse[]> => {
@@ -60,7 +60,7 @@ export const getSoundboardCreateSoundUrl = (guildId: string,) => {
 
 
 
-  return `/api/soundboard/guilds/${guildId}/sounds`
+  return `/api/soundboard/guilds/${encodeURIComponent(String(guildId))}/sounds`
 }
 
 export const soundboardCreateSound = async (guildId: string,

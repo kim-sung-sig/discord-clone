@@ -79,5 +79,6 @@ tasks.withType<Test>().configureEach {
     inputs.file(rootProject.file("docs/api/openapi.json")).withPropertyName("openApiContract")
     if (openApiWrite == "true") {
         outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
     }
 }

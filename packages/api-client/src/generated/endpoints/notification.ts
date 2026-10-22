@@ -86,7 +86,7 @@ export const getNotificationMarkServerItemReadUrl = (itemId: string,) => {
 
 
 
-  return `/api/notifications/${itemId}/read`
+  return `/api/notifications/${encodeURIComponent(String(itemId))}/read`
 }
 
 export const notificationMarkServerItemRead = async (itemId: string, options?: Parameters<typeof discordFetch>[1]): Promise<void> => {

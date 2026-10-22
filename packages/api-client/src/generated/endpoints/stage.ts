@@ -17,7 +17,7 @@ export const getStageStartSessionUrl = (channelId: string,) => {
 
 
 
-  return `/api/stage/channels/${channelId}/sessions`
+  return `/api/stage/channels/${encodeURIComponent(String(channelId))}/sessions`
 }
 
 export const stageStartSession = async (channelId: string,
@@ -52,7 +52,7 @@ export const getStageActiveSessionUrl = (channelId: string,) => {
 
 
 
-  return `/api/stage/channels/${channelId}/sessions/active`
+  return `/api/stage/channels/${encodeURIComponent(String(channelId))}/sessions/active`
 }
 
 export const stageActiveSession = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<StageSessionResponse> => {
@@ -73,7 +73,7 @@ export const getStageMoveToAudienceUrl = (sessionId: string,
 
 
 
-  return `/api/stage/sessions/${sessionId}/audience/${userId}`
+  return `/api/stage/sessions/${encodeURIComponent(String(sessionId))}/audience/${encodeURIComponent(String(userId))}`
 }
 
 export const stageMoveToAudience = async (sessionId: string,
@@ -94,7 +94,7 @@ export const getStageRequestToSpeakUrl = (sessionId: string,) => {
 
 
 
-  return `/api/stage/sessions/${sessionId}/request-to-speak`
+  return `/api/stage/sessions/${encodeURIComponent(String(sessionId))}/request-to-speak`
 }
 
 export const stageRequestToSpeak = async (sessionId: string, options?: Parameters<typeof discordFetch>[1]): Promise<StageSessionResponse> => {
@@ -115,7 +115,7 @@ export const getStageApproveSpeakerUrl = (sessionId: string,
 
 
 
-  return `/api/stage/sessions/${sessionId}/speakers/${userId}`
+  return `/api/stage/sessions/${encodeURIComponent(String(sessionId))}/speakers/${encodeURIComponent(String(userId))}`
 }
 
 export const stageApproveSpeaker = async (sessionId: string,

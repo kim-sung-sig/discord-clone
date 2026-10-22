@@ -5,7 +5,12 @@ import { defineConfig } from 'orval'
 export default defineConfig({
   discord: {
     input: {
-      target: './docs/api/openapi.json'
+      target: './docs/api/openapi.json',
+      // Internal operator endpoints (X-Internal-* headers) are not part of the web client.
+      filters: {
+        mode: 'exclude',
+        tags: ['message-outbox']
+      }
     },
     output: {
       mode: 'tags',
@@ -13,6 +18,8 @@ export default defineConfig({
       target: './packages/api-client/src/generated/endpoints',
       schemas: './packages/api-client/src/generated/model',
       clean: true,
+      // Encode path parameters (the hand-written client used encodeURIComponent for every segment).
+      urlEncodeParameters: true,
       override: {
         mutator: {
           path: './packages/api-client/src/http/discord-fetch.ts',

@@ -18,7 +18,7 @@ export const getServerEventListUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/events`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/events`
 }
 
 export const serverEventList = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<ServerEvent[]> => {
@@ -38,7 +38,7 @@ export const getServerEventCreateUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/events`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/events`
 }
 
 export const serverEventCreate = async (guildId: string,
@@ -74,7 +74,7 @@ export const getServerEventGetUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/events/${eventId}`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/events/${encodeURIComponent(String(eventId))}`
 }
 
 export const serverEventGet = async (guildId: string,
@@ -96,7 +96,7 @@ export const getServerEventCancelUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/events/${eventId}/cancel`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/events/${encodeURIComponent(String(eventId))}/cancel`
 }
 
 export const serverEventCancel = async (guildId: string,

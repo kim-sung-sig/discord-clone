@@ -16,6 +16,8 @@ import java.util.Locale;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.providers.ObjectMapperProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,10 @@ import org.springframework.web.method.HandlerMethod;
  * Controllers stay annotation-free: names come from the controller class and handler method.
  */
 @Configuration(proxyBeanMethods = false)
+// Same conditions as springdoc's SpringDocConfiguration, which provides ObjectMapperProvider: deployed profiles
+// disable api-docs and admin-cli runs without a web server, and neither may fail to start because of this class.
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnProperty(name = "springdoc.api-docs.enabled", matchIfMissing = true)
 class OpenApiConfiguration {
     static final String BEARER_SCHEME = "bearerAuth";
     private static final String CONTROLLER_SUFFIX = "Controller";
@@ -75,13 +81,18 @@ class OpenApiConfiguration {
     // REST controllers serialize JSON; springdoc reports "*/*" when a handler does not declare produces.
     @Bean
     OpenApiCustomizer jsonResponses() {
-        return openApi -> openApi.getPaths().values().forEach(path -> path.readOperations().forEach(operation ->
-            operation.getResponses().values().forEach(response -> {
-                Content content = response.getContent();
-                if (content != null && content.containsKey(ANY_MEDIA_TYPE)) {
-                    content.addMediaType(MediaType.APPLICATION_JSON_VALUE, content.remove(ANY_MEDIA_TYPE));
-                }
-            })));
+        return openApi -> {
+            if (openApi.getPaths() == null) {
+                return;
+            }
+            openApi.getPaths().values().forEach(path -> path.readOperations().forEach(operation ->
+                operation.getResponses().values().forEach(response -> {
+                    Content content = response.getContent();
+                    if (content != null && content.containsKey(ANY_MEDIA_TYPE)) {
+                        content.addMediaType(MediaType.APPLICATION_JSON_VALUE, content.remove(ANY_MEDIA_TYPE));
+                    }
+                })));
+        };
     }
 
     private static boolean isHeader(Parameter parameter, String name) {

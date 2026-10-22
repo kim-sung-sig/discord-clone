@@ -18,7 +18,7 @@ export const getInviteCreateInviteUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/invites`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/invites`
 }
 
 export const inviteCreateInvite = async (guildId: string,
@@ -53,7 +53,7 @@ export const getInviteDeleteInviteUrl = (code: string,) => {
 
 
 
-  return `/api/invites/${code}`
+  return `/api/invites/${encodeURIComponent(String(code))}`
 }
 
 export const inviteDeleteInvite = async (code: string, options?: Parameters<typeof discordFetch>[1]): Promise<void> => {
@@ -73,7 +73,7 @@ export const getInvitePreviewInviteUrl = (code: string,) => {
 
 
 
-  return `/api/invites/${code}`
+  return `/api/invites/${encodeURIComponent(String(code))}`
 }
 
 export const invitePreviewInvite = async (code: string, options?: Parameters<typeof discordFetch>[1]): Promise<InviteResponse> => {
@@ -93,7 +93,7 @@ export const getInviteAcceptInviteUrl = (code: string,) => {
 
 
 
-  return `/api/invites/${code}/accept`
+  return `/api/invites/${encodeURIComponent(String(code))}/accept`
 }
 
 export const inviteAcceptInvite = async (code: string, options?: Parameters<typeof discordFetch>[1]): Promise<InviteAcceptResponse> => {

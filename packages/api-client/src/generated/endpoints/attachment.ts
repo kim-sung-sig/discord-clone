@@ -74,7 +74,7 @@ export const getAttachmentRequestDownloadUrl = (attachmentId: string,) => {
 
 
 
-  return `/api/attachments/${attachmentId}/download`
+  return `/api/attachments/${encodeURIComponent(String(attachmentId))}/download`
 }
 
 export const attachmentRequestDownload = async (attachmentId: string, options?: Parameters<typeof discordFetch>[1]): Promise<AttachmentDownloadResponse> => {
@@ -94,7 +94,7 @@ export const getAttachmentMarkUploadedUrl = (attachmentId: string,) => {
 
 
 
-  return `/api/attachments/${attachmentId}/uploaded`
+  return `/api/attachments/${encodeURIComponent(String(attachmentId))}/uploaded`
 }
 
 export const attachmentMarkUploaded = async (attachmentId: string, options?: Parameters<typeof discordFetch>[1]): Promise<AttachmentResponse> => {
@@ -116,7 +116,7 @@ export const getAttachmentAttachToMessageUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/attachments/${attachmentId}`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/attachments/${encodeURIComponent(String(attachmentId))}`
 }
 
 export const attachmentAttachToMessage = async (channelId: string,

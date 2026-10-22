@@ -11,7 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * remaining clash fails the export instead of corrupting the generated client types.
  */
 final class DomainQualifiedTypeNameResolver extends TypeNameResolver {
-    private final Map<String, Class<?>> owners = new ConcurrentHashMap<>();
+    // Class names, not Class objects: a restarted classloader must not look like a clash.
+    private final Map<String, String> owners = new ConcurrentHashMap<>();
 
     @Override
     protected String getNameOfClass(Class<?> type) {
@@ -19,12 +20,12 @@ final class DomainQualifiedTypeNameResolver extends TypeNameResolver {
         String name = super.getNameOfClass(type);
         if (enclosing != null && enclosing.getSimpleName().endsWith("Controller")) {
             String prefix = capitalize(OpenApiConfiguration.domain(enclosing.getSimpleName()));
-            name = type.getSimpleName().startsWith(prefix) ? type.getSimpleName() : prefix + type.getSimpleName();
+            name = name.startsWith(prefix) ? name : prefix + name;
         }
-        Class<?> owner = owners.putIfAbsent(name, type);
-        if (owner != null && !owner.equals(type)) {
+        String owner = owners.putIfAbsent(name, type.getName());
+        if (owner != null && !owner.equals(type.getName())) {
             throw new IllegalStateException("OpenAPI schema name " + name + " is used by both "
-                + owner.getName() + " and " + type.getName());
+                + owner + " and " + type.getName());
         }
         return name;
     }

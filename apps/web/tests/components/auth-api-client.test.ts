@@ -60,6 +60,16 @@ describe('auth store transport (generated API client)', () => {
     expect(auth.sessionError).toBeNull()
   })
 
+  it('encodes path parameters so an id cannot redirect the bearer request', async () => {
+    const calls = stubFetch(() => new Response(null, { status: 204 }))
+    const auth = useAuthStore()
+    auth.$patch({ accessToken: 'access', user: { id: 'u1', username: 'user', displayName: 'User' } })
+
+    await auth.revokeSession('../../users/@me?x=1#y')
+
+    expect(calls[0]?.url).toMatch(/\/api\/auth\/sessions\/\.\.%2F\.\.%2Fusers%2F%40me%3Fx%3D1%23y$/)
+  })
+
   it('logs out with the previous bearer token and clears local state even when the call fails', async () => {
     const calls = stubFetch(() => json({ message: 'unavailable' }, 503))
     const auth = useAuthStore()
@@ -85,11 +95,15 @@ describe('auth store transport (generated API client)', () => {
   })
 
   it('rejects an incomplete login response instead of storing a partial session', async () => {
-    stubFetch(() => json({ accessToken: 'token-without-user' }))
+    const calls = stubFetch(() => json({ accessToken: 'token-without-user' }))
     const auth = useAuthStore()
 
     await auth.login({ email: 'user@example.com', password: 'secret' })
 
+    expect(calls[0]?.url).toMatch(/\/api\/auth\/login$/)
+    expect(calls[0]?.init.method).toBe('POST')
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ email: 'user@example.com', password: 'secret' }))
+    expect(headerOf(calls[0], 'Content-Type')).toBe('application/json')
     expect(auth.accessToken).toBeNull()
     expect(auth.user).toBeNull()
     expect(auth.error).toBe('Unable to reach the Discord API. Try again.')

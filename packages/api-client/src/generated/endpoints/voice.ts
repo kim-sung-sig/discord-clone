@@ -19,7 +19,7 @@ export const getVoiceJoinUrl = (channelId: string,) => {
 
 
 
-  return `/api/voice/channels/${channelId}/join`
+  return `/api/voice/channels/${encodeURIComponent(String(channelId))}/join`
 }
 
 export const voiceJoin = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<VoiceJoinResponse> => {
@@ -39,7 +39,7 @@ export const getVoiceLeaveUrl = (channelId: string,) => {
 
 
 
-  return `/api/voice/channels/${channelId}/leave`
+  return `/api/voice/channels/${encodeURIComponent(String(channelId))}/leave`
 }
 
 export const voiceLeave = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<void> => {
@@ -59,7 +59,7 @@ export const getVoiceParticipantsUrl = (channelId: string,) => {
 
 
 
-  return `/api/voice/channels/${channelId}/participants`
+  return `/api/voice/channels/${encodeURIComponent(String(channelId))}/participants`
 }
 
 export const voiceParticipants = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<VoiceParticipantResponse[]> => {
@@ -79,7 +79,7 @@ export const getVoiceUpdateStateUrl = (channelId: string,) => {
 
 
 
-  return `/api/voice/channels/${channelId}/state`
+  return `/api/voice/channels/${encodeURIComponent(String(channelId))}/state`
 }
 
 export const voiceUpdateState = async (channelId: string,

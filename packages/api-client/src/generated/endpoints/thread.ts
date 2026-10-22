@@ -24,7 +24,7 @@ export const getThreadCreateForumPostUrl = (forumChannelId: string,) => {
 
 
 
-  return `/api/channels/${forumChannelId}/forum-posts`
+  return `/api/channels/${encodeURIComponent(String(forumChannelId))}/forum-posts`
 }
 
 export const threadCreateForumPost = async (forumChannelId: string,
@@ -59,7 +59,7 @@ export const getThreadCreateForumTagUrl = (forumChannelId: string,) => {
 
 
 
-  return `/api/channels/${forumChannelId}/forum-tags`
+  return `/api/channels/${encodeURIComponent(String(forumChannelId))}/forum-tags`
 }
 
 export const threadCreateForumTag = async (forumChannelId: string,
@@ -94,7 +94,7 @@ export const getThreadCreateThreadUrl = (parentChannelId: string,) => {
 
 
 
-  return `/api/channels/${parentChannelId}/threads`
+  return `/api/channels/${encodeURIComponent(String(parentChannelId))}/threads`
 }
 
 export const threadCreateThread = async (parentChannelId: string,
@@ -149,7 +149,7 @@ export const getThreadArchiveUrl = (threadId: string,) => {
 
 
 
-  return `/api/threads/${threadId}/archive`
+  return `/api/threads/${encodeURIComponent(String(threadId))}/archive`
 }
 
 export const threadArchive = async (threadId: string, options?: Parameters<typeof discordFetch>[1]): Promise<ThreadResponse> => {
@@ -169,7 +169,7 @@ export const getThreadWriteUrl = (threadId: string,) => {
 
 
 
-  return `/api/threads/${threadId}/messages`
+  return `/api/threads/${encodeURIComponent(String(threadId))}/messages`
 }
 
 export const threadWrite = async (threadId: string,
@@ -204,7 +204,7 @@ export const getThreadReopenUrl = (threadId: string,) => {
 
 
 
-  return `/api/threads/${threadId}/reopen`
+  return `/api/threads/${encodeURIComponent(String(threadId))}/reopen`
 }
 
 export const threadReopen = async (threadId: string, options?: Parameters<typeof discordFetch>[1]): Promise<ThreadResponse> => {

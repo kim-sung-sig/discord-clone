@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -54,10 +55,9 @@ mkdirSync(join(scratch, 'docs/api'), { recursive: true })
 cpSync(join(root, 'docs/api/openapi.json'), join(scratch, 'docs/api/openapi.json'))
 cpSync(join(root, 'packages/api-client/src/http'), join(scratch, 'packages/api-client/src/http'), { recursive: true })
 writeFileSync(join(scratch, 'orval.config.mjs'), readFileSync(join(root, 'orval.config.mjs'), 'utf8'))
-execFileSync(process.execPath, [join(root, 'node_modules/orval/dist/bin/orval.mjs'), '--config', 'orval.config.mjs'], {
-  cwd: scratch,
-  stdio: 'pipe'
-})
+const orvalPackage = createRequire(import.meta.url).resolve('orval/package.json')
+const orvalBin = JSON.parse(readFileSync(orvalPackage, 'utf8')).bin
+const orvalCli = resolve(dirname(orvalPackage), typeof orvalBin === 'string' ? orvalBin : orvalBin.orval)
 
 const listFiles = (base) => {
   const files = []
@@ -72,16 +72,30 @@ const listFiles = (base) => {
   return files.sort()
 }
 const normalize = (text) => text.replace(/\r\n/g, '\n')
-const expectedDir = join(scratch, generatedDir)
+let expectedFiles
 const committedDir = join(root, generatedDir)
-const expectedFiles = listFiles(expectedDir)
-assert.deepEqual(listFiles(committedDir), expectedFiles, `${generatedDir} file set is stale; run npm run openapi:write`)
-for (const file of expectedFiles) {
-  assert.equal(
-    normalize(readFileSync(join(committedDir, file), 'utf8')),
-    normalize(readFileSync(join(expectedDir, file), 'utf8')),
-    `${generatedDir}/${file} is stale; run npm run openapi:write`
-  )
+try {
+  execFileSync(process.execPath, [orvalCli, '--config', 'orval.config.mjs'], { cwd: scratch, stdio: 'pipe' })
+  const expectedDir = join(scratch, generatedDir)
+  expectedFiles = listFiles(expectedDir)
+  assert.deepEqual(listFiles(committedDir), expectedFiles, `${generatedDir} file set is stale; run npm run openapi:write`)
+  for (const file of expectedFiles) {
+    assert.equal(
+      normalize(readFileSync(join(committedDir, file), 'utf8')),
+      normalize(readFileSync(join(expectedDir, file), 'utf8')),
+      `${generatedDir}/${file} is stale; run npm run openapi:write`
+    )
+  }
+  // Path parameters must stay URL-encoded (urlEncodeParameters): a raw `${id}` lets an id add segments or a query.
+  for (const file of expectedFiles.filter((name) => name.startsWith('endpoints/'))) {
+    const source = readFileSync(join(committedDir, file), 'utf8')
+    for (const template of source.match(/`\/api\/[^`]*`/g) ?? []) {
+      const pathPart = template.split('?')[0]
+      assert.doesNotMatch(pathPart, /\$\{(?!encodeURIComponent\()/, `${file}: unencoded path parameter in ${template}`)
+    }
+  }
+  assert.ok(!expectedFiles.includes('endpoints/message-outbox.ts'), 'internal operator endpoints must stay out of the web client')
+} finally {
+  rmSync(scratch, { recursive: true, force: true })
 }
-rmSync(scratch, { recursive: true, force: true })
 console.log(`OPENAPI_CONTRACT_PASS operations=${operationIds.length} generatedFiles=${expectedFiles.length}`)

@@ -58,7 +58,7 @@ export const getGuildCreateChannelUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/channels`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/channels`
 }
 
 export const guildCreateChannel = async (guildId: string,
@@ -93,7 +93,7 @@ export const getGuildVisibleChannelsUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/channels/visible`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/channels/visible`
 }
 
 export const guildVisibleChannels = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<GuildChannelResponse[]> => {
@@ -115,7 +115,7 @@ export const getGuildReplaceChannelRoleOverwriteUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/channels/${channelId}/overwrites/roles/${roleId}`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/channels/${encodeURIComponent(String(channelId))}/overwrites/roles/${encodeURIComponent(String(roleId))}`
 }
 
 export const guildReplaceChannelRoleOverwrite = async (guildId: string,
@@ -153,7 +153,7 @@ export const getGuildAddMemberUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/members/${memberId}`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/members/${encodeURIComponent(String(memberId))}`
 }
 
 export const guildAddMember = async (guildId: string,
@@ -176,7 +176,7 @@ export const getGuildAssignRoleToMemberUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/members/${memberId}/roles/${roleId}`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/members/${encodeURIComponent(String(memberId))}/roles/${encodeURIComponent(String(roleId))}`
 }
 
 export const guildAssignRoleToMember = async (guildId: string,
@@ -198,7 +198,7 @@ export const getGuildRolesUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/roles`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/roles`
 }
 
 export const guildRoles = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<GuildRoleResponse[]> => {
@@ -218,7 +218,7 @@ export const getGuildCreateRoleUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/roles`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/roles`
 }
 
 export const guildCreateRole = async (guildId: string,
@@ -254,7 +254,7 @@ export const getGuildReplaceRolePermissionsUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/roles/${roleId}/permissions`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/roles/${encodeURIComponent(String(roleId))}/permissions`
 }
 
 export const guildReplaceRolePermissions = async (guildId: string,

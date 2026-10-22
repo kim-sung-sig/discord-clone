@@ -143,7 +143,7 @@ export const getAuthRevokeSessionUrl = (sessionId: string,) => {
 
 
 
-  return `/api/auth/sessions/${sessionId}`
+  return `/api/auth/sessions/${encodeURIComponent(String(sessionId))}`
 }
 
 export const authRevokeSession = async (sessionId: string, options?: Parameters<typeof discordFetch>[1]): Promise<void> => {

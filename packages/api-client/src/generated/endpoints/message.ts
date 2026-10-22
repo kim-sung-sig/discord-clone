@@ -28,7 +28,7 @@ export const getMessageListUrl = (channelId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/messages?${stringifiedParams}` : `/api/channels/${channelId}/messages`
+  return stringifiedParams.length > 0 ? `/api/channels/${encodeURIComponent(String(channelId))}/messages?${stringifiedParams}` : `/api/channels/${encodeURIComponent(String(channelId))}/messages`
 }
 
 export const messageList = async (channelId: string,
@@ -49,7 +49,7 @@ export const getMessageCreateUrl = (channelId: string,) => {
 
 
 
-  return `/api/channels/${channelId}/messages`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages`
 }
 
 export const messageCreate = async (channelId: string,
@@ -92,7 +92,7 @@ export const getMessageSearchUrl = (channelId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/messages/search?${stringifiedParams}` : `/api/channels/${channelId}/messages/search`
+  return stringifiedParams.length > 0 ? `/api/channels/${encodeURIComponent(String(channelId))}/messages/search?${stringifiedParams}` : `/api/channels/${encodeURIComponent(String(channelId))}/messages/search`
 }
 
 export const messageSearch = async (channelId: string,
@@ -114,7 +114,7 @@ export const getMessageDeleteUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}`
 }
 
 export const messageDelete = async (channelId: string,
@@ -136,7 +136,7 @@ export const getMessageEditUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}`
 }
 
 export const messageEdit = async (channelId: string,
@@ -173,7 +173,7 @@ export const getMessageUnpinUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/pin`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/pin`
 }
 
 export const messageUnpin = async (channelId: string,
@@ -195,7 +195,7 @@ export const getMessagePinUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/pin`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/pin`
 }
 
 export const messagePin = async (channelId: string,

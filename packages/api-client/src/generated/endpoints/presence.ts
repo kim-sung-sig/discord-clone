@@ -23,7 +23,7 @@ export const getPresenceReadMarkerUrl = (channelId: string,) => {
 
 
 
-  return `/api/presence/channels/${channelId}/read`
+  return `/api/presence/channels/${encodeURIComponent(String(channelId))}/read`
 }
 
 export const presenceReadMarker = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<PresenceReadMarkerResponse> => {
@@ -43,7 +43,7 @@ export const getPresenceMarkReadUrl = (channelId: string,) => {
 
 
 
-  return `/api/presence/channels/${channelId}/read`
+  return `/api/presence/channels/${encodeURIComponent(String(channelId))}/read`
 }
 
 export const presenceMarkRead = async (channelId: string,
@@ -78,7 +78,7 @@ export const getPresenceTypingUsersUrl = (channelId: string,) => {
 
 
 
-  return `/api/presence/channels/${channelId}/typing`
+  return `/api/presence/channels/${encodeURIComponent(String(channelId))}/typing`
 }
 
 export const presenceTypingUsers = async (channelId: string, options?: Parameters<typeof discordFetch>[1]): Promise<PresenceTypingUsersResponse> => {
@@ -98,7 +98,7 @@ export const getPresenceStartTypingUrl = (channelId: string,) => {
 
 
 
-  return `/api/presence/channels/${channelId}/typing`
+  return `/api/presence/channels/${encodeURIComponent(String(channelId))}/typing`
 }
 
 export const presenceStartTyping = async (channelId: string,
@@ -133,7 +133,7 @@ export const getPresenceUnreadCountUrl = (channelId: string,) => {
 
 
 
-  return `/api/presence/channels/${channelId}/unread-count`
+  return `/api/presence/channels/${encodeURIComponent(String(channelId))}/unread-count`
 }
 
 export const presenceUnreadCount = async (channelId: string,
@@ -202,7 +202,7 @@ export const getPresenceUserPresenceUrl = (userId: string,) => {
 
 
 
-  return `/api/presence/users/${userId}`
+  return `/api/presence/users/${encodeURIComponent(String(userId))}`
 }
 
 export const presenceUserPresence = async (userId: string, options?: Parameters<typeof discordFetch>[1]): Promise<PresenceResponse> => {

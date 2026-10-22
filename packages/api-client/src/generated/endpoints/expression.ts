@@ -21,7 +21,7 @@ export const getExpressionReactionsUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/reactions`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/reactions`
 }
 
 export const expressionReactions = async (channelId: string,
@@ -44,7 +44,7 @@ export const getExpressionRemoveReactionUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/reactions/${emojiKey}`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/reactions/${encodeURIComponent(String(emojiKey))}`
 }
 
 export const expressionRemoveReaction = async (channelId: string,
@@ -68,7 +68,7 @@ export const getExpressionAddReactionUrl = (channelId: string,
 
 
 
-  return `/api/channels/${channelId}/messages/${messageId}/reactions/${emojiKey}`
+  return `/api/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/reactions/${encodeURIComponent(String(emojiKey))}`
 }
 
 export const expressionAddReaction = async (channelId: string,
@@ -90,7 +90,7 @@ export const getExpressionCustomEmojisUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/emojis`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/emojis`
 }
 
 export const expressionCustomEmojis = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<ExpressionCustomEmojiResponse[]> => {
@@ -110,7 +110,7 @@ export const getExpressionCreateCustomEmojiUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/emojis`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/emojis`
 }
 
 export const expressionCreateCustomEmoji = async (guildId: string,
@@ -146,7 +146,7 @@ export const getExpressionDeleteCustomEmojiUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/emojis/${emojiId}`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/emojis/${encodeURIComponent(String(emojiId))}`
 }
 
 export const expressionDeleteCustomEmoji = async (guildId: string,
@@ -167,7 +167,7 @@ export const getExpressionStickersUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/stickers`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/stickers`
 }
 
 export const expressionStickers = async (guildId: string, options?: Parameters<typeof discordFetch>[1]): Promise<ExpressionStickerResponse[]> => {
@@ -187,7 +187,7 @@ export const getExpressionCreateStickerUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/stickers`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/stickers`
 }
 
 export const expressionCreateSticker = async (guildId: string,

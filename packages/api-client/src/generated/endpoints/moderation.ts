@@ -37,7 +37,7 @@ export const getModerationAuditLogsUrl = (guildId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/guilds/${guildId}/audit-logs?${stringifiedParams}` : `/api/guilds/${guildId}/audit-logs`
+  return stringifiedParams.length > 0 ? `/api/guilds/${encodeURIComponent(String(guildId))}/audit-logs?${stringifiedParams}` : `/api/guilds/${encodeURIComponent(String(guildId))}/audit-logs`
 }
 
 export const moderationAuditLogs = async (guildId: string,
@@ -58,7 +58,7 @@ export const getModerationCreateAutoModRuleUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/automod/rules`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/automod/rules`
 }
 
 export const moderationCreateAutoModRule = async (guildId: string,
@@ -95,7 +95,7 @@ export const getModerationReportMessageUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/channels/${channelId}/messages/${messageId}/reports`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/channels/${encodeURIComponent(String(channelId))}/messages/${encodeURIComponent(String(messageId))}/reports`
 }
 
 export const moderationReportMessage = async (guildId: string,
@@ -140,7 +140,7 @@ export const getModerationMessageReportsUrl = (guildId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/guilds/${guildId}/message-reports?${stringifiedParams}` : `/api/guilds/${guildId}/message-reports`
+  return stringifiedParams.length > 0 ? `/api/guilds/${encodeURIComponent(String(guildId))}/message-reports?${stringifiedParams}` : `/api/guilds/${encodeURIComponent(String(guildId))}/message-reports`
 }
 
 export const moderationMessageReports = async (guildId: string,
@@ -162,7 +162,7 @@ export const getModerationResolveMessageReportUrl = (guildId: string,
 
 
 
-  return `/api/guilds/${guildId}/message-reports/${reportId}/resolve`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/message-reports/${encodeURIComponent(String(reportId))}/resolve`
 }
 
 export const moderationResolveMessageReport = async (guildId: string,
@@ -198,7 +198,7 @@ export const getModerationSubmitOnboardingAnswersUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/onboarding/answers`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/onboarding/answers`
 }
 
 export const moderationSubmitOnboardingAnswers = async (guildId: string,
@@ -233,7 +233,7 @@ export const getModerationCreateOnboardingQuestionUrl = (guildId: string,) => {
 
 
 
-  return `/api/guilds/${guildId}/onboarding/questions`
+  return `/api/guilds/${encodeURIComponent(String(guildId))}/onboarding/questions`
 }
 
 export const moderationCreateOnboardingQuestion = async (guildId: string,
@@ -276,7 +276,7 @@ export const getModerationSecurityAlertsUrl = (guildId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/guilds/${guildId}/security-alerts?${stringifiedParams}` : `/api/guilds/${guildId}/security-alerts`
+  return stringifiedParams.length > 0 ? `/api/guilds/${encodeURIComponent(String(guildId))}/security-alerts?${stringifiedParams}` : `/api/guilds/${encodeURIComponent(String(guildId))}/security-alerts`
 }
 
 export const moderationSecurityAlerts = async (guildId: string,

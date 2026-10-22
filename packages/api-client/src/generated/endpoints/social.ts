@@ -27,7 +27,7 @@ export const getSocialBlockUrl = (targetUserId: string,) => {
 
 
 
-  return `/api/social/blocks/${targetUserId}`
+  return `/api/social/blocks/${encodeURIComponent(String(targetUserId))}`
 }
 
 export const socialBlock = async (targetUserId: string, options?: Parameters<typeof discordFetch>[1]): Promise<void> => {
@@ -89,7 +89,7 @@ export const getSocialDirectMessagesUrl = (targetUserId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/social/dms/${targetUserId}/messages?${stringifiedParams}` : `/api/social/dms/${targetUserId}/messages`
+  return stringifiedParams.length > 0 ? `/api/social/dms/${encodeURIComponent(String(targetUserId))}/messages?${stringifiedParams}` : `/api/social/dms/${encodeURIComponent(String(targetUserId))}/messages`
 }
 
 export const socialDirectMessages = async (targetUserId: string,
@@ -110,7 +110,7 @@ export const getSocialSendDirectMessageUrl = (targetUserId: string,) => {
 
 
 
-  return `/api/social/dms/${targetUserId}/messages`
+  return `/api/social/dms/${encodeURIComponent(String(targetUserId))}/messages`
 }
 
 export const socialSendDirectMessage = async (targetUserId: string,
@@ -145,7 +145,7 @@ export const getSocialDirectMessageReadMarkerUrl = (targetUserId: string,) => {
 
 
 
-  return `/api/social/dms/${targetUserId}/read`
+  return `/api/social/dms/${encodeURIComponent(String(targetUserId))}/read`
 }
 
 export const socialDirectMessageReadMarker = async (targetUserId: string, options?: Parameters<typeof discordFetch>[1]): Promise<SocialDmReadResponse> => {
@@ -165,7 +165,7 @@ export const getSocialMarkDirectMessageReadUrl = (targetUserId: string,) => {
 
 
 
-  return `/api/social/dms/${targetUserId}/read`
+  return `/api/social/dms/${encodeURIComponent(String(targetUserId))}/read`
 }
 
 export const socialMarkDirectMessageRead = async (targetUserId: string,
@@ -234,7 +234,7 @@ export const getSocialAcceptFriendRequestUrl = (requestId: string,) => {
 
 
 
-  return `/api/social/friends/requests/${requestId}/accept`
+  return `/api/social/friends/requests/${encodeURIComponent(String(requestId))}/accept`
 }
 
 export const socialAcceptFriendRequest = async (requestId: string, options?: Parameters<typeof discordFetch>[1]): Promise<SocialFriendRequestResponse> => {
@@ -254,7 +254,7 @@ export const getSocialDeclineFriendRequestUrl = (requestId: string,) => {
 
 
 
-  return `/api/social/friends/requests/${requestId}/decline`
+  return `/api/social/friends/requests/${encodeURIComponent(String(requestId))}/decline`
 }
 
 export const socialDeclineFriendRequest = async (requestId: string, options?: Parameters<typeof discordFetch>[1]): Promise<SocialFriendRequestResponse> => {
@@ -308,7 +308,7 @@ export const getSocialSetGroupCallStateUrl = (groupId: string,) => {
 
 
 
-  return `/api/social/group-dms/${groupId}/call`
+  return `/api/social/group-dms/${encodeURIComponent(String(groupId))}/call`
 }
 
 export const socialSetGroupCallState = async (groupId: string,
@@ -344,7 +344,7 @@ export const getSocialRemoveGroupMemberUrl = (groupId: string,
 
 
 
-  return `/api/social/group-dms/${groupId}/members/${memberId}`
+  return `/api/social/group-dms/${encodeURIComponent(String(groupId))}/members/${encodeURIComponent(String(memberId))}`
 }
 
 export const socialRemoveGroupMember = async (groupId: string,
@@ -366,7 +366,7 @@ export const getSocialAddGroupMemberUrl = (groupId: string,
 
 
 
-  return `/api/social/group-dms/${groupId}/members/${memberId}`
+  return `/api/social/group-dms/${encodeURIComponent(String(groupId))}/members/${encodeURIComponent(String(memberId))}`
 }
 
 export const socialAddGroupMember = async (groupId: string,

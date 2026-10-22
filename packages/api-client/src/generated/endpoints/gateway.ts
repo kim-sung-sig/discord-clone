@@ -79,7 +79,7 @@ export const getGatewayAcknowledgeUrl = (sessionId: string,) => {
 
 
 
-  return `/api/gateway/sessions/${sessionId}/ack`
+  return `/api/gateway/sessions/${encodeURIComponent(String(sessionId))}/ack`
 }
 
 export const gatewayAcknowledge = async (sessionId: string,
@@ -122,7 +122,7 @@ export const getGatewayEventsUrl = (sessionId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/gateway/sessions/${sessionId}/events?${stringifiedParams}` : `/api/gateway/sessions/${sessionId}/events`
+  return stringifiedParams.length > 0 ? `/api/gateway/sessions/${encodeURIComponent(String(sessionId))}/events?${stringifiedParams}` : `/api/gateway/sessions/${encodeURIComponent(String(sessionId))}/events`
 }
 
 export const gatewayEvents = async (sessionId: string,
@@ -143,7 +143,7 @@ export const getGatewayHeartbeatUrl = (sessionId: string,) => {
 
 
 
-  return `/api/gateway/sessions/${sessionId}/heartbeat`
+  return `/api/gateway/sessions/${encodeURIComponent(String(sessionId))}/heartbeat`
 }
 
 export const gatewayHeartbeat = async (sessionId: string, options?: Parameters<typeof discordFetch>[1]): Promise<GatewayHeartbeatResponse> => {
@@ -163,7 +163,7 @@ export const getGatewayResumeUrl = (sessionId: string,) => {
 
 
 
-  return `/api/gateway/sessions/${sessionId}/resume`
+  return `/api/gateway/sessions/${encodeURIComponent(String(sessionId))}/resume`
 }
 
 export const gatewayResume = async (sessionId: string,
