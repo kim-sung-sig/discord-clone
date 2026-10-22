@@ -1,26 +1,28 @@
 package com.example.discord.event;
 
+import com.example.discord.guild.Guild;
 import com.example.discord.guild.GuildMember;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
 class ServerEventRecipientResolver implements Function<ServerEvent, Set<UUID>> {
-    private final InMemoryGuildService guilds;
+    private final GuildService guilds;
 
-    ServerEventRecipientResolver(InMemoryGuildService guilds) {
+    ServerEventRecipientResolver(GuildService guilds) {
         this.guilds = guilds;
     }
 
     @Override
     public Set<UUID> apply(ServerEvent event) {
-        return guilds.guild(event.guildId()).members().stream()
-            .map(GuildMember::userId)
-            .filter(id -> guilds.canViewChannel(event.guildId(), event.channelId(), id))
-            .collect(Collectors.toSet());
+        Guild guild = guilds.guild(event.guildId());
+        return Set.copyOf(guilds.channelViewers(
+            guild,
+            event.channelId(),
+            guild.members().stream().map(GuildMember::userId).toList()
+        ));
     }
 }

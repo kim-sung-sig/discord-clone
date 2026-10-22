@@ -1,7 +1,7 @@
 package com.example.discord.gateway;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -34,13 +34,13 @@ class GatewayController {
     private static final String INTERNAL_PUBLISHER_HEADER = "X-Internal-Gateway-Publisher";
 
     private final InMemoryGatewayService gatewayService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final String internalPublisherToken;
 
     GatewayController(
         InMemoryGatewayService gatewayService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         AuthenticatedUserResolver authenticatedUserResolver,
         @Value("${discord.gateway.internal-publisher-token:}") String internalPublisherToken
     ) {

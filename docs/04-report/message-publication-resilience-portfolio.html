@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>메시지 발행 장애 복원력·관측성 실측 보고서</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --text: #334155;
+      --muted: #64748b;
+      --heading: #0f172a;
+      --line: #e2e8f0;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --success-soft: #dcfce7;
+      --success-text: #166534;
+      --warning-soft: #fef3c7;
+      --warning-text: #92400e;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --paper: #111827;
+      --text: #d1d5db;
+      --muted: #9ca3af;
+      --heading: #f8fafc;
+      --line: #253044;
+      --primary: #60a5fa;
+      --primary-soft: #0f2548;
+      --success-soft: #123524;
+      --success-text: #86efac;
+      --warning-soft: #3a2a0a;
+      --warning-text: #facc15;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 960px);
+      gap: 24px;
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .document {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 3px solid var(--heading);
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1, h2, h3, h4 { color: var(--heading); letter-spacing: 0; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    h2 {
+      font-size: 20px;
+      border-left: 6px solid var(--primary);
+      padding: 10px 0 10px 12px;
+      margin: 36px 0 16px;
+      background: var(--primary-soft);
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 10px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+      color: var(--primary);
+    }
+    h4 {
+      font-size: 16px;
+      margin: 16px 0 8px;
+      display: flex;
+      align-items: center;
+    }
+    h4::before {
+      content: "•";
+      color: var(--primary);
+      font-weight: 800;
+      display: inline-block;
+      width: 1em;
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .theme-toggle {
+      border: 1px solid var(--line);
+      background: var(--heading);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .toc-title {
+      display: block;
+      font-weight: 800;
+      color: var(--heading);
+      margin-bottom: 8px;
+    }
+
+    .toc {
+      display: grid;
+      gap: 6px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .toc a {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+
+    .toc a:hover, .toc a.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .summary-box {
+      background: var(--primary-soft);
+      border: 1px solid var(--line);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+
+    .point-tag, .badge {
+      display: inline-block;
+      border-radius: 5px;
+      font-weight: 800;
+      font-size: 0.82rem;
+    }
+
+    .point-tag {
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 10px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      background: var(--success-soft);
+      color: var(--success-text);
+      padding: 2px 8px;
+      margin-left: 8px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .before-after, .ba-box {
+      background: var(--bg);
+      border-left: 4px solid var(--line);
+      padding: 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+
+    .highlight {
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .decision {
+      background: var(--warning-soft);
+      color: var(--warning-text);
+      border: 1px solid color-mix(in srgb, var(--warning-text) 28%, transparent);
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.94rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--primary-soft);
+      color: var(--heading);
+    }
+
+    .hidden-by-search { display: none; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .document { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="보고서 도구">
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="보고서 검색" aria-label="보고서 검색">
+        <button id="themeToggle" class="theme-toggle" type="button">다크모드</button>
+      </div>
+      <strong class="toc-title">목차</strong>
+      <nav id="toc" class="toc" aria-label="목차"></nav>
+    </aside>
+
+    <main class="document">
+      <header class="header">
+        <h1>메시지 발행 장애 복원력·관측성 실측 보고서</h1>
+        <p>API → PostgreSQL Outbox → Redpanda(Kafka) → 소비자 → Gateway/PostgreSQL · 2026-10-21</p>
+      </header>
+
+      <section class="summary-box report-section" id="summary">
+        <span class="point-tag">핵심 요약</span>
+        <p><strong>실제 Kafka와 PostgreSQL 장애를 주입해 중복 방지, 재시도, DLQ, 수동 재생 복구와 consumer lag를 검증했습니다.</strong></p>
+        <ul>
+          <li><strong>성과:</strong> listener 재시작 뒤 Gateway 효과 1회, DB 복구 뒤 Inbox 반영 140ms, consumer lag 5→0</li>
+          <li><strong>검증:</strong> 옵트인 실통합 테스트 4/4 통과; 전체 Gradle 테스트 및 backend Checkstyle 통과</li>
+          <li><strong>리스크:</strong> 단일 로컬 실행값이며 운영 부하·SLO·장애 빈도를 대표하지 않습니다.</li>
+        </ul>
+      </section>
+
+      <section class="report-section" id="scope">
+        <h2>I. 작업 범위</h2>
+        <div class="metric-grid">
+          <div class="item"><span class="label">목표</span>메시지 발행의 API 요청부터 Outbox, Kafka, consumer, Gateway DB 효과까지 추적하고 대표 장애를 재현합니다.</div>
+          <div class="item"><span class="label">완료 기준</span>중복/재시작, DB 단절 및 재생, 잘못된 이벤트 DLQ, backlog/lag 변화, 로그·지표와 테스트 결과 확인</div>
+        </div>
+      </section>
+
+      <section class="report-section" id="completed">
+        <h2>II. 완료 내용</h2>
+        <h3>1. 주요 변경</h3>
+        <div class="before-after">
+          <strong>[Before & After]</strong><br>
+          - <strong>기존:</strong> Inbox 완료 표시가 Gateway 효과보다 먼저 기록될 수 있었고, 기본 소비자 lag 계측은 pause 시 실제 미처리 offset을 보이지 못했습니다.<br>
+          - <strong>현재:</strong> <span class="highlight">Gateway 효과가 성공한 뒤 Inbox를 완료 처리하고 안정 eventId로 crash-window 중복을 막습니다. 커밋 offset 기준 lag, 저카디널리티 결과 지표, 요청 correlationId를 연결했습니다.</span>
+        </div>
+        <h3>2. 변경 파일</h3>
+        <table>
+          <thead>
+            <tr><th>파일</th><th>변경 요약</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>KafkaMessagePublishedConsumer</code><br><code>MessagePublicationInbox</code></td><td>성공 효과 뒤 완료 기록; 중복·재시도·crash-window 복구 검증</td></tr>
+<tr><td><code>MessageKafkaConfiguration</code><br><code>MessagePublicationConsumerLag</code></td><td>metadata-only DLQ, 토픽 범위 지표, 전체 파티션 offset lag와 전용 scheduler</td></tr>
+<tr><td><code>MessagePublicationRelayWorker</code><br><code>MessageController</code></td><td>Outbox backlog/relay 지표와 HTTP request ID 기반 correlationId</td></tr>
+<tr><td><code>MessagePublicationFailureIntegrationTest</code></td><td>Testcontainers PostgreSQL + 로컬 Redpanda 장애 재현 및 복구 측정</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="review">
+        <h2>III. 리뷰 및 점수</h2>
+        <table>
+          <thead>
+            <tr><th>항목</th><th>점수</th><th>근거</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>보안</td><td>통과</td><td>DLQ는 본문 대신 topic, eventId, 예외 분류, 크기, 해시 prefix만 담고 로그·지표 라벨에 본문·eventId를 넣지 않습니다.</td></tr>
+            <tr><td>사용성</td><td>해당 없음</td><td>사용자 화면 변경 범위가 아닙니다.</td></tr>
+            <tr><td>유지보수성</td><td>독립 리뷰 14/15</td><td>기존 Micrometer, AdminClient, Testcontainers, Outbox/Inbox 경계를 사용했습니다.</td></tr>
+            <tr><td>기능성</td><td>독립 리뷰 18/20</td><td>중복·재시도·DLQ·재생·lag 검증 테스트와 일치하는 구현을 확인했습니다.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="report-section" id="verification">
+        <h2>IV. 검증 결과</h2>
+        <div class="ba-box">
+          <strong>실행한 검증</strong><br>
+          <ul><li><code>$env:DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS='true'; .\gradlew.bat :backend:boot:test --tests com.example.discord.message.MessagePublicationFailureIntegrationTest</code> — 4 tests, 0 failures</li><li><code>.\gradlew.bat test</code> — BUILD SUCCESSFUL</li><li><code>npm run lint:backend</code> — Checkstyle BUILD SUCCESSFUL</li><li>최종 독립 acceptance review: 89/100, P0/P1/P2 없음. 코드·문서 정합성을 확인했고 테스트 실행 증거는 별도 명령 결과로 확인했습니다.</li></ul>
+        </div>
+      </section>
+
+      <section class="report-section" id="decision">
+        <h2>V. 결정 필요 사항</h2>
+        <div class="decision">추가 결정 없음. 이 보고서는 승인된 메시지 발행 복원력 범위와 실제 실행 결과만 기록합니다.</div>
+      </section>
+
+      <section class="report-section" id="risk">
+        <h2>VI. 잔여 리스크</h2>
+        <ul>
+          <li>테스트에서 Spring Kafka listener container를 멈추고 다시 시작했습니다. 실제 프로세스 강제 종료·재기동은 별도로 재현하지 않았으며, gateway 효과 후 Inbox 기록 전 crash window는 단위 테스트에서 재시도와 안정 eventId 중복 제거로 검증했습니다.</li>
+          <li>공용 Kafka error handler가 같은 message topic의 gateway/notification consumer group에서 각각 처리합니다. 단일 DB 실패에서 gateway consumer 실패 3회, 전체 retry callback 6회와 DLQ 기록 2건이 관측됐습니다.</li>
+        </ul>
+      </section>
+      <section class="report-section" id="scenarios">
+        <h2>VII. 장애 재현 및 실측</h2>
+        <p>첫 lag 계측은 Kafka client의 <code>records-lag-max</code>였습니다. listener를 pause한 테스트에서도 값이 증가하지 않아 RED가 났습니다. 이는 fetch 상태만으로 미커밋 backlog를 설명할 수 없다는 증거였고, consumer group committed offset과 broker latest offset의 차이로 바꿨습니다. 미커밋 파티션은 committed offset 0으로 계산합니다.</p>
+        <table>
+          <thead><tr><th>시나리오</th><th>관찰</th><th>결과</th></tr></thead>
+          <tbody>
+            <tr><td>중복 전달 + listener 재시작</td><td>같은 event를 listener stop/start 뒤 다시 보냄</td><td>duplicate_events=1, Gateway event 1건, Inbox 완료 행 1건</td></tr>
+            <tr><td>PostgreSQL 연결 중단</td><td>Testcontainers DB container pause; 두 consumer group DLQ ACK를 확인할 때까지 outage 유지</td><td>gateway consumer 실패 3회; 공용 두 consumer group의 retry callback 6회, DLQ 2건; failure→DLQ 10,756ms</td></tr>
+            <tr><td>DB 복구 + 원본 event 재생</td><td>DB unpause 뒤 같은 원본 payload를 message topic에 새 record로 재발행 (consumer offset reset 아님)</td><td>재생 발행부터 Inbox 반영 140ms; Gateway event는 eventId 기준 1건</td></tr>
+            <tr><td>잘못된 이벤트</td><td>schema에 맞지 않는 payload와 본문 sentinel 발행</td><td>Gateway listener의 malformed IllegalArgumentException은 non-retryable 분류; DLQ에서 payload 본문과 content 필드가 제외됨을 확인</td></tr>
+            <tr><td>Consumer lag</td><td>consumer pause 중 5건 추가, resume 후 drain 대기</td><td>peak 5 → drain 0, queued_events=5</td></tr>
+            <tr><td>Inbox 완료 직전 crash window</td><td>단위 테스트에서 Gateway append 뒤 Inbox 기록 직전에 실패를 주입</td><td>재시도되며 안정 eventId dedupe가 Gateway 효과 중복을 막음</td></tr>
+          </tbody>
+        </table>
+        <p><strong>실행 근거:</strong> 저장된 실측 스냅샷 <code>docs/04-report/message-publication-resilience-evidence.json</code>은 opt-in 통합 테스트 4건, 실패 0건을 기록합니다. DB 장애 시 DLQ latency는 10,756ms였고 복구 재생은 140ms였습니다. 로컬 Docker/Redpanda 환경에서 한 번 실행한 수치입니다.</p>
+        <p><strong>파이프라인 관측:</strong> API에서 전달한 request ID를 event correlationId에 기록하고 eventId/correlationId 안전 로그로 relay와 consumer를 연결합니다. Prometheus 지표는 Outbox backlog, relay 결과·시간, consumer 결과·end-to-end timer, retries, dead letters, consumer offset lag를 제공합니다.</p>
+      </section>
+      <section class="report-section" id="failure-expansion-20261022">
+        <h2>2026-10-22 재해 테스트 확장</h2>
+        <p>서브에이전트 3개가 Outbox, 소비자·DLQ, 실제 인프라 경계를 조사했습니다. 기존 통합 테스트 4개와 단위 테스트가 다루지 못한 장애 순서를 정리하고, 28개 실행 케이스를 추가했습니다. 이 중 9개는 poison 입력의 파라미터 검증입니다.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>검증 범위</th><th>결과</th><th>실제 장애와 관측</th></tr></thead>
+          <tbody>
+            <tr><td>Kafka·PostgreSQL·자식 JVM</td><td>11건 통과, 77.559초</td><td>기존 4건에 poison 이후 정상 진행 3건, Inbox INSERT 실패, 동시 중복, producer metadata timeout, 실제 JVM 강제 종료·재시작을 추가했습니다.</td></tr>
+            <tr><td>PostgreSQL lease·fencing</td><td>5건 통과, 테스트 본문 0.824초</td><td>만료 1μs 전·만료 정각, 동시 worker 8개, 이전 claim의 완료·실패 기록 차단을 실제 DB에서 확인했습니다. 컨테이너 준비 시간은 본문 시간에 포함되지 않습니다.</td></tr>
+            <tr><td>빠른 경계·실패 순서</td><td>32건 통과</td><td>DLQ 발행 예외·실패 ACK·timeout·interrupt, 깨진 JSON 등 입력, ACK 이후 DB 실패와 연속 release 실패를 검증합니다. Kafka I/O 실패 future와 relay fake는 실제 인프라 장애와 구분합니다.</td></tr>
+          </tbody>
+        </table></div>
+        <p><strong>처음 빠뜨린 원인:</strong> 기존 malformed 사례는 문법상 유효한 JSON의 필드 누락만 다뤘습니다. 잘린 JSON 3종을 먼저 실행하자 DLQ 생성도 실패했습니다. JSON 파싱 실패 시 eventId 없이 안전한 메타데이터를 만들도록 수정했고, 같은 파티션의 다음 정상 이벤트가 진행하는 것을 실제 Kafka에서 확인했습니다.</p>
+        <p>Outbox의 완료 기록과 실패 기록이 연속으로 실패하면 최초 예외가 가려지는 결함도 RED로 재현했습니다. 후속 실패를 suppressed로 보존한 뒤 같은 테스트를 통과시켰습니다. 이미 동작하던 재해 시나리오는 기존 동작 검증으로 기록했으며 새 RED라고 주장하지 않습니다.</p>
+        <p><strong>실제 프로세스 복구:</strong> 자식 JVM이 Gateway SQL 기록을 마치고 Inbox 완료 전에 latch에서 정지한 것을 확인한 뒤 강제 종료했습니다. 동일 Kafka·DB로 새 JVM을 띄워 재발행 없이 복구했고, Gateway 행은 1개, Inbox는 0개에서 1개가 됐습니다. 해당 테스트는 22.185초였습니다.</p>
+        <p>이번 DB 중단 실행은 실패 3회, 두 group의 retry callback 6회와 DLQ 2건, 장애→DLQ 13,889ms, 재전달→Inbox 198ms, lag 5→0을 기록했습니다. 앞선 실행 수치와 별도인 로컬 단일 실행 결과입니다.</p>
+        <p><strong>검증 한계:</strong> producer 장애는 테스트 전용 무응답 endpoint를 통한 metadata timeout이며 공유 broker 프로세스를 중지한 실험은 아닙니다. DLQ 발행 실패는 handler 반환값을 검증하며 실제 committed offset 장애 증거는 아닙니다. 동시 consumer는 같은 Gateway service를 사용하며 WebSocket 전달 횟수 1회를 증명하지 않습니다. API는 MockMvc 통합 테스트입니다.</p>
+        <p><a href="message-publication-failure-expansion-evidence.json">확장 실측 JSON</a> · <a href="../03-analysis/message-publication-failure-matrix.md">재해 테스트 매트릭스</a></p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const searchInput = document.getElementById('searchInput');
+    const toc = document.getElementById('toc');
+    const sections = Array.from(document.querySelectorAll('.report-section'));
+
+    const savedTheme = localStorage.getItem('report-theme');
+    if (savedTheme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '라이트모드';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        root.removeAttribute('data-theme');
+        localStorage.setItem('report-theme', 'light');
+        themeToggle.textContent = '다크모드';
+      } else {
+        root.setAttribute('data-theme', 'dark');
+        localStorage.setItem('report-theme', 'dark');
+        themeToggle.textContent = '라이트모드';
+      }
+    });
+
+    sections.forEach((section) => {
+      const heading = section.querySelector('h2, .point-tag');
+      const label = heading ? heading.textContent.trim() : section.id;
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      link.textContent = label;
+      toc.appendChild(link);
+    });
+
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matched = section.textContent.toLowerCase().includes(query);
+        section.classList.toggle('hidden-by-search', query.length > 0 && !matched);
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        toc.querySelectorAll('a').forEach((link) => {
+          link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+        });
+      });
+    }, { rootMargin: '-25% 0px -65% 0px' });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

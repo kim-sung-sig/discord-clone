@@ -1,12 +1,38 @@
 package com.example.discord.moderation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class InMemoryModerationServiceTest {
+    @Test
+    void sharedRulePolicySkipsDisabledAndSpamAndNormalizesKeywords() {
+        UUID guild = UUID.randomUUID();
+        var keyword = new AutoModRule(UUID.randomUUID(), guild, AutoModRuleType.KEYWORD, "rule", List.of(" Spoiler "), true);
+        assertThat(keyword.matches("a SPOILER here")).isTrue();
+        assertThat(keyword.matches(null)).isFalse();
+        assertThat(new AutoModRule(keyword.id(), guild, keyword.type(), keyword.name(), keyword.keywords(), false).matches("spoiler")).isFalse();
+        assertThat(new AutoModRule(keyword.id(), guild, AutoModRuleType.SPAM, keyword.name(), keyword.keywords(), true).matches("spoiler")).isFalse();
+    }
+
+    @Test
+    void sharedReportResolutionRejectsOpenAndPreservesIdentity() {
+        var service = new InMemoryModerationService();
+        var report = service.reportMessage(new ReportMessageCommand(UUID.randomUUID(), UUID.randomUUID(),
+            UUID.randomUUID(), UUID.randomUUID(), "reason"));
+        UUID moderator = UUID.randomUUID();
+        assertThatThrownBy(() -> report.resolve(moderator, MessageReportStatus.OPEN, "", java.time.Instant.now()))
+            .isInstanceOf(IllegalArgumentException.class);
+        var resolved = report.resolve(moderator, MessageReportStatus.RESOLVED, null, java.time.Instant.now());
+        assertThat(resolved.id()).isEqualTo(report.id());
+        assertThat(resolved.createdAt()).isEqualTo(report.createdAt());
+        assertThat(resolved.moderatorId()).contains(moderator);
+        assertThat(resolved.resolution()).isEmpty();
+    }
+
     @Test
     void onboardingAnswersGrantOnlyConfiguredRoles() {
         InMemoryModerationService service = new InMemoryModerationService();

@@ -1,7 +1,7 @@
 package com.example.discord.expression;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.message.ChannelMessageTarget;
 import com.example.discord.message.MessageLookupPort;
 import com.example.discord.message.MessageNotFoundException;
@@ -27,13 +27,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class ExpressionController {
     private final ExpressionService expressionService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final MessageLookupPort messageLookup;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     ExpressionController(
         ExpressionService expressionService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         MessageLookupPort messageLookup,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {

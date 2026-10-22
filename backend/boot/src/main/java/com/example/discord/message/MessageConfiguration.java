@@ -1,8 +1,8 @@
 package com.example.discord.message;
 
 import com.example.discord.gateway.InMemoryGatewayService;
-import com.example.discord.guild.InMemoryGuildService;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.guild.GuildService;
+import com.example.discord.moderation.ModerationService;
 import com.example.discord.notification.MessageMentionProjector;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import java.time.Clock;
@@ -109,15 +109,15 @@ class MessageConfiguration {
     }
 
     @Bean
-    @Profile("!postgres")
-    MessageAuthorizationPolicy messageAuthorizationPolicy(InMemoryGuildService guildService) {
+    @Profile("test & !postgres")
+    MessageAuthorizationPolicy messageAuthorizationPolicy(GuildService guildService) {
         return new MessageAuthorizationPolicy(guildService);
     }
 
     @Bean
     @Profile("postgres")
     MessageAuthorizationPolicy projectedMessageAuthorizationPolicy(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         AuthorizationProjectionStore projections,
         @Value("${discord.authz.projection-enabled:false}") boolean projectionEnabled
     ) {
@@ -144,12 +144,12 @@ class MessageConfiguration {
     }
 
     @Bean
-    MessageContentPolicy messageContentPolicy(InMemoryModerationService moderationService) {
+    MessageContentPolicy messageContentPolicy(ModerationService moderationService) {
         return new MessageContentModerationPolicy(moderationService);
     }
 
     @Bean
-    @Profile("!postgres")
+    @Profile("test & !postgres")
     MessagePublicationOutbox messagePublicationOutbox() {
         return event -> {
         };

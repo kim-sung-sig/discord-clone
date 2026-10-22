@@ -2,7 +2,7 @@ package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.gateway.InMemoryGatewayService;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,13 +23,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class SoundboardController {
     private final InMemoryExperienceService experienceService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final InMemoryGatewayService gatewayService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     SoundboardController(
         InMemoryExperienceService experienceService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         InMemoryGatewayService gatewayService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {

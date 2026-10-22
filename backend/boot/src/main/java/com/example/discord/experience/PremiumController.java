@@ -1,9 +1,9 @@
 package com.example.discord.experience;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,16 +24,16 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class PremiumController {
     private final InMemoryExperienceService experienceService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final BillingProvider billingProvider;
-    private final InMemoryModerationService moderationService;
+    private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     PremiumController(
         InMemoryExperienceService experienceService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         BillingProvider billingProvider,
-        InMemoryModerationService moderationService,
+        ModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.experienceService = experienceService;

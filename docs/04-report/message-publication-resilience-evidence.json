@@ -1,0 +1,47 @@
+{
+  "runAt": "2026-10-21T10:12:59.861Z",
+  "source": "backend/boot/build/test-results/test/TEST-com.example.discord.message.MessagePublicationFailureIntegrationTest.xml",
+  "command": "$env:DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS='true'; .\\gradlew.bat :backend:boot:test --tests com.example.discord.message.MessagePublicationFailureIntegrationTest",
+  "suite": {
+    "tests": 4,
+    "skipped": 0,
+    "failures": 0,
+    "errors": 0
+  },
+  "scenarios": {
+    "duplicateAfterListenerRestart": {
+      "duplicateEvents": 1,
+      "gatewayEffects": 1,
+      "inboxRows": 1
+    },
+    "postgresUnavailable": {
+      "gatewayConsumerFailedAttempts": 3,
+      "retryCallbacksAcrossGatewayAndNotificationGroups": 6,
+      "deadLetterRecords": 2,
+      "failureToDeadLetterMs": 10756
+    },
+    "replayAfterPostgresRecovery": {
+      "replayToInboxMs": 140,
+      "gatewayEffects": 1
+    },
+    "consumerLag": {
+      "queuedEvents": 5,
+      "peak": 5,
+      "afterDrain": 0
+    },
+    "malformedEvent": {
+      "deadLettered": true,
+      "gatewayListenerClassification": "non-retryable IllegalArgumentException",
+      "payloadBodyIncluded": false
+    },
+    "crashWindow": {
+      "method": "unit-test fault injection after gateway append and before inbox completion",
+      "deduplicatedByStableEventId": true
+    }
+  },
+  "measurementLimits": [
+    "Local Docker PostgreSQL Testcontainers and Redpanda run; not production traffic or an SLO measurement.",
+    "Listener stop/start was tested; hard process termination was not.",
+    "Retry and dead-letter callback counts include both gateway-service-v1 and notification-service-v1 groups."
+  ]
+}

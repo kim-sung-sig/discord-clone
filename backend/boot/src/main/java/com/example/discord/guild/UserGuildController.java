@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/users/@me/guilds")
 class UserGuildController {
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    UserGuildController(InMemoryGuildService guildService, AuthenticatedUserResolver authenticatedUserResolver) {
+    UserGuildController(GuildService guildService, AuthenticatedUserResolver authenticatedUserResolver) {
         this.guildService = guildService;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }

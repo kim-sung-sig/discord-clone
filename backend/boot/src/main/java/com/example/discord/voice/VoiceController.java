@@ -4,7 +4,7 @@ import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.gateway.InMemoryGatewayService;
 import com.example.discord.guild.Channel;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,13 +30,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/voice")
 class VoiceController {
     private final InMemoryVoiceService voiceService;
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final InMemoryGatewayService gatewayService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     VoiceController(
         InMemoryVoiceService voiceService,
-        InMemoryGuildService guildService,
+        GuildService guildService,
         InMemoryGatewayService gatewayService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {

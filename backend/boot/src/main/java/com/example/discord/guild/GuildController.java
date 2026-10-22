@@ -3,7 +3,7 @@ package com.example.discord.guild;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.channel.ChannelType;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import com.example.discord.permission.Permission;
 import com.example.discord.permission.PermissionSet;
 import java.util.Arrays;
@@ -28,13 +28,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/guilds")
 class GuildController {
-    private final InMemoryGuildService guildService;
-    private final InMemoryModerationService moderationService;
+    private final GuildService guildService;
+    private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     GuildController(
-        InMemoryGuildService guildService,
-        InMemoryModerationService moderationService,
+        GuildService guildService,
+        ModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.guildService = guildService;

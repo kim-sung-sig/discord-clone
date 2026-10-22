@@ -3,9 +3,9 @@ package com.example.discord.invite;
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.Guild;
 import com.example.discord.guild.GuildMember;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.moderation.AuditLogAction;
-import com.example.discord.moderation.InMemoryModerationService;
+import com.example.discord.moderation.ModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -28,14 +28,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 class InviteController {
     private final InviteService inviteService;
-    private final InMemoryGuildService guildService;
-    private final InMemoryModerationService moderationService;
+    private final GuildService guildService;
+    private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     InviteController(
         InviteService inviteService,
-        InMemoryGuildService guildService,
-        InMemoryModerationService moderationService,
+        GuildService guildService,
+        ModerationService moderationService,
         AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.inviteService = inviteService;

@@ -24,7 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 @EnabledIfEnvironmentVariable(named = "DISCORD_RUN_POSTGRES_TESTS", matches = "true")
 class PostgresGuildServiceTest {
     @Autowired
-    private GuildSnapshotStore snapshots;
+    private GuildStore store;
 
     @Autowired
     private DataSource dataSource;
@@ -33,6 +33,10 @@ class PostgresGuildServiceTest {
     void cleanGuildTables() throws Exception {
         try (var connection = dataSource.getConnection();
              var statement = connection.createStatement()) {
+            try (var database = statement.executeQuery("SELECT current_database()")) {
+                assertThat(database.next()).isTrue();
+                assertThat(database.getString(1)).startsWith("discord_runtime_guild_");
+            }
             statement.executeUpdate("DELETE FROM consumer_inbox");
             statement.executeUpdate("DELETE FROM authorization_projection");
             statement.executeUpdate("DELETE FROM authorization_watermark");
@@ -57,7 +61,7 @@ class PostgresGuildServiceTest {
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
         insertUser(memberId, "member" + memberId.toString().substring(0, 8), "Member");
 
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("Persisted Guild", ownerId);
         Channel channel = service.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
         Role manager = service.createRole(
@@ -68,11 +72,11 @@ class PostgresGuildServiceTest {
         service.addMember(guild.id(), memberId);
         service.assignRoleToMember(guild.id(), memberId, manager.id());
 
-        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
+        GuildService reloaded = new GuildService(store);
 
         assertThat(guild.name()).isEqualTo("Persisted Guild");
         assertThat(guild.ownerId()).isEqualTo(ownerId);
-        assertThat(guild.members()).extracting(GuildMember::userId).containsExactly(ownerId, memberId);
+        assertThat(reloaded.guild(guild.id()).members()).extracting(GuildMember::userId).containsExactly(ownerId, memberId);
         assertThat(guild.everyoneRole().name()).isEqualTo("@everyone");
         assertThat(guild.member(ownerId).roleIds()).contains(guild.everyoneRole().id());
         assertThat(reloaded.guildIdsForMember(ownerId)).containsExactly(guild.id());
@@ -100,7 +104,7 @@ class PostgresGuildServiceTest {
         UUID ownerId = UUID.randomUUID();
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
 
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("Persisted Guild", ownerId);
         Channel general = service.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
         Channel staff = service.createChannel(guild.id(), "staff", ChannelType.GUILD_TEXT, null);
@@ -114,7 +118,7 @@ class PostgresGuildServiceTest {
             PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
         );
 
-        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
+        GuildService reloaded = new GuildService(store);
 
         assertThat(reloaded.visibleChannels(guild.id(), ownerId)).extracting(Channel::id)
             .containsExactly(general.id());
@@ -125,7 +129,7 @@ class PostgresGuildServiceTest {
         UUID ownerId = UUID.randomUUID();
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
 
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("Persisted Guild", ownerId);
         Channel adminOnly = service.createChannel(guild.id(), "admin-only", ChannelType.GUILD_TEXT, null);
         Role adminRole = service.createRole(guild.id(), "admin");
@@ -140,7 +144,7 @@ class PostgresGuildServiceTest {
             PermissionSet.empty().grant(Permission.VIEW_CHANNEL)
         );
 
-        PersistentGuildService reloaded = new PersistentGuildService(snapshots);
+        GuildService reloaded = new GuildService(store);
 
         assertThat(reloaded.visibleChannels(guild.id(), ownerId)).extracting(Channel::id)
             .containsExactly(adminOnly.id());
@@ -152,7 +156,7 @@ class PostgresGuildServiceTest {
         UUID memberId = UUID.randomUUID();
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
         insertUser(memberId, "member" + memberId.toString().substring(0, 8), "Member");
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("projection-overwrite", ownerId);
         service.addMember(guild.id(), memberId);
         Channel channel = service.createChannel(guild.id(), "restricted", ChannelType.GUILD_TEXT, null);
@@ -193,7 +197,7 @@ class PostgresGuildServiceTest {
         UUID ownerId = UUID.randomUUID();
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
 
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("Persisted Guild", ownerId);
         Channel channel = service.createChannel(guild.id(), "general", ChannelType.GUILD_TEXT, null);
 
@@ -250,7 +254,7 @@ class PostgresGuildServiceTest {
     void rollsBackGuildAndAuthorizationRowsWhenChildPersistenceFails() throws Exception {
         UUID ownerId = UUID.randomUUID();
         insertUser(ownerId, "owner" + ownerId.toString().substring(0, 8), "Owner");
-        PersistentGuildService service = new PersistentGuildService(snapshots);
+        GuildService service = new GuildService(store);
         Guild guild = service.createGuild("rollback", ownerId);
         int guildRows = countRows("guilds");
         int channelRows = countRows("channels");

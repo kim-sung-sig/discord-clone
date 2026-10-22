@@ -2,7 +2,7 @@ package com.example.discord.event;
 
 import com.example.discord.auth.AuthenticatedUserResolver;
 import com.example.discord.guild.Channel;
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -34,10 +34,10 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/guilds/{guildId}/events")
 class ServerEventController {
     private final AuthenticatedUserResolver users;
-    private final InMemoryGuildService guilds;
+    private final GuildService guilds;
     private final JdbcServerEventService events;
 
-    ServerEventController(AuthenticatedUserResolver users, InMemoryGuildService guilds, JdbcServerEventService events) {
+    ServerEventController(AuthenticatedUserResolver users, GuildService guilds, JdbcServerEventService events) {
         this.users = users;
         this.guilds = guilds;
         this.events = events;

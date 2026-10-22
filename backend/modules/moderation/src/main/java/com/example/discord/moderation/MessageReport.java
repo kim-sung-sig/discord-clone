@@ -39,6 +39,15 @@ public record MessageReport(
         }
     }
 
+    public MessageReport resolve(UUID moderator, MessageReportStatus next, String resolution, Instant now) {
+        require(moderator, "moderatorId");
+        if (next == null || next == MessageReportStatus.OPEN) {
+            throw new IllegalArgumentException("terminal report status is required");
+        }
+        return new MessageReport(id, guildId, channelId, messageId, reporterId, reason, next,
+            Optional.of(moderator), resolution, createdAt, now);
+    }
+
     private static void require(UUID value, String name) {
         if (value == null) {
             throw new IllegalArgumentException(name + " is required");

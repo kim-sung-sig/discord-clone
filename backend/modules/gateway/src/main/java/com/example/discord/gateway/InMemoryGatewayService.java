@@ -1,6 +1,6 @@
 package com.example.discord.gateway;
 
-import com.example.discord.guild.InMemoryGuildService;
+import com.example.discord.guild.GuildService;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import com.example.discord.permission.AuthorizationResourceType;
 import com.example.discord.permission.Permission;
@@ -17,7 +17,7 @@ import java.util.function.Consumer;
 public final class InMemoryGatewayService {
     static final int MAX_RETAINED_EVENTS = 1_000;
 
-    private final InMemoryGuildService guildService;
+    private final GuildService guildService;
     private final Clock clock;
     private final Duration heartbeatTimeout;
     private final GatewayEventBus eventBus;
@@ -29,12 +29,12 @@ public final class InMemoryGatewayService {
     private final java.util.Set<String> notifiedEventIds = new java.util.HashSet<>();
     private final List<Consumer<GatewayEvent>> listeners = new ArrayList<>();
 
-    public InMemoryGatewayService(InMemoryGuildService guildService, Clock clock, Duration heartbeatTimeout) {
+    public InMemoryGatewayService(GuildService guildService, Clock clock, Duration heartbeatTimeout) {
         this(guildService, clock, heartbeatTimeout, new InMemoryGatewayEventBus(clock));
     }
 
     public InMemoryGatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock clock,
         Duration heartbeatTimeout,
         GatewayEventBus eventBus
@@ -43,7 +43,7 @@ public final class InMemoryGatewayService {
     }
 
     public InMemoryGatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock clock,
         Duration heartbeatTimeout,
         GatewayEventBus eventBus,
@@ -53,7 +53,7 @@ public final class InMemoryGatewayService {
     }
 
     public InMemoryGatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock clock,
         Duration heartbeatTimeout,
         GatewayEventBus eventBus,
@@ -64,7 +64,7 @@ public final class InMemoryGatewayService {
     }
 
     public InMemoryGatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock clock,
         Duration heartbeatTimeout,
         GatewayEventBus eventBus,
@@ -86,7 +86,7 @@ public final class InMemoryGatewayService {
     }
 
     public InMemoryGatewayService(
-        InMemoryGuildService guildService,
+        GuildService guildService,
         Clock clock,
         Duration heartbeatTimeout,
         GatewayEventBus eventBus,
