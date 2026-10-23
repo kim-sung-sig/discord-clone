@@ -13,6 +13,10 @@ export interface DiscordRequestOptions {
 export type DiscordFetchInit = RequestInit & DiscordRequestOptions
 
 export class DiscordRestError extends Error {
+  readonly detail?: string
+  readonly code?: string
+  readonly requestId?: string
+
   constructor(
     message: string,
     readonly status: number,
@@ -20,6 +24,10 @@ export class DiscordRestError extends Error {
   ) {
     super(message)
     this.name = 'DiscordRestError'
+    const problem = body !== null && typeof body === 'object' ? body as Record<string, unknown> : {}
+    this.detail = typeof problem.detail === 'string' ? problem.detail : undefined
+    this.code = typeof problem.code === 'string' ? problem.code : undefined
+    this.requestId = typeof problem.requestId === 'string' ? problem.requestId : undefined
   }
 }
 

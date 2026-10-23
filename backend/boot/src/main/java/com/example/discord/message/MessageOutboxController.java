@@ -51,6 +51,7 @@ class MessageOutboxController {
     }
 
     @PostMapping("/dead-letter/{eventId}/replay")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.ACCEPTED)
     ResponseEntity<ReplayResponse> replayDeadLetter(
         @RequestHeader(value = INTERNAL_OPERATOR_HEADER, required = false) String internalOperator,
         @PathVariable UUID eventId

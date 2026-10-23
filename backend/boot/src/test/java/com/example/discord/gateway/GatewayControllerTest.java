@@ -28,12 +28,14 @@ class GatewayControllerTest {
 
     @Test
     void resyncRequiredIsMappedToHttpProtocolError() {
-        var response = new GatewayControllerAdvice().resyncRequired(
-            new GatewayResyncRequiredException("retention expired"));
+        var response = new com.example.discord.auth.ApiExceptionHandler().failure(
+            new GatewayResyncRequiredException("retention expired"),
+            new org.springframework.mock.web.MockHttpServletRequest(),
+            new org.springframework.mock.web.MockHttpServletResponse());
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().code()).isEqualTo("RESYNC_REQUIRED");
+        assertThat(((org.springframework.http.ProblemDetail) response.getBody()).getProperties().get("code")).isEqualTo("RESYNC_REQUIRED");
     }
 
     @Test

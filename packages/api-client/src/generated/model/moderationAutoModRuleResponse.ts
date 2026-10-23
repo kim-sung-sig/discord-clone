@@ -7,10 +7,10 @@
 import type { ModerationAutoModRuleResponseType } from './moderationAutoModRuleResponseType';
 
 export interface ModerationAutoModRuleResponse {
-  enabled?: boolean;
-  guildId?: string;
-  id?: string;
-  keywords?: string[];
-  name?: string;
-  type?: ModerationAutoModRuleResponseType;
+  enabled: boolean;
+  guildId: string;
+  id: string;
+  keywords: string[];
+  name: string;
+  type: ModerationAutoModRuleResponseType;
 }

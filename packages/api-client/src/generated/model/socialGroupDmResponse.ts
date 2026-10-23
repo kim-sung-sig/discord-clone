@@ -7,11 +7,11 @@
 import type { SocialGroupCallResponse } from './socialGroupCallResponse';
 
 export interface SocialGroupDmResponse {
-  callState?: SocialGroupCallResponse;
-  createdAt?: string;
-  id?: string;
-  members?: string[];
-  name?: string;
-  ownerId?: string;
-  updatedAt?: string;
+  callState: SocialGroupCallResponse;
+  createdAt: string;
+  id: string;
+  members: string[];
+  name: string;
+  ownerId: string;
+  updatedAt: string;
 }

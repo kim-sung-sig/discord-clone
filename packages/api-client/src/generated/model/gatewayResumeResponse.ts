@@ -8,7 +8,7 @@ import type { GatewayEventResponse } from './gatewayEventResponse';
 import type { GatewaySessionResponse } from './gatewaySessionResponse';
 
 export interface GatewayResumeResponse {
-  events?: GatewayEventResponse[];
-  resumed?: GatewayEventResponse;
-  session?: GatewaySessionResponse;
+  events: GatewayEventResponse[];
+  resumed: GatewayEventResponse;
+  session: GatewaySessionResponse;
 }

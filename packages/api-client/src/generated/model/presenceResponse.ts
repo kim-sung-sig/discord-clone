@@ -7,7 +7,7 @@
 import type { PresenceResponseStatus } from './presenceResponseStatus';
 
 export interface PresenceResponse {
-  status?: PresenceResponseStatus;
-  updatedAt?: string;
-  userId?: string;
+  status: PresenceResponseStatus;
+  updatedAt: string;
+  userId: string;
 }

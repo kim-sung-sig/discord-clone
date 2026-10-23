@@ -6,6 +6,6 @@
  */
 
 export interface AuthGlobalRoleAuditRetentionPolicyResponse {
-  maxAgeDays?: number;
-  retainsSince?: string;
+  maxAgeDays: number;
+  retainsSince: string;
 }

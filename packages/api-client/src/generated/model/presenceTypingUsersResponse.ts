@@ -6,5 +6,5 @@
  */
 
 export interface PresenceTypingUsersResponse {
-  typingUserIds?: string[];
+  typingUserIds: string[];
 }

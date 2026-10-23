@@ -6,6 +6,6 @@
  */
 
 export interface GatewayAckResponse {
-  acknowledgedSequence?: number;
-  deliveryEpoch?: number;
+  acknowledgedSequence: number;
+  deliveryEpoch: number;
 }

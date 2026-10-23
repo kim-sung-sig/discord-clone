@@ -6,7 +6,7 @@
  */
 
 export interface GuildRoleResponse {
-  id?: string;
-  name?: string;
-  permissions?: string[];
+  id: string;
+  name: string;
+  permissions: string[];
 }

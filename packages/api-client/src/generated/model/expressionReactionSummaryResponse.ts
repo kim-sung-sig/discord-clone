@@ -6,7 +6,7 @@
  */
 
 export interface ExpressionReactionSummaryResponse {
-  count?: number;
-  currentUserReacted?: boolean;
-  emojiKey?: string;
+  count: number;
+  currentUserReacted: boolean;
+  emojiKey: string;
 }

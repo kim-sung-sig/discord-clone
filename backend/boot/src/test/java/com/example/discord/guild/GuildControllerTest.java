@@ -152,7 +152,7 @@ class GuildControllerTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test
@@ -274,7 +274,7 @@ class GuildControllerTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
 
     }
 
@@ -289,7 +289,7 @@ class GuildControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("null"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test
@@ -314,7 +314,7 @@ class GuildControllerTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
 
         mockMvc.perform(put(
                 "/api/guilds/{guildId}/channels/{channelId}/overwrites/roles/{roleId}",
@@ -331,7 +331,7 @@ class GuildControllerTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test

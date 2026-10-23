@@ -10,9 +10,7 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -44,6 +41,7 @@ class ExpressionController {
     }
 
     @PostMapping("/api/guilds/{guildId}/emojis")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<CustomEmojiResponse> createCustomEmoji(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -72,6 +70,7 @@ class ExpressionController {
     }
 
     @DeleteMapping("/api/guilds/{guildId}/emojis/{emojiId}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> deleteCustomEmoji(
         @PathVariable UUID guildId,
         @PathVariable UUID emojiId,
@@ -83,6 +82,7 @@ class ExpressionController {
     }
 
     @PostMapping("/api/guilds/{guildId}/stickers")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<StickerResponse> createSticker(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -119,6 +119,7 @@ class ExpressionController {
     }
 
     @DeleteMapping("/api/channels/{channelId}/messages/{messageId}/reactions/{emojiKey}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> removeReaction(
         @PathVariable UUID channelId,
         @PathVariable UUID messageId,
@@ -222,29 +223,4 @@ class ExpressionController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = ExpressionController.class)
-class ExpressionControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<ExpressionController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new ExpressionController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<ExpressionController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new ExpressionController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(ExpressionNotFoundException.class)
-    ResponseEntity<ExpressionController.ErrorResponse> missingExpression(ExpressionNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ExpressionController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(MessageNotFoundException.class)
-    ResponseEntity<ExpressionController.ErrorResponse> missingMessage(MessageNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ExpressionController.ErrorResponse(exception.getMessage()));
-    }
 }

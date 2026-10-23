@@ -6,15 +6,16 @@
  */
 
 export interface InviteResponse {
-  channelId?: string;
-  code?: string;
-  creatorId?: string;
-  expiresAt?: string;
-  guildId?: string;
-  guildName?: string;
-  maxAgeSeconds?: number;
-  maxUses?: number;
-  roleGrantIds?: string[];
-  temporary?: boolean;
-  uses?: number;
+  channelId: string;
+  code: string;
+  creatorId: string;
+  /** @nullable */
+  expiresAt: string | null;
+  guildId: string;
+  guildName: string;
+  maxAgeSeconds: number;
+  maxUses: number;
+  roleGrantIds: string[];
+  temporary: boolean;
+  uses: number;
 }

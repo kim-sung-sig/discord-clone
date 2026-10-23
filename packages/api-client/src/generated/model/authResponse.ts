@@ -7,6 +7,6 @@
 import type { AuthUserResponse } from './authUserResponse';
 
 export interface AuthResponse {
-  accessToken?: string;
-  user?: AuthUserResponse;
+  accessToken: string;
+  user: AuthUserResponse;
 }

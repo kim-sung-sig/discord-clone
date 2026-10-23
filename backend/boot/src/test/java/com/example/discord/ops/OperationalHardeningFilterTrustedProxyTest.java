@@ -57,7 +57,7 @@ class OperationalHardeningFilterTrustedProxyTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "2"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
 
         mockMvc.perform(post("/api/auth/login")
                 .with(request -> {
@@ -112,7 +112,7 @@ class OperationalHardeningFilterTrustedProxyTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "2"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
 
         mockMvc.perform(post("/api/auth/login")
                 .with(request -> {

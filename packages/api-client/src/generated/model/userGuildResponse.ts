@@ -7,8 +7,8 @@
 import type { UserGuildChannelResponse } from './userGuildChannelResponse';
 
 export interface UserGuildResponse {
-  channels?: UserGuildChannelResponse[];
-  id?: string;
-  name?: string;
-  ownerId?: string;
+  channels: UserGuildChannelResponse[];
+  id: string;
+  name: string;
+  ownerId: string;
 }

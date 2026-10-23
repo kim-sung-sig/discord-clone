@@ -6,10 +6,10 @@
  */
 
 export interface GatewaySessionResponse {
-  closed?: boolean;
-  guildIds?: string[];
-  id?: string;
-  lastAcknowledgedAt?: string;
-  lastDeliveredSequence?: number;
-  userId?: string;
+  closed: boolean;
+  guildIds: string[];
+  id: string;
+  lastAcknowledgedAt: string;
+  lastDeliveredSequence: number;
+  userId: string;
 }

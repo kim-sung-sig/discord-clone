@@ -7,8 +7,9 @@
 import type { UserGuildChannelResponseType } from './userGuildChannelResponseType';
 
 export interface UserGuildChannelResponse {
-  id?: string;
-  name?: string;
-  parentId?: string;
-  type?: UserGuildChannelResponseType;
+  id: string;
+  name: string;
+  /** @nullable */
+  parentId: string | null;
+  type: UserGuildChannelResponseType;
 }

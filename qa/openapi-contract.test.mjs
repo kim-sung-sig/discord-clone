@@ -26,6 +26,21 @@ for (const id of operationIds) {
   assert.match(id, /^[a-z][A-Za-z0-9]*$/, `operationId ${id} must be a plain function name`)
 }
 
+assert.ok(spec.paths['/api/auth/signup'].post.responses['201'])
+assert.ok(spec.paths['/api/auth/logout'].post.responses['204'])
+assert.equal(spec.paths['/api/auth/logout'].post.responses['204'].content, undefined)
+assert.deepEqual([...spec.components.schemas.ApiProblem.required].sort(),
+  ['type', 'title', 'status', 'detail', 'instance', 'code', 'requestId'].sort())
+for (const operation of operations) {
+  assert.equal(operation.responses['500'].content['application/problem+json'].schema.$ref, '#/components/schemas/ApiProblem')
+}
+for (const [name, schema] of Object.entries(spec.components.schemas)) {
+  if (!name.endsWith('Request') && schema.properties) {
+    assert.deepEqual([...(schema.required ?? [])].sort(), Object.keys(schema.properties).sort(), `${name} response presence must be explicit`)
+  }
+}
+assert.ok(spec.components.schemas.GuildChannelResponse.properties.parentId.type.includes('null'))
+
 for (const path of [
   '/api/auth/login',
   '/api/auth/refresh',

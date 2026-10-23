@@ -6,7 +6,7 @@
  */
 
 export interface AttachmentDownloadResponse {
-  attachmentId?: string;
-  downloadUrl?: string;
-  objectKey?: string;
+  attachmentId: string;
+  downloadUrl: string;
+  objectKey: string;
 }

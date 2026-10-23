@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -45,6 +43,7 @@ class AuthController {
     }
 
     @PostMapping("/auth/signup")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<AuthResponse> signup(
         @RequestBody SignupRequest request,
         @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
@@ -83,6 +82,7 @@ class AuthController {
     }
 
     @PostMapping("/auth/logout")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> logout(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @CookieValue(value = REFRESH_COOKIE, required = false) String refreshToken,
@@ -120,6 +120,7 @@ class AuthController {
     }
 
     @DeleteMapping("/auth/sessions/{sessionId}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> revokeSession(
         @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
         @PathVariable UUID sessionId
@@ -201,10 +202,7 @@ class AuthController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-
-    private void addRefreshCookie(HttpServletRequest request, HttpServletResponse response, String refreshToken) {
+private void addRefreshCookie(HttpServletRequest request, HttpServletResponse response, String refreshToken) {
         writeRefreshCookie(request, response, refreshToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
     }
 
@@ -254,51 +252,5 @@ class AuthController {
             return false;
         }
         return "https".equalsIgnoreCase(forwardedProto.split(",", 2)[0].trim());
-    }
-}
-
-@RestControllerAdvice(assignableTypes = AuthController.class)
-@Profile("!production & !admin-cli")
-class AuthControllerAdvice {
-    @ExceptionHandler(LoginLockedException.class)
-    ResponseEntity<AuthController.ErrorResponse> loginLocked(LoginLockedException exception) {
-        return ResponseEntity.status(HttpStatus.LOCKED)
-            .body(new AuthController.ErrorResponse("login temporarily locked"));
-    }
-
-    @ExceptionHandler(InvalidCredentialsException.class)
-    ResponseEntity<AuthController.ErrorResponse> invalidCredentials(InvalidCredentialsException exception) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(new AuthController.ErrorResponse("invalid credentials"));
-    }
-
-    @ExceptionHandler(DuplicateAccountException.class)
-    ResponseEntity<AuthController.ErrorResponse> duplicateAccount(DuplicateAccountException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(new AuthController.ErrorResponse("account already exists"));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<AuthController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest()
-            .body(new AuthController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(InvalidRefreshTokenException.class)
-    ResponseEntity<AuthController.ErrorResponse> invalidRefresh(InvalidRefreshTokenException exception) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(new AuthController.ErrorResponse("refresh token invalid"));
-    }
-
-    @ExceptionHandler(RefreshTokenReuseDetectedException.class)
-    ResponseEntity<AuthController.ErrorResponse> refreshReuse(RefreshTokenReuseDetectedException exception) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(new AuthController.ErrorResponse("refresh token reuse detected"));
-    }
-
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<AuthController.ErrorResponse> responseStatus(ResponseStatusException exception) {
-        return ResponseEntity.status(exception.getStatusCode())
-            .body(new AuthController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
     }
 }

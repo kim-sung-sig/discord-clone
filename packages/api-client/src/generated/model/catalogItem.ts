@@ -6,7 +6,7 @@
  */
 
 export interface CatalogItem {
-  featureKey?: string;
-  name?: string;
-  sku?: string;
+  featureKey: string;
+  name: string;
+  sku: string;
 }

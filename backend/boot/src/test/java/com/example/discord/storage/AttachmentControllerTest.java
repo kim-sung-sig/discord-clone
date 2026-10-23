@@ -67,7 +67,8 @@ class AttachmentControllerTest {
                     }
                     """.formatted(channelId)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid attachment"));
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test

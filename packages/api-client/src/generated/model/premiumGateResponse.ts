@@ -6,7 +6,7 @@
  */
 
 export interface PremiumGateResponse {
-  enabled?: boolean;
-  featureKey?: string;
-  userId?: string;
+  enabled: boolean;
+  featureKey: string;
+  userId: string;
 }

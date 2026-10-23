@@ -6,9 +6,9 @@
  */
 
 export interface SocialDirectMessageChannelResponse {
-  createdAt?: string;
-  firstUserId?: string;
-  id?: string;
-  participants?: string[];
-  secondUserId?: string;
+  createdAt: string;
+  firstUserId: string;
+  id: string;
+  participants: string[];
+  secondUserId: string;
 }

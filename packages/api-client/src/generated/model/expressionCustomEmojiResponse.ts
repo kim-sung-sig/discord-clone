@@ -6,9 +6,9 @@
  */
 
 export interface ExpressionCustomEmojiResponse {
-  creatorId?: string;
-  guildId?: string;
-  id?: string;
-  imageObjectKey?: string;
-  name?: string;
+  creatorId: string;
+  guildId: string;
+  id: string;
+  imageObjectKey: string;
+  name: string;
 }
