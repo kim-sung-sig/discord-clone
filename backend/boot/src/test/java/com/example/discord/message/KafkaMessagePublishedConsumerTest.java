@@ -295,7 +295,7 @@ class KafkaMessagePublishedConsumerTest {
     }
 
     @Test
-    void concurrentAppendConflictCompletesInboxWithoutSecondGatewayEffect() throws Exception {
+    void concurrentAppendConflictCompletesInboxWithoutSecondListenerNotification() throws Exception {
         UUID userId = UUID.randomUUID();
         InMemoryGuildService guilds = new InMemoryGuildService();
         var guild = guilds.createGuild("messages", userId);
@@ -333,8 +333,11 @@ class KafkaMessagePublishedConsumerTest {
                 return durableLog.latestSequence();
             }
         };
+        InMemoryGatewayEventBus bus = new InMemoryGatewayEventBus(CLOCK);
+        List<GatewayBusEvent> busSent = new ArrayList<>();
+        bus.addEventListener(busSent::add);
         InMemoryGatewayService gateway = new InMemoryGatewayService(
-            guilds, CLOCK, Duration.ofSeconds(30), new InMemoryGatewayEventBus(CLOCK),
+            guilds, CLOCK, Duration.ofSeconds(30), bus,
             new InMemoryGatewaySessionRegistry(), null, false, checkedBeforeConcurrentAppend,
             new InMemoryGatewaySessionCursorStore());
         List<GatewayBusEvent> sent = new ArrayList<>();
@@ -380,6 +383,11 @@ class KafkaMessagePublishedConsumerTest {
         assertThat(sent).hasSize(1);
         assertThat(sent.getFirst().payload()).containsEntry("content", "first delivery");
         assertThat(durableLog.after(0L, 10)).hasSize(1);
+        assertThat(durableLog.after(0L, 10).getFirst().payload()).containsEntry("content", "first delivery");
+        // The bus publish happens before the append detects the conflict, so the edited payload still reaches the bus
+        // once more. Only the durable log and service listeners are protected (see the T216 blueprint race analysis).
+        assertThat(busSent).extracting(event -> event.payload().get("content"))
+            .containsExactly("first delivery", "second delivery");
         assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "processed").counter().count())
             .isEqualTo(1);
         assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter())

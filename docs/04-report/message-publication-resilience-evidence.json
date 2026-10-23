@@ -1,7 +1,8 @@
 {
   "runAt": "2026-10-23T23:07:30.977Z",
   "task": "T216 message pipeline follow-ups",
-  "source": "backend/boot/build/test-results/test/TEST-com.example.discord.message.MessagePublicationFailureIntegrationTest.xml",
+  "source": "backend/boot/build/test-results/test/TEST-com.example.discord.message.MessagePublicationFailureIntegrationTest.xml (path right after the run; later Gradle test runs overwrite it, so it no longer holds this run)",
+  "sourceCopy": "C:\\tmp\\t216-evidence\\drill-green.xml (local artifact, not in the repository; testsuite timestamp 2026-10-23T23:07:30.977Z)",
   "command": "$env:DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS='true'; .\\gradlew.bat :backend:boot:test --tests com.example.discord.message.MessagePublicationFailureIntegrationTest --rerun",
   "suite": {
     "tests": 11,
@@ -56,10 +57,33 @@
       "note": "Before T216 the retries counter counted every failed-delivery callback, including the exhausted attempt; 6 callbacks correspond to 4 retries under the current definition."
     }
   ],
+  "followUpRuns": [
+    {
+      "runAt": "2026-10-23T23:32:29.436Z",
+      "task": "T216 P3 follow-ups",
+      "sourceCopy": "C:\\tmp\\t216-evidence\\p3\\drill-full-green.xml (local artifact)",
+      "tests": 11,
+      "failures": 0,
+      "seconds": 74.946,
+      "poisonRecords": {
+        "scenarios": [
+          "broken JSON",
+          "JSON null",
+          "tombstone"
+        ],
+        "retriesScenarioDelta": 0,
+        "failedDeliveriesPerGroup": 1,
+        "note": "Asserted directly per scenario for gateway-service-v1 and notification-service-v1. Before the follow-up, tombstone counted 2 retries without retrying, and JSON null without its guard counts 4."
+      },
+      "postgresUnavailableRetries": 4,
+      "note": "consumer.retries now counts only backoffs that schedule another attempt; the snapshot values above keep their meaning under this definition."
+    }
+  ],
   "measurementLimits": [
     "Local Docker PostgreSQL Testcontainers and Redpanda run; not production traffic or an SLO measurement.",
     "Hard process termination is covered by hardKilledConsumerReplaysFromKafkaUsingTheSameDurableDatabase; broker process stop/restart is not.",
     "Retry and dead-letter counts include both gateway-service-v1 and notification-service-v1 groups.",
+    "consumer.retries does not count the immediate redelivery after a failed dead-letter publish; that outage shows as a missing dead_letter increment and error handler logs.",
     "processed and end-to-end samples are per consumer attempt; two concurrent deliveries of one event can both be counted.",
     "The shared recoverer writes exhausted records from every listener, including authorization projection listeners, to the message dead-letter topic; filter by the topic field."
   ]

@@ -202,6 +202,40 @@ class MessageKafkaConfigurationTest {
     }
 
     @Test
+    void frameworkNotRetryableFailureIsNotCountedAsRetry() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), metrics, "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", null);
+        // Spring Kafka classifies conversion failures as not retryable before the custom backoff function runs.
+        var conversion = new org.springframework.messaging.converter.MessageConversionException("cannot convert payload");
+
+        assertThat(handler.handleOne(conversion, message, mock(), mock())).as("dead-lettered at once").isTrue();
+        assertThat(metrics.find("discord.message.publication.consumer.retries").counter()).isNull();
+    }
+
+    @Test
+    void deadLetterPublishFailureRedeliveryIsNotCountedAsRetry() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("dead-letter topic unavailable")));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), metrics, "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", "null");
+        IllegalArgumentException invalid = new IllegalArgumentException("invalid");
+
+        // A failed recovery resets the record state, so each redelivery is immediate, not a backoff retry.
+        for (int delivery = 0; delivery < 2; delivery++) {
+            assertThat(handler.handleOne(invalid, message, mock(), mock())).as("dead-letter publish failed").isFalse();
+        }
+        assertThat(metrics.find("discord.message.publication.consumer.retries").counter()).isNull();
+    }
+
+    @Test
     void ignoresRetryMetricsForUnrelatedTopic() {
         KafkaTemplate<String, String> kafka = mock();
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();

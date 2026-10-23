@@ -79,4 +79,5 @@ flowchart LR
 - 2026-10-24 T216 정정
   - message topic의 JSON `null` record도 `IllegalArgumentException`으로 분류돼 두 group 모두 재시도 없이 DLQ로 간다. 이전에는 NPE로 group마다 3회 시도했다(drill `jsonNullDeadLetters…` 7.1~7.2초 → 4.4초).
   - DB 장애 drill의 retry 수치는 `consumer.retries` 정의 변경으로 6 → 4(group당 실제 재시도 2회)다. 실패 3회와 DLQ 2건은 그대로다.
+  - (P3 후속) `consumer.retries`는 backoff가 다음 시도를 예약할 때만 센다. tombstone처럼 spring-kafka가 not-retryable로 분류하는 실패는 이전 방식에서 재시도 없이도 group당 1로 집계됐는데, 이제 0이다. poison 3종(깨진 JSON, JSON `null`, tombstone) drill은 재시도 0과 group별 실패 전달 1회를 직접 단언한다.
   - 공유 recoverer는 authorization projection listener의 소진 record도 message DLQ topic으로 보낸다. 재생 도구는 DLQ metadata의 `topic` 필드로 걸러야 한다.

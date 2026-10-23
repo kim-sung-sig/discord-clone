@@ -192,5 +192,7 @@ flowchart TD
 
 ## 2026-10-24 T216 정정 (metrics 의미)
 - `retries`의 의미: 실제로 다시 시도되는 실패 전달 수다. spring-kafka는 소진 직전 마지막 실패와 재시도 없는 판정에도 `RetryListener.failedDelivery`를 호출하므로, T216 전에는 message topic IAE가 1, 재시도 가능 실패가 group당 3(실제 재시도 2)으로 집계됐다. 이제 재시도 생략 판정(message topic IAE, 원인 체인 포함)은 세지 않고, 재시도 가능 실패는 `deliveryAttempt <= 2`인 전달만 센다. DB 장애 drill 기준 두 group 합계 6 → 4. 근거와 RED→GREEN은 `docs/03-analysis/task_T216-message-pipeline-followups.blueprint.md`.
+  - (T216 P3 후속) 정확한 정의: message topic에서 backoff가 다음 시도를 예약한 횟수다. 집계 위치를 retry listener에서 backoff function이 돌려주는 `BackOffExecution`으로 옮겼다. 그래서 spring-kafka 기본 not-retryable 예외(`MessageConversionException`, `MethodArgumentResolutionException`, `DeserializationException` 등. tombstone이 여기에 해당)도 세지 않는다. 이전 방식은 이 경우 group당 1을 셌다.
+  - 한계: DLQ 발행이 실패해 상태가 초기화된 뒤의 즉시 재전달은 backoff 예약이 아니므로 세지 않는다. 이 장애는 `dead_letter` counter가 오르지 않는 것과 error handler 로그로 관측한다. 재시도 가능 실패라면 재전달 뒤 새 backoff 주기의 재시도는 센다.
 - `processed`와 end-to-end timer는 consumer 시도 기준이다(at-least-once). rebalance처럼 두 delivery가 같은 event를 동시에 처리하면 두 delivery 모두 `isProcessed=false`를 보고 각자 inbox 완료(`ON CONFLICT DO NOTHING`)까지 가므로, inbox 행은 1개지만 `processed`와 end-to-end sample은 2회 집계될 수 있다. 정확한 처리량이 필요하면 inbox 행 수를 기준으로 한다.
 - JSON `null` record는 두 consumer 모두 `IllegalArgumentException("invalid message publication record")`로 거부하므로 위 IAE 규칙에 따라 재시도 없이 DLQ로 간다. 이전에는 NPE로 group마다 3회 시도했다.

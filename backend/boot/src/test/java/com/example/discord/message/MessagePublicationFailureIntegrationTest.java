@@ -81,6 +81,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class MessagePublicationFailureIntegrationTest {
     private static final String TOPIC_PREFIX = "message-pipeline-" + UUID.randomUUID().toString().replace("-", "");
     private static final BlockingQueue<ListenerSignal> LISTENER_SIGNALS = new LinkedBlockingQueue<>();
+    // awaitListener drains LISTENER_SIGNALS, so failed deliveries are also kept here for per-group attempt counts.
+    private static final java.util.Queue<ListenerSignal> FAILED_DELIVERIES = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private static final BlockingQueue<Boolean> PAUSE_SIGNALS = new LinkedBlockingQueue<>();
     private static final CountDownLatch GATEWAY_PARTITION_ASSIGNED = new CountDownLatch(1);
     private static final ObjectMapper EVENT_MAPPER = new ObjectMapper();
@@ -116,6 +118,7 @@ class MessagePublicationFailureIntegrationTest {
     @BeforeEach
     void createTopicsBeforeSending() throws Exception {
         LISTENER_SIGNALS.clear();
+        FAILED_DELIVERIES.clear();
         messageConsumer().resume();
         Properties properties = new Properties();
         properties.put("bootstrap.servers", bootstrapServers());
@@ -165,12 +168,24 @@ class MessagePublicationFailureIntegrationTest {
         PublicationPayload next = publicationPayload(messageId);
         String key = "poison-" + UUID.randomUUID();
         String topic = TOPIC_PREFIX + ".message.published.v1";
+        double retriesBefore = metrics.counter("discord.message.publication.consumer.retries").count();
         kafka.send(topic, key, poison).get(10, TimeUnit.SECONDS);
         kafka.send(topic, key, next.payload()).get(10, TimeUnit.SECONDS);
         awaitListener("gateway-service-v1", next.eventId(), true);
         assertThat(awaitDeadLettersForKey(key, 2)).allSatisfy(value ->
             assertThat(value).contains("payloadSha256Prefix").doesNotContain("pipeline-check"));
         assertThat(inboxCount(next.eventId())).isEqualTo(1);
+        // Both groups recover the poison before its dead letter is visible, so every failed attempt is counted by now.
+        assertThat(metrics.counter("discord.message.publication.consumer.retries").count() - retriesBefore)
+            .as("poison record retries across both groups")
+            .isZero();
+        for (String groupId : List.of("gateway-service-v1", "notification-service-v1")) {
+            assertThat(FAILED_DELIVERIES.stream()
+                .filter(signal -> signal.groupId().equals(groupId) && signal.eventId().isEmpty())
+                .count())
+                .as("failed poison deliveries for " + groupId)
+                .isEqualTo(1);
+        }
     }
 
     @Test
@@ -749,7 +764,9 @@ class MessagePublicationFailureIntegrationTest {
                         Exception failure,
                         Consumer<Object, Object> consumer
                     ) {
-                        LISTENER_SIGNALS.offer(new ListenerSignal(groupId, eventId(String.valueOf(record.value())), failure));
+                        ListenerSignal signal = new ListenerSignal(groupId, eventId(String.valueOf(record.value())), failure);
+                        FAILED_DELIVERIES.add(signal);
+                        LISTENER_SIGNALS.offer(signal);
                     }
                 });
                 container.getContainerProperties().setConsumerRebalanceListener(new ConsumerAwareRebalanceListener() {
