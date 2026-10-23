@@ -55,7 +55,9 @@ class OpenApiConfiguration {
         Map.entry("AttachmentResponse", Set.of("messageId")),
         Map.entry("ModerationAuditLogEntryResponse", Set.of("targetId", "reason")),
         Map.entry("ModerationMessageReportResponse", Set.of("moderatorId")),
-        Map.entry("NotificationResponse", Set.of("guildId", "eventId", "targetUserId"))
+        Map.entry("NotificationResponse", Set.of("guildId", "eventId", "targetUserId")),
+        Map.entry("MessageOutboxMessageAuthorResponse", Set.of("userId", "botId", "webhookId")),
+        Map.entry("MessageOutboxMessageTargetResponse", Set.of("guildId", "channelId", "threadId", "conversationId", "recipientId"))
     );
 
     @Bean

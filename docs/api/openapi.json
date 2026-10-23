@@ -1186,18 +1186,27 @@
         "properties" : {
           "botId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "type" : {
             "type" : "string"
           },
           "userId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "webhookId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           }
         },
         "required" : [
@@ -1212,23 +1221,38 @@
         "properties" : {
           "channelId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "conversationId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "guildId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "recipientId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "threadId" : {
             "format" : "uuid",
-            "type" : "string"
+            "type" : [
+              "string",
+              "null"
+            ]
           },
           "type" : {
             "type" : "string"

@@ -118,6 +118,8 @@ flowchart TD
 - `requestId`는 본문과 `X-Request-Id` 헤더가 일치해야 한다. rate limit의 `Retry-After`, `X-RateLimit-*`를 보존한다.
 - null 후보: channel `parentId`, gateway event `guildId/channelId`, invite/premium `expiresAt`, message page `nextCursor`, moderation report `moderatorId`, attachment `messageId`, DM notification `guildId`. notification 추가 필드와 audit 값은 실제 mapping을 더 확인한다. 후보를 일괄 nullable 처리하지 않는다.
 - 내부 outbox의 선택적 author/target 필드는 공개 웹 계약에 노출하지 않는다.
+- 내부 outbox도 export된 OpenAPI의 진실성 검증 대상이다. author `userId/botId/webhookId`, target `guildId/channelId/threadId/conversationId/recipientId`는 필수 존재·nullable로 선언하고 variant projection을 회귀 검증한다.
+- 예상 밖 500은 requestId·예외 종류·발생 위치를 서버에 기록한다. 예외 message와 raw stack trace는 비밀 누출 위험 때문에 기록하지 않는다.
 - `MessageResponse.sequence`는 실제 primitive long 경로를 사용하므로 선택 필드로 남기지 않는다.
 
 ## Implementation Steps

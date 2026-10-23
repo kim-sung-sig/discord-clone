@@ -93,6 +93,20 @@ class OpenApiContractTest {
     }
 
     @Test
+    void outboxVariantIdentifiersAreRequiredButNullable() {
+        Map<String, List<String>> identifiers = Map.of(
+            "MessageOutboxMessageAuthorResponse", List.of("userId", "botId", "webhookId"),
+            "MessageOutboxMessageTargetResponse", List.of("guildId", "channelId", "threadId", "conversationId", "recipientId"));
+        identifiers.forEach((name, fields) -> fields.forEach(field -> {
+            JsonNode schema = spec.at("/components/schemas/" + name);
+            assertThat(schema.path("required")).contains(mapper.valueToTree(field));
+            assertThat(schema.at("/properties/" + field + "/type").toString())
+                .as(name + "." + field + " must permit actual variant null")
+                .contains("null");
+        }));
+    }
+
+    @Test
     void responseFieldsAreRequiredAndNoContentResponsesHaveNoBody() {
         spec.at("/components/schemas").properties().forEach(entry -> {
             JsonNode schema = entry.getValue();

@@ -12,8 +12,11 @@ import com.example.discord.gateway.GatewayResyncRequiredException;
 import jakarta.servlet.RequestDispatcher;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -29,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(ApiExceptionHandlerTest.FailureController.class)
+@ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
     @Autowired
     private MockMvc mvc;
@@ -76,12 +80,14 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
-    void unexpectedExceptionDoesNotExposeInternalDetails() throws Exception {
+    void unexpectedExceptionDoesNotExposeInternalDetails(CapturedOutput output) throws Exception {
         mvc.perform(get("/api/problem-test/internal"))
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
             .andExpect(result -> assertThat(result.getResponse().getContentAsString())
                 .doesNotContain("database-password", "IllegalStateException"));
+        assertThat(output.getAll()).contains("exception_type=java.lang.IllegalStateException",
+            "ApiExceptionHandlerTest$FailureController.fail", "request_id=").doesNotContain("database-password");
     }
 
     @Test

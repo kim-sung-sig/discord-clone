@@ -19,6 +19,8 @@ import com.example.discord.thread.ThreadNotFoundException;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -38,6 +40,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @Hidden
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> failure(Exception exception, HttpServletRequest request, HttpServletResponse response) {
         HttpStatusCode status = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -106,6 +110,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         ProblemDetail problem = ApiProblems.create(status, code == null ? ApiProblems.code(status) : code,
             detail == null ? ApiProblems.detail(status) : detail, request, response);
+        logServerFailure(exception, status, problem);
         headers.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
         return new ResponseEntity<>(problem, headers, status);
     }
@@ -122,9 +127,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ApiProblems.create(status, ApiProblems.code(status),
             detail,
             servlet.getRequest(), servlet.getResponse());
+        logServerFailure(exception, status, problem);
         HttpHeaders copied = new HttpHeaders();
         copied.addAll(headers);
         copied.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
         return super.handleExceptionInternal(exception, problem, copied, status, webRequest);
+    }
+
+    private static void logServerFailure(Exception exception, HttpStatusCode status, ProblemDetail problem) {
+        if (status.is5xxServerError()) {
+            StackTraceElement[] frames = exception.getStackTrace();
+            LOG.error("api request failed exception_type={} origin={} request_id={}", exception.getClass().getName(),
+                frames.length == 0 ? "unknown" : frames[0], problem.getProperties().get("requestId"));
+        }
     }
 }

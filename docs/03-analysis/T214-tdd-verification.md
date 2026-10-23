@@ -42,6 +42,16 @@ TDD 중 raw 로그는 임시 파일이며 일부 공통 Gradle XML은 후속 실
 | `git diff --check` | exit0. `C:/tmp/t214-diff-check.log` |
 | Node 버전 | v24.12.0. 루트 package와 lockfile 최소 요구 `>=22.18.0` |
 
+## 독립 검수 보정 루프
+- 첫 구현 content SHA `eccf46b64942d53f436cb30b9acef6f49fe4fd77`는 품질 92/100·보안97/100이었으나 명세88/100 및 P1 1건으로 불합격했다. 이 revision은 push/merge 근거로 사용하지 않았다.
+- P1: 내부 outbox author/target의 variant별 null identifier 8개가 export된 명세에서 non-null로 선언됐다. 웹 생성 대상 제외와 내부 명세 정확성을 잘못 동일시한 누락이다.
+- P2: catch-all 500의 요청 상태 로그는 있었지만 예외 종류/발생 위치 로그가 없었다.
+- 설계서를 먼저 보정한 후 `outboxVariantIdentifiersAreRequiredButNullable` 및 500 안전 진단 로그 assertion을 추가했다. 두 테스트가 각각 예상한 assertion으로 실패했다: `2 tests completed, 2 failed`, `BUILD FAILED in 20s`. 보존 로그 `C:/tmp/t214-review-fix-red.log`.
+- 기존 nullable map에 author `userId/botId/webhookId`, target `guildId/channelId/threadId/conversationId/recipientId`를 추가했다. required 존재 규칙은 그대로다. 명세를 backend export로 재생성했고 웹 생성물은 변경되지 않음을 drift 검사로 확인했다.
+- 5xx에서만 exception class·첫 stack frame·requestId를 기록한다. exception message, cause message, raw stack trace는 기록하지 않는다. 새 테스트가 `database-password` 원문이 응답과 로그 모두에 없음을 검사한다.
+- `./gradlew :backend:boot:test --tests com.example.discord.auth.ApiExceptionHandlerTest --tests com.example.discord.openapi.OpenApiContractTest -Popenapi.write=true`는 `BUILD SUCCESSFUL in 19s`, 이어 `node qa/openapi-contract.test.mjs`는 `OPENAPI_CONTRACT_PASS operations=110 generatedFiles=163`였다. GREEN 로그 `C:/tmp/t214-review-fix-green.log`.
+- 보정 후 새 SHA에서 fresh spec/quality/security 검수 및 전체 verification을 다시 수행한다. 최종 승인 여부와 정확한 SHA는 merge-review artifact에 기록한다.
+
 ## 환경 제한과 잔여 범위
 - Windows에서 `npm run lint:backend`의 기존 helper가 기본 PATH로 `gradlew.bat`를 찾지 못했다. 저장소 경로를 해당 명령의 PATH에 추가한 실행과 Git Bash 직접 wrapper 실행은 모두 성공했다. helper 자체는 범위 밖이라 변경하지 않았다.
 - 기본 실행 도구의 quoted Git Bash shell 경로는 WSL bash로 잘못 연결됐다. `cmd.exe`에서 `C:\Progra~1\Git\bin\bash.exe C:/tmp/<script>.sh`로 실제 Git Bash를 실행했다. 저장소 작업은 모두 해당 Git Bash 안에서 수행했다.
