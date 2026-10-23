@@ -7,15 +7,16 @@
 import type { ModerationMessageReportResponseStatus } from './moderationMessageReportResponseStatus';
 
 export interface ModerationMessageReportResponse {
-  channelId?: string;
-  createdAt?: string;
-  guildId?: string;
-  id?: string;
-  messageId?: string;
-  moderatorId?: string;
-  reason?: string;
-  reporterId?: string;
-  resolution?: string;
-  status?: ModerationMessageReportResponseStatus;
-  updatedAt?: string;
+  channelId: string;
+  createdAt: string;
+  guildId: string;
+  id: string;
+  messageId: string;
+  /** @nullable */
+  moderatorId: string | null;
+  reason: string;
+  reporterId: string;
+  resolution: string;
+  status: ModerationMessageReportResponseStatus;
+  updatedAt: string;
 }

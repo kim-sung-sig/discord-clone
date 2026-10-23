@@ -6,5 +6,5 @@
  */
 
 export interface AttachmentCleanupResponse {
-  deletedCount?: number;
+  deletedCount: number;
 }

@@ -7,16 +7,19 @@
 import type { NotificationResponseKind } from './notificationResponseKind';
 
 export interface NotificationResponse {
-  channelId?: string;
-  createdAt?: string;
-  eventId?: string;
-  guildId?: string;
-  id?: string;
-  kind?: NotificationResponseKind;
-  read?: boolean;
-  sequence?: number;
-  sourceId?: string;
-  summary?: string;
-  targetUserId?: string;
-  userId?: string;
+  channelId: string;
+  createdAt: string;
+  /** @nullable */
+  eventId: string | null;
+  /** @nullable */
+  guildId: string | null;
+  id: string;
+  kind: NotificationResponseKind;
+  read: boolean;
+  sequence: number;
+  sourceId: string;
+  summary: string;
+  /** @nullable */
+  targetUserId: string | null;
+  userId: string;
 }

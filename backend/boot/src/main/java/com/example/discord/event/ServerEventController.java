@@ -24,9 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -73,6 +70,7 @@ class ServerEventController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ServerEvent> create(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -116,18 +114,5 @@ class ServerEventController {
     }
 
     record CancelRequest(String reason) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = ServerEventController.class)
-class ServerEventControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<Void> invalidRequest() {
-        return ResponseEntity.badRequest().build();
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<Void> unreadableRequest() {
-        return ResponseEntity.badRequest().build();
     }
 }

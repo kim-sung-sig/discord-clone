@@ -6,9 +6,9 @@
  */
 
 export interface AuthUserResponse {
-  admin?: boolean;
-  displayName?: string;
-  id?: string;
-  roles?: string[];
-  username?: string;
+  admin: boolean;
+  displayName: string;
+  id: string;
+  roles: string[];
+  username: string;
 }

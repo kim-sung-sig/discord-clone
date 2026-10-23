@@ -6,8 +6,8 @@
  */
 
 export interface SoundboardPlayEventResponse {
-  channelId?: string;
-  id?: string;
-  soundId?: string;
-  userId?: string;
+  channelId: string;
+  id: string;
+  soundId: string;
+  userId: string;
 }

@@ -6,8 +6,8 @@
  */
 
 export interface ThreadWriteResponse {
-  authorId?: string;
-  content?: string;
-  threadId?: string;
-  writtenAt?: string;
+  authorId: string;
+  content: string;
+  threadId: string;
+  writtenAt: string;
 }

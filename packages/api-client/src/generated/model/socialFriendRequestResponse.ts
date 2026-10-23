@@ -7,10 +7,10 @@
 import type { SocialFriendRequestResponseStatus } from './socialFriendRequestResponseStatus';
 
 export interface SocialFriendRequestResponse {
-  addresseeId?: string;
-  createdAt?: string;
-  id?: string;
-  requesterId?: string;
-  status?: SocialFriendRequestResponseStatus;
-  updatedAt?: string;
+  addresseeId: string;
+  createdAt: string;
+  id: string;
+  requesterId: string;
+  status: SocialFriendRequestResponseStatus;
+  updatedAt: string;
 }

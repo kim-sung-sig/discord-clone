@@ -7,14 +7,14 @@
 import type { ServerEventStatus } from './serverEventStatus';
 
 export interface ServerEvent {
-  channelId?: string;
-  creatorId?: string;
-  endsAt?: string;
-  guildId?: string;
-  id?: string;
-  interestedMemberIds?: string[];
-  startsAt?: string;
-  status?: ServerEventStatus;
-  title?: string;
-  updatedAt?: string;
+  channelId: string;
+  creatorId: string;
+  endsAt: string;
+  guildId: string;
+  id: string;
+  interestedMemberIds: string[];
+  startsAt: string;
+  status: ServerEventStatus;
+  title: string;
+  updatedAt: string;
 }

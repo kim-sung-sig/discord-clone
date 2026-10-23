@@ -6,7 +6,7 @@
  */
 
 export interface AuthGlobalRoleAuditExportPolicyResponse {
-  formats?: string[];
-  maxEntriesPerRequest?: number;
-  requiresRole?: string;
+  formats: string[];
+  maxEntriesPerRequest: number;
+  requiresRole: string;
 }

@@ -17,8 +17,4 @@ class NotificationOpenApiExportConfiguration {
         return new NotificationController(users, guilds, mock(JdbcNotificationInboxService.class));
     }
 
-    @Bean
-    NotificationControllerAdvice notificationControllerAdvice() {
-        return new NotificationControllerAdvice();
-    }
 }

@@ -8,6 +8,6 @@ import type { VoiceParticipantResponse } from './voiceParticipantResponse';
 import type { VoiceTokenResponse } from './voiceTokenResponse';
 
 export interface VoiceJoinResponse {
-  participant?: VoiceParticipantResponse;
-  token?: VoiceTokenResponse;
+  participant: VoiceParticipantResponse;
+  token: VoiceTokenResponse;
 }

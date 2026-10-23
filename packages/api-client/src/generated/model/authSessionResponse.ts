@@ -6,9 +6,9 @@
  */
 
 export interface AuthSessionResponse {
-  createdAt?: string;
-  deviceName?: string;
-  expiresAt?: string;
-  id?: string;
-  revoked?: boolean;
+  createdAt: string;
+  deviceName: string;
+  expiresAt: string;
+  id: string;
+  revoked: boolean;
 }

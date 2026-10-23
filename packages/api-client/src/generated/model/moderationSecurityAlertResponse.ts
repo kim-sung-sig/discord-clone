@@ -6,12 +6,12 @@
  */
 
 export interface ModerationSecurityAlertResponse {
-  actorId?: string;
-  createdAt?: string;
-  guildId?: string;
-  id?: string;
-  reason?: string;
-  severity?: string;
-  targetId?: string;
-  type?: string;
+  actorId: string;
+  createdAt: string;
+  guildId: string;
+  id: string;
+  reason: string;
+  severity: string;
+  targetId: string;
+  type: string;
 }

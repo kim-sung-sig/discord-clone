@@ -82,7 +82,7 @@ class InviteControllerTest {
         mockMvc.perform(post("/api/invites/{code}/accept", code)
                 .header("Authorization", member.bearer()))
             .andExpect(status().isGone())
-            .andExpect(jsonPath("$.message").value("invite expired"));
+            .andExpect(jsonPath("$.detail").value("invite expired"));
     }
 
     @Test
@@ -99,12 +99,12 @@ class InviteControllerTest {
 
         mockMvc.perform(get("/api/invites/{code}", code))
             .andExpect(status().isGone())
-            .andExpect(jsonPath("$.message").value("invite deleted"));
+            .andExpect(jsonPath("$.detail").value("invite deleted"));
 
         mockMvc.perform(post("/api/invites/{code}/accept", code)
                 .header("Authorization", member.bearer()))
             .andExpect(status().isGone())
-            .andExpect(jsonPath("$.message").value("invite deleted"));
+            .andExpect(jsonPath("$.detail").value("invite deleted"));
     }
 
     @Test
@@ -124,7 +124,7 @@ class InviteControllerTest {
         mockMvc.perform(post("/api/invites/{code}/accept", code)
                 .header("Authorization", secondMember.bearer()))
             .andExpect(status().isGone())
-            .andExpect(jsonPath("$.message").value("invite max uses exceeded"));
+            .andExpect(jsonPath("$.detail").value("invite max uses exceeded"));
     }
 
     @Test

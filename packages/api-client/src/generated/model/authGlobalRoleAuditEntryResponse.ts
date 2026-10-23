@@ -6,10 +6,10 @@
  */
 
 export interface AuthGlobalRoleAuditEntryResponse {
-  action?: string;
-  actor?: string;
-  occurredAt?: string;
-  result?: string;
-  role?: string;
-  targetUserId?: string;
+  action: string;
+  actor: string;
+  occurredAt: string;
+  result: string;
+  role: string;
+  targetUserId: string;
 }

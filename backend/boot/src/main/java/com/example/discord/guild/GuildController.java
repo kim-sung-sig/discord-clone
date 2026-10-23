@@ -10,10 +10,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -43,6 +40,7 @@ class GuildController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<GuildResponse> createGuild(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody CreateGuildRequest request
@@ -54,6 +52,7 @@ class GuildController {
     }
 
     @PostMapping("/{guildId}/channels")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ChannelResponse> createChannel(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -91,6 +90,7 @@ class GuildController {
     }
 
     @PostMapping("/{guildId}/roles")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<RoleResponse> createRole(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -268,25 +268,4 @@ class GuildController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = GuildController.class)
-class GuildControllerAdvice {
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<GuildController.ErrorResponse> responseStatus(ResponseStatusException exception) {
-        return ResponseEntity.status(exception.getStatusCode())
-            .body(new GuildController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<GuildController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new GuildController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<GuildController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new GuildController.ErrorResponse("invalid request"));
-    }
 }

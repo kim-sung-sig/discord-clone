@@ -6,9 +6,9 @@
  */
 
 export interface ExpressionStickerResponse {
-  creatorId?: string;
-  description?: string;
-  guildId?: string;
-  id?: string;
-  name?: string;
+  creatorId: string;
+  description: string;
+  guildId: string;
+  id: string;
+  name: string;
 }

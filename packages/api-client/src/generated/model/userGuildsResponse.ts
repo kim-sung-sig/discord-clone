@@ -7,5 +7,5 @@
 import type { UserGuildResponse } from './userGuildResponse';
 
 export interface UserGuildsResponse {
-  guilds?: UserGuildResponse[];
+  guilds: UserGuildResponse[];
 }

@@ -5,6 +5,7 @@
  * OpenAPI spec version: v1
  */
 
+export * from './apiProblem';
 export * from './attachmentCleanupResponse';
 export * from './attachmentDownloadResponse';
 export * from './attachmentResponse';

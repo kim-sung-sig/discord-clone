@@ -9,7 +9,7 @@ import type { AuthGlobalRoleAuditExportPolicyResponse } from './authGlobalRoleAu
 import type { AuthGlobalRoleAuditRetentionPolicyResponse } from './authGlobalRoleAuditRetentionPolicyResponse';
 
 export interface AuthGlobalRoleAuditLogResponse {
-  entries?: AuthGlobalRoleAuditEntryResponse[];
-  export?: AuthGlobalRoleAuditExportPolicyResponse;
-  retention?: AuthGlobalRoleAuditRetentionPolicyResponse;
+  entries: AuthGlobalRoleAuditEntryResponse[];
+  export: AuthGlobalRoleAuditExportPolicyResponse;
+  retention: AuthGlobalRoleAuditRetentionPolicyResponse;
 }

@@ -16,8 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestController
 @RequestMapping("/api/gateway")
@@ -110,6 +107,7 @@ class GatewayController {
     }
 
     @PostMapping("/events")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<EventResponse> publish(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestHeader(value = INTERNAL_PUBLISHER_HEADER, required = false) String internalPublisher,
@@ -229,42 +227,4 @@ class GatewayController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-
-    record ResyncErrorResponse(String code, String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = GatewayController.class)
-class GatewayControllerAdvice {
-    @ExceptionHandler(GatewayResyncRequiredException.class)
-    ResponseEntity<GatewayController.ResyncErrorResponse> resyncRequired(GatewayResyncRequiredException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(new GatewayController.ResyncErrorResponse("RESYNC_REQUIRED", exception.getMessage()));
-    }
-
-    @ExceptionHandler(GatewayForbiddenException.class)
-    ResponseEntity<GatewayController.ErrorResponse> forbidden(GatewayForbiddenException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(new GatewayController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(GatewaySessionNotFoundException.class)
-    ResponseEntity<GatewayController.ErrorResponse> notFound(GatewaySessionNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(new GatewayController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<GatewayController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest()
-            .body(new GatewayController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<GatewayController.ErrorResponse> invalidBody(MethodArgumentNotValidException exception) {
-        return ResponseEntity.badRequest()
-            .body(new GatewayController.ErrorResponse("invalid request"));
-    }
 }

@@ -6,6 +6,6 @@
  */
 
 export interface ModerationMemberRoleResponse {
-  memberId?: string;
-  roleIds?: string[];
+  memberId: string;
+  roleIds: string[];
 }

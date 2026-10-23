@@ -6,12 +6,12 @@
  */
 
 export interface VoiceParticipantResponse {
-  channelId?: string;
-  deafened?: boolean;
-  guildId?: string;
-  muted?: boolean;
-  screenSharing?: boolean;
-  speaking?: boolean;
-  updatedAt?: string;
-  userId?: string;
+  channelId: string;
+  deafened: boolean;
+  guildId: string;
+  muted: boolean;
+  screenSharing: boolean;
+  speaking: boolean;
+  updatedAt: string;
+  userId: string;
 }

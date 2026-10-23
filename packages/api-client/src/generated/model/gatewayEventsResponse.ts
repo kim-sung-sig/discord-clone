@@ -7,5 +7,5 @@
 import type { GatewayEventResponse } from './gatewayEventResponse';
 
 export interface GatewayEventsResponse {
-  events?: GatewayEventResponse[];
+  events: GatewayEventResponse[];
 }

@@ -229,14 +229,14 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/admin/global-roles/audit-log")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.message").value("forbidden"));
+            .andExpect(jsonPath("$.detail").value("forbidden"));
     }
 
     @Test
     void globalRoleAuditReviewRejectsMissingBearerToken() throws Exception {
         mockMvc.perform(get("/api/admin/global-roles/audit-log"))
             .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.message").value("bearer token required"));
+            .andExpect(jsonPath("$.detail").value("bearer token required"));
     }
 
     @Test
@@ -250,13 +250,13 @@ class AuthControllerTest {
                 .queryParam("limit", "0")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
 
         mockMvc.perform(get("/api/admin/global-roles/audit-log")
                 .queryParam("limit", "101")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test
@@ -296,7 +296,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isLocked())
-            .andExpect(jsonPath("$.message").value("login temporarily locked"));
+            .andExpect(jsonPath("$.detail").value("login temporarily locked"));
     }
 
     @Test
@@ -324,7 +324,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.message").value("account already exists"));
+            .andExpect(jsonPath("$.detail").value("account already exists"));
 
         MvcResult login = mockMvc.perform(post("/api/auth/login")
                 .with(remoteAddr("198.51.100.30"))
@@ -401,7 +401,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/refresh")
                 .cookie(firstRefresh))
             .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.message").value("refresh token reuse detected"));
+            .andExpect(jsonPath("$.detail").value("refresh token reuse detected"));
 
         mockMvc.perform(post("/api/auth/refresh")
                 .cookie(rotatedRefresh))
@@ -473,7 +473,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isLocked())
-            .andExpect(jsonPath("$.message").value("login temporarily locked"));
+            .andExpect(jsonPath("$.detail").value("login temporarily locked"));
     }
 
     @Test
@@ -489,7 +489,7 @@ class AuthControllerTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("invalid request"));
+            .andExpect(jsonPath("$.detail").value("invalid request"));
     }
 
     @Test

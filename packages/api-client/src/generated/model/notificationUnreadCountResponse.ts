@@ -7,6 +7,6 @@
 import type { NotificationUnreadCountResponseByKind } from './notificationUnreadCountResponseByKind';
 
 export interface NotificationUnreadCountResponse {
-  byKind?: NotificationUnreadCountResponseByKind;
-  unreadCount?: number;
+  byKind: NotificationUnreadCountResponseByKind;
+  unreadCount: number;
 }

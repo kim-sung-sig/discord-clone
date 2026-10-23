@@ -12,9 +12,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -64,6 +61,7 @@ class MessageController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<MessageResponse> create(
         @PathVariable UUID channelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -124,6 +122,7 @@ class MessageController {
     }
 
     @DeleteMapping("/{messageId}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> delete(
         @PathVariable UUID channelId,
         @PathVariable UUID messageId,
@@ -316,40 +315,4 @@ class MessageController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = MessageController.class)
-class MessageControllerAdvice {
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<MessageController.ErrorResponse> responseStatus(ResponseStatusException exception) {
-        return ResponseEntity.status(exception.getStatusCode())
-            .body(new MessageController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<MessageController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new MessageController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<MessageController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new MessageController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(MessageNotFoundException.class)
-    ResponseEntity<MessageController.ErrorResponse> missingMessage(MessageNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new MessageController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(MessagePublishRejectedException.class)
-    ResponseEntity<MessageController.ErrorResponse> rejectedPublish(MessagePublishRejectedException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(new MessageController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(MessageMutationRejectedException.class)
-    ResponseEntity<MessageController.ErrorResponse> rejectedMutation(MessageMutationRejectedException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageController.ErrorResponse(exception.getMessage()));
-    }
 }

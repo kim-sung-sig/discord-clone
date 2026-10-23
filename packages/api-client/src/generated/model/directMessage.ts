@@ -6,10 +6,10 @@
  */
 
 export interface DirectMessage {
-  channelId?: string;
-  content?: string;
-  createdAt?: string;
-  id?: string;
-  senderId?: string;
-  sequence?: number;
+  channelId: string;
+  content: string;
+  createdAt: string;
+  id: string;
+  senderId: string;
+  sequence: number;
 }

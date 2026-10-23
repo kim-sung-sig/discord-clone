@@ -12,9 +12,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -45,6 +42,7 @@ class SocialController {
     }
 
     @PostMapping("/friends/requests")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<FriendRequestResponse> requestFriend(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody FriendTargetRequest request
@@ -74,6 +72,7 @@ class SocialController {
     }
 
     @PutMapping("/blocks/{targetUserId}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> block(
         @PathVariable UUID targetUserId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
@@ -88,6 +87,7 @@ class SocialController {
     }
 
     @PostMapping("/dms")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<DirectMessageChannelResponse> directMessageChannel(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody FriendTargetRequest request
@@ -101,6 +101,7 @@ class SocialController {
     }
 
     @PostMapping("/dms/{targetUserId}/messages")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<DirectMessageReceiptResponse> sendDirectMessage(
         @PathVariable UUID targetUserId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -155,6 +156,7 @@ class SocialController {
     }
 
     @PostMapping("/group-dms")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<GroupDmResponse> createGroupDm(
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
         @RequestBody CreateGroupDmRequest request
@@ -306,29 +308,4 @@ class SocialController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = SocialController.class)
-class SocialControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<SocialController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new SocialController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<SocialController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new SocialController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(SocialPolicyException.class)
-    ResponseEntity<SocialController.ErrorResponse> socialPolicy(SocialPolicyException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new SocialController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(SocialNotFoundException.class)
-    ResponseEntity<SocialController.ErrorResponse> notFound(SocialNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new SocialController.ErrorResponse(exception.getMessage()));
-    }
 }

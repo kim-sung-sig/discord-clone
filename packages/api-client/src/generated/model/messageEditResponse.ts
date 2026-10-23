@@ -6,6 +6,6 @@
  */
 
 export interface MessageEditResponse {
-  content?: string;
-  editedAt?: string;
+  content: string;
+  editedAt: string;
 }

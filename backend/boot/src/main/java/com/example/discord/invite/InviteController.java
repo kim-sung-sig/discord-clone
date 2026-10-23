@@ -12,9 +12,7 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -45,6 +42,7 @@ class InviteController {
     }
 
     @PostMapping("/api/guilds/{guildId}/invites")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<InviteResponse> createInvite(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -95,6 +93,7 @@ class InviteController {
     }
 
     @DeleteMapping("/api/invites/{code}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> deleteInvite(
         @PathVariable String code,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
@@ -172,45 +171,4 @@ class InviteController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = InviteController.class)
-class InviteControllerAdvice {
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<InviteController.ErrorResponse> responseStatus(ResponseStatusException exception) {
-        return ResponseEntity.status(exception.getStatusCode())
-            .body(new InviteController.ErrorResponse(exception.getReason() == null ? "request failed" : exception.getReason()));
-    }
-
-    @ExceptionHandler(InviteNotFoundException.class)
-    ResponseEntity<InviteController.ErrorResponse> notFound(InviteNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new InviteController.ErrorResponse("invite not found"));
-    }
-
-    @ExceptionHandler(InviteDeletedException.class)
-    ResponseEntity<InviteController.ErrorResponse> deleted(InviteDeletedException exception) {
-        return ResponseEntity.status(HttpStatus.GONE).body(new InviteController.ErrorResponse("invite deleted"));
-    }
-
-    @ExceptionHandler(InviteExpiredException.class)
-    ResponseEntity<InviteController.ErrorResponse> expired(InviteExpiredException exception) {
-        return ResponseEntity.status(HttpStatus.GONE).body(new InviteController.ErrorResponse("invite expired"));
-    }
-
-    @ExceptionHandler(InviteMaxUsesExceededException.class)
-    ResponseEntity<InviteController.ErrorResponse> maxUses(InviteMaxUsesExceededException exception) {
-        return ResponseEntity.status(HttpStatus.GONE).body(new InviteController.ErrorResponse("invite max uses exceeded"));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<InviteController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new InviteController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<InviteController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new InviteController.ErrorResponse("invalid request"));
-    }
 }

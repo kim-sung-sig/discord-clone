@@ -6,7 +6,7 @@
  */
 
 export interface Quest {
-  id?: string;
-  name?: string;
-  rewardFeatureKey?: string;
+  id: string;
+  name: string;
+  rewardFeatureKey: string;
 }

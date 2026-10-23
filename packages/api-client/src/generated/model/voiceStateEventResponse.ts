@@ -6,13 +6,13 @@
  */
 
 export interface VoiceStateEventResponse {
-  channelId?: string;
-  deafened?: boolean;
-  guildId?: string;
-  muted?: boolean;
-  occurredAt?: string;
-  screenSharing?: boolean;
-  speaking?: boolean;
-  type?: string;
-  userId?: string;
+  channelId: string;
+  deafened: boolean;
+  guildId: string;
+  muted: boolean;
+  occurredAt: string;
+  screenSharing: boolean;
+  speaking: boolean;
+  type: string;
+  userId: string;
 }
