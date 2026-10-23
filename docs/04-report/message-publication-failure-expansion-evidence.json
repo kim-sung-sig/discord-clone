@@ -2,6 +2,7 @@
   "runDate": "2026-10-22",
   "scope": "서브에이전트 조사 후 재해 테스트 확장; 기존 실측 스냅샷은 별도 보존",
   "artifacts": ".gradle/message-failure-expansion/",
+  "snapshotNote": "suites와 measuredScenarios는 2026-10-22 확장 시점(be1c9a9 이전) 값이다. T216(2026-10-24) 이후 집중 테스트 수는 MessageKafkaConfigurationTest 22, KafkaMessagePublishedConsumerTest 8이고, retryCallbacksAcrossBothGroups 6은 현재 retries 정의(실제 재시도만)로 4에 해당한다. 최신 drill은 message-publication-resilience-evidence.json에 있다.",
   "tdd": [
     {"test": "poisonPayloadAlwaysProducesSafeDeadLetterMetadata", "red": "JSON 문법 오류 입력 3종에서 DLQ encoding IllegalStateException", "green": "JSON 파싱 실패 시 eventId 없이 안전한 메타데이터 DLQ 생성"},
     {"test": "preservesMarkFailureWhenReleasingClaimAlsoFails", "red": "최초 markPublished 예외 대신 releaseFailed 예외가 전파됨", "green": "최초 예외를 전파하고 release 실패는 suppressed로 보존"}

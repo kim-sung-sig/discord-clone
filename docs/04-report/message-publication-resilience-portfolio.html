@@ -361,7 +361,8 @@
         <h2>VI. 잔여 리스크</h2>
         <ul>
           <li>테스트에서 Spring Kafka listener container를 멈추고 다시 시작했습니다. 실제 프로세스 강제 종료·재기동은 별도로 재현하지 않았으며, gateway 효과 후 Inbox 기록 전 crash window는 단위 테스트에서 재시도와 안정 eventId 중복 제거로 검증했습니다.</li>
-          <li>공용 Kafka error handler가 같은 message topic의 gateway/notification consumer group에서 각각 처리합니다. 단일 DB 실패에서 gateway consumer 실패 3회, 전체 retry callback 6회와 DLQ 기록 2건이 관측됐습니다.</li>
+          <li>공용 Kafka error handler가 같은 message topic의 gateway/notification consumer group에서 각각 처리합니다. 단일 DB 실패에서 gateway consumer 실패 3회, 전체 retry callback 6회와 DLQ 기록 2건이 관측됐습니다. (2026-10-24 T216 정정: <code>consumer.retries</code>는 이제 실제로 다시 시도된 전달만 세므로 같은 장애가 4회(group당 2회)로 기록됩니다.)</li>
+          <li>공용 recoverer는 소진된 record를 원래 topic과 관계없이 <code>*.message.published.v1.dead-letter</code>로 보냅니다. authorization projection listener의 소진 record도 이 DLQ에 <code>topic</code> 필드와 함께 섞이므로, 재생 도구는 <code>topic</code>으로 걸러야 합니다. message 지표는 topic으로 걸러 오염되지 않습니다.</li>
         </ul>
       </section>
       <section class="report-section" id="scenarios">
@@ -373,12 +374,12 @@
             <tr><td>중복 전달 + listener 재시작</td><td>같은 event를 listener stop/start 뒤 다시 보냄</td><td>duplicate_events=1, Gateway event 1건, Inbox 완료 행 1건</td></tr>
             <tr><td>PostgreSQL 연결 중단</td><td>Testcontainers DB container pause; 두 consumer group DLQ ACK를 확인할 때까지 outage 유지</td><td>gateway consumer 실패 3회; 공용 두 consumer group의 retry callback 6회, DLQ 2건; failure→DLQ 10,756ms</td></tr>
             <tr><td>DB 복구 + 원본 event 재생</td><td>DB unpause 뒤 같은 원본 payload를 message topic에 새 record로 재발행 (consumer offset reset 아님)</td><td>재생 발행부터 Inbox 반영 140ms; Gateway event는 eventId 기준 1건</td></tr>
-            <tr><td>잘못된 이벤트</td><td>schema에 맞지 않는 payload와 본문 sentinel 발행</td><td>Gateway listener의 malformed IllegalArgumentException은 non-retryable 분류; DLQ에서 payload 본문과 content 필드가 제외됨을 확인</td></tr>
+            <tr><td>잘못된 이벤트</td><td>schema에 맞지 않는 payload와 본문 sentinel 발행</td><td>Gateway listener의 malformed IllegalArgumentException은 non-retryable 분류; DLQ에서 payload 본문과 content 필드가 제외됨을 확인. <em>2026-10-22·10-24 정정: message topic의 IllegalArgumentException(원인 체인 포함, JSON <code>null</code> 포함)은 gateway·notification 두 group 모두 재시도 없이 DLQ로 갑니다. 다른 topic listener는 1초 간격 2회 재시도를 유지합니다.</em></td></tr>
             <tr><td>Consumer lag</td><td>consumer pause 중 5건 추가, resume 후 drain 대기</td><td>peak 5 → drain 0, queued_events=5</td></tr>
             <tr><td>Inbox 완료 직전 crash window</td><td>단위 테스트에서 Gateway append 뒤 Inbox 기록 직전에 실패를 주입</td><td>재시도되며 안정 eventId dedupe가 Gateway 효과 중복을 막음</td></tr>
           </tbody>
         </table>
-        <p><strong>실행 근거:</strong> 저장된 실측 스냅샷 <code>docs/04-report/message-publication-resilience-evidence.json</code>은 opt-in 통합 테스트 4건, 실패 0건을 기록합니다. DB 장애 시 DLQ latency는 10,756ms였고 복구 재생은 140ms였습니다. 로컬 Docker/Redpanda 환경에서 한 번 실행한 수치입니다.</p>
+        <p><strong>실행 근거:</strong> 위 표는 2026-10-21 최초 실행값입니다. 당시 opt-in 통합 테스트 4건, 실패 0건이었고 DB 장애 시 DLQ latency는 10,756ms, 복구 재생은 140ms였습니다. 로컬 Docker/Redpanda 환경에서 한 번 실행한 수치입니다. 실측 JSON <code>docs/04-report/message-publication-resilience-evidence.json</code>은 2026-10-24 최신 drill(11건)로 갱신했고, 최초 값은 같은 파일의 <code>previousSnapshots</code>에 남겼습니다(아래 2026-10-24 절).</p>
         <p><strong>파이프라인 관측:</strong> API에서 전달한 request ID를 event correlationId에 기록하고 eventId/correlationId 안전 로그로 relay와 consumer를 연결합니다. Prometheus 지표는 Outbox backlog, relay 결과·시간, consumer 결과·end-to-end timer, retries, dead letters, consumer offset lag를 제공합니다.</p>
       </section>
       <section class="report-section" id="failure-expansion-20261022">
@@ -398,6 +399,21 @@
         <p>이번 DB 중단 실행은 실패 3회, 두 group의 retry callback 6회와 DLQ 2건, 장애→DLQ 13,889ms, 재전달→Inbox 198ms, lag 5→0을 기록했습니다. 앞선 실행 수치와 별도인 로컬 단일 실행 결과입니다.</p>
         <p><strong>검증 한계:</strong> producer 장애는 테스트 전용 무응답 endpoint를 통한 metadata timeout이며 공유 broker 프로세스를 중지한 실험은 아닙니다. DLQ 발행 실패는 handler 반환값을 검증하며 실제 committed offset 장애 증거는 아닙니다. 동시 consumer는 같은 Gateway service를 사용하며 WebSocket 전달 횟수 1회를 증명하지 않습니다. API는 MockMvc 통합 테스트입니다.</p>
         <p><a href="message-publication-failure-expansion-evidence.json">확장 실측 JSON</a> · <a href="../03-analysis/message-publication-failure-matrix.md">재해 테스트 매트릭스</a></p>
+      </section>
+      <section class="report-section" id="t216-20261024">
+        <h2>2026-10-24 T216 후속 정리와 최신 실측</h2>
+        <p>PR #13~#14 검토에서 비차단으로 남긴 메시지 처리 흐름 항목을 정리했습니다. 근거와 RED→GREEN 기록은 <a href="../03-analysis/task_T216-message-pipeline-followups.blueprint.md">T216 blueprint</a>에 있습니다.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>항목</th><th>변경</th><th>관측</th></tr></thead>
+          <tbody>
+            <tr><td>JSON <code>null</code> record</td><td>두 consumer가 <code>null</code> 해석 결과를 IllegalArgumentException으로 바꿔 재시도 없이 DLQ</td><td>실제 Kafka 시험 <code>jsonNullDeadLetters…</code> 7.1~7.2초 → 4.4초. 깨진 JSON·tombstone과 같은 시간입니다.</td></tr>
+            <tr><td><code>consumer.retries</code></td><td>재시도 없는 판정과 소진 직전 마지막 실패는 세지 않음</td><td>DB 장애에서 두 group 합계 6 → 4(group당 2회). 실패 3회, DLQ 2건은 그대로입니다.</td></tr>
+            <tr><td>이미 기록된 Gateway event 확인</td><td><code>SELECT 1 … WHERE event_id = ?</code>로 존재만 확인, Gateway 전역 lock 밖에서 조회</td><td>실제 PostgreSQL 계약 시험 2건 추가</td></tr>
+            <tr><td>drill 지표 단언</td><td>공유 registry 절대값 대신 시나리오 전후 차이</td><td><code>duplicate_events=1</code>, <code>end_to_end_samples=1</code>, <code>end_to_end_total_ms=265.844</code>(이 시나리오의 합계)</td></tr>
+          </tbody>
+        </table></div>
+        <p><strong>최신 drill:</strong> <code>MessagePublicationFailureIntegrationTest</code> 11건 통과, 실패·skip 0, 78.818초. DB 장애 실패 3회, retries 4회, DLQ 2건, 장애→DLQ 13,876ms, 재전달→Inbox 195ms, lag 5→0. 로컬 단일 실행값이며 앞선 실행과 합치지 않습니다.</p>
+        <p><strong>집계 주의:</strong> <code>processed</code>와 end-to-end timer는 consumer 시도 기준입니다. rebalance처럼 두 delivery가 동시에 같은 event를 처리하면 inbox 행은 1개지만 <code>processed</code>가 2회 집계될 수 있습니다(at-least-once).</p>
       </section>
     </main>
   </div>

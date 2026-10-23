@@ -69,9 +69,14 @@ flowchart LR
 
 ## 최종 검증 결과
 - 추가 실행 케이스 28개: poison 입력 파라미터 9개, DLQ 실패 4개, relay 실패 순서 3개, PG lease 5개, Kafka/PG/JVM 재해 7개.
-- 집중 검증 총 48건 통과: Configuration 18, RecoveryFailure 4, Consumer 5, Relay 5, 실제 PG lease 5, 실제 Kafka/PG/JVM 11. 각 명령의 XML을 별도 보존했으며 서로 다른 실행의 지연 수치를 합치지 않았다.
+- 집중 검증 총 48건 통과(2026-10-22 확장 시점, `be1c9a9` 이전 수치): Configuration 18, RecoveryFailure 4, Consumer 5, Relay 5, 실제 PG lease 5, 실제 Kafka/PG/JVM 11. 각 명령의 XML을 별도 보존했으며 서로 다른 실행의 지연 수치를 합치지 않았다.
+  - 2026-10-24 T216 이후 수치: Configuration 22, Consumer 8, Mention consumer 3, RecoveryFailure 4, 실제 Kafka/PG/JVM 11(78.818초). 근거는 `docs/03-analysis/task_T216-message-pipeline-followups.blueprint.md`.
 - TDD RED: 깨진 JSON 3종의 DLQ encoding 실패, mark/release 연속 실패 시 최초 원인 상실. 두 결함 모두 해당 테스트를 먼저 실패시킨 뒤 운영 코드를 수정해 GREEN을 확인했다. 나머지 추가 테스트는 기존 동작 검증이다.
 - JVM 강제 종료 테스트 22.185초, Kafka/PG 전체 class 77.559초. PG lease 본문 0.824초(컨테이너 준비 시간 제외). 고정 sleep을 추가하지 않았다.
 - 전체 `test`와 `npm run lint:backend`, `git diff --check` 통과. runtime은 opt-in이며 기본 test에서 infra 테스트를 자동 실행하지 않는다.
 - 범위 한계: broker 자체 중단/재시작, 외부 HTTP만 사용하는 black-box, DLQ 실패 시 실제 committed offset, 독립 Gateway instance 경합과 WebSocket 전달 횟수는 미검증이다. concurrent consumer는 같은 Gateway service를 사용한다.
 - 실측 JSON: `docs/04-report/message-publication-failure-expansion-evidence.json`. 이전 수치와 구분해 HTML portfolio에 날짜별로 추가했다.
+- 2026-10-24 T216 정정
+  - message topic의 JSON `null` record도 `IllegalArgumentException`으로 분류돼 두 group 모두 재시도 없이 DLQ로 간다. 이전에는 NPE로 group마다 3회 시도했다(drill `jsonNullDeadLetters…` 7.1~7.2초 → 4.4초).
+  - DB 장애 drill의 retry 수치는 `consumer.retries` 정의 변경으로 6 → 4(group당 실제 재시도 2회)다. 실패 3회와 DLQ 2건은 그대로다.
+  - 공유 recoverer는 authorization projection listener의 소진 record도 message DLQ topic으로 보낸다. 재생 도구는 DLQ metadata의 `topic` 필드로 걸러야 한다.

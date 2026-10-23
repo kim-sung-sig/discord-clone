@@ -187,8 +187,11 @@ public final class InMemoryGatewayService {
         });
     }
 
-    /** Whether an event published with this source ID is already in the durable Gateway event log. */
-    public synchronized boolean hasAppended(UUID sourceEventId) {
+    /**
+     * Whether an event published with this source ID is already in the durable Gateway event log.
+     * Reads only the thread-safe event log, so the per-message lookup does not hold the gateway monitor.
+     */
+    public boolean hasAppended(UUID sourceEventId) {
         return eventLog.contains(Objects.requireNonNull(sourceEventId, "sourceEventId must not be null").toString());
     }
 

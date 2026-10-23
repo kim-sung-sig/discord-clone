@@ -148,6 +148,60 @@ class MessageKafkaConfigurationTest {
     }
 
     @Test
+    void invalidMessagePublicationRecordIsNotCountedAsRetry() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), metrics, "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", "null");
+
+        assertThat(handler.handleOne(new IllegalArgumentException("invalid"), message, mock(), mock())).isTrue();
+
+        assertThat(metrics.find("discord.message.publication.consumer.retries").counter()).isNull();
+        assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "dead_letter").counter().count())
+            .isEqualTo(1);
+    }
+
+    @Test
+    void retriesCountOnlyDeliveriesThatAreRetried() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), metrics, "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", "{}");
+        IllegalStateException outage = new IllegalStateException("database unavailable");
+
+        assertThat(handler.handleOne(outage, message, mock(), mock())).as("first failure: retried").isFalse();
+        assertThat(handler.handleOne(outage, message, mock(), mock())).as("second failure: retried").isFalse();
+        assertThat(handler.handleOne(outage, message, mock(), mock())).as("third failure: dead-lettered").isTrue();
+
+        assertThat(metrics.get("discord.message.publication.consumer.retries").counter().count()).isEqualTo(2);
+        assertThat(metrics.get("discord.message.publication.consumer.events").tag("outcome", "dead_letter").counter().count())
+            .isEqualTo(1);
+    }
+
+    @Test
+    void wrappedInvalidRecordStillSkipsRetries() {
+        KafkaTemplate<String, String> kafka = mock();
+        when(kafka.send(anyString(), anyString(), anyString()))
+            .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        var handler = new MessageKafkaConfiguration().messageKafkaErrorHandler(
+            kafka, new ObjectMapper(), metrics, "discord", 1000);
+        ConsumerRecord<String, String> message = new ConsumerRecord<>("discord.message.published.v1", 0, 0L, "key", "{}");
+        // The error handler only strips listener wrappers, so an IAE further down the cause chain must still match.
+        var wrapped = new org.springframework.kafka.listener.ListenerExecutionFailedException(
+            "listener failed", new IllegalStateException("projection failed", new IllegalArgumentException("guild not found")));
+
+        assertThat(handler.handleOne(wrapped, message, mock(), mock())).isTrue();
+        assertThat(metrics.find("discord.message.publication.consumer.retries").counter()).isNull();
+    }
+
+    @Test
     void ignoresRetryMetricsForUnrelatedTopic() {
         KafkaTemplate<String, String> kafka = mock();
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();

@@ -26,6 +26,8 @@ import org.springframework.util.backoff.FixedBackOff;
 @Configuration
 @Profile("kafka")
 class MessageKafkaConfiguration {
+    private static final long MAX_RETRIES = 2L;
+
     @Bean
     AdminClient messagePublicationLagAdminClient(KafkaAdmin kafkaAdmin) {
         return AdminClient.create(kafkaAdmin.getConfigurationProperties());
@@ -54,10 +56,9 @@ class MessageKafkaConfiguration {
         @Value("${discord.kafka.topic-prefix:discord}") String topicPrefix,
         @Value("${discord.kafka.message-dlq-timeout-ms:5000}") long dlqTimeoutMillis
     ) {
-        String dlqTopic = (topicPrefix == null || topicPrefix.isBlank() ? "discord" : topicPrefix.trim())
-            + ".message.published.v1.dead-letter";
         String messageTopic = (topicPrefix == null || topicPrefix.isBlank() ? "discord" : topicPrefix.trim())
             + ".message.published.v1";
+        String dlqTopic = messageTopic + ".dead-letter";
         ConsumerRecordRecoverer recoverer = (record, failure) -> {
             try {
                 kafka.send(
@@ -75,16 +76,23 @@ class MessageKafkaConfiguration {
                 metrics.counter("discord.message.publication.consumer.events", "outcome", "dead_letter").increment();
             }
         };
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 2L));
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, MAX_RETRIES));
         // The handler is shared by every @KafkaListener, so only invalid message publication records skip retries.
-        handler.setBackOffFunction((record, failure) -> messageTopic.equals(record.topic())
-            && causedBy(failure, IllegalArgumentException.class) ? new FixedBackOff(0L, 0L) : null);
+        handler.setBackOffFunction((record, failure) ->
+            skipsRetries(messageTopic, record, failure) ? new FixedBackOff(0L, 0L) : null);
+        // Spring Kafka reports every failed delivery, including the one that is recovered without another attempt.
         handler.setRetryListeners((RetryListener) (record, failure, deliveryAttempt) -> {
-            if (messageTopic.equals(record.topic())) {
+            if (messageTopic.equals(record.topic())
+                && !skipsRetries(messageTopic, record, failure)
+                && deliveryAttempt <= MAX_RETRIES) {
                 metrics.counter("discord.message.publication.consumer.retries").increment();
             }
         });
         return handler;
+    }
+
+    private static boolean skipsRetries(String messageTopic, ConsumerRecord<?, ?> record, Exception failure) {
+        return messageTopic.equals(record.topic()) && causedBy(failure, IllegalArgumentException.class);
     }
 
     private static boolean causedBy(Throwable failure, Class<? extends Throwable> type) {

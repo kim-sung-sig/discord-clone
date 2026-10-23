@@ -189,8 +189,12 @@ class JdbcGatewayEventLog implements GatewayEventLog {
 
     @Override
     public boolean contains(String eventId) {
-        try (Connection connection = dataSource.getConnection()) {
-            return findByEventId(connection, eventId) != null;
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("SELECT 1 FROM gateway_event_log WHERE event_id = ?")) {
+            statement.setObject(1, UUID.fromString(eventId));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to read gateway event", exception);
         }

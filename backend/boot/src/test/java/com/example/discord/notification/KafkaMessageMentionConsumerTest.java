@@ -49,6 +49,17 @@ class KafkaMessageMentionConsumerTest {
     }
 
     @Test
+    void jsonNullRecordIsRejectedAsInvalid() {
+        var projector = new MessageMentionProjector(
+            (target, id) -> { throw new AssertionError("lookup must not run"); },
+            new MessageMentionRecipientResolver(new InMemoryGuildService()), id -> 1L, command -> {});
+
+        assertThatThrownBy(() -> new KafkaMessageMentionConsumer(new ObjectMapper(), projector).consume("null"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("invalid message publication record");
+    }
+
+    @Test
     void projectionFailureIsNotReportedAsMalformedKafkaRecord() throws Exception {
         UUID guildId = UUID.randomUUID();
         UUID channelId = UUID.randomUUID();
