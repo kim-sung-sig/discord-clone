@@ -1,0 +1,3 @@
+
+# orval output (npm run openapi:write); generated verbatim, so whitespace rules do not apply.
+packages/api-client/src/generated/** -whitespace linguist-generated=true

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { useRuntimeConfig } from '#app'
-import { DiscordRestError, createDiscordRestClient, discordApiPaths } from '../services/discord-api'
+import { DiscordRestError } from '@discord-clone/api-client'
+import type { AuthResponse as ApiAuthResponse, AuthSessionResponse, AuthSessionsResponse } from '@discord-clone/api-client'
+import { authLogin, authLogout, authRefresh, authRevokeSession, authSessions } from '@discord-clone/api-client/endpoints/auth'
 import { useShellStore } from './shell'
 
 type LoginCredentials = {
@@ -29,15 +31,27 @@ export type AuthSession = {
 
 const isClient = () => typeof window !== 'undefined'
 
-type SessionsResponse = {
-  sessions: AuthSession[]
+const apiOptions = (bearerToken?: string) => ({
+  baseUrl: useRuntimeConfig().public.apiBaseUrl,
+  ...(bearerToken ? { bearerToken } : {})
+})
+
+// The generated contract cannot express non-null fields yet (T214), so validate before storing a session.
+function requireSession(response: ApiAuthResponse): AuthResponse {
+  const { accessToken, user } = response
+  if (!accessToken || !user?.id || !user.username || typeof user.displayName !== 'string') {
+    throw new Error('Discord API returned an incomplete session')
+  }
+  return { accessToken, user: { id: user.id, username: user.username, displayName: user.displayName } }
 }
 
-const authClient = () => {
-  const config = useRuntimeConfig()
-  return createDiscordRestClient({
-    baseUrl: config.public.apiBaseUrl,
-    fetcher: globalThis.fetch
+function requireSessions(response: AuthSessionsResponse): AuthSession[] {
+  return (response.sessions ?? []).map((session: AuthSessionResponse) => {
+    const { id, deviceName, createdAt, expiresAt, revoked } = session
+    if (!id || typeof deviceName !== 'string' || !createdAt || !expiresAt || typeof revoked !== 'boolean') {
+      throw new Error('Discord API returned an incomplete session list')
+    }
+    return { id, deviceName, createdAt, expiresAt, revoked }
   })
 }
 
@@ -76,11 +90,10 @@ export const useAuthStore = defineStore('auth', {
 
       this.isRestoring = true
       const generation = this.sessionGeneration
-      this.restorePromise = authClient()
-        .post<AuthResponse>(discordApiPaths.auth.refresh())
+      this.restorePromise = authRefresh(apiOptions())
         .then((response) => {
           if (generation !== this.sessionGeneration) return false
-          this.acceptSession(response)
+          this.acceptSession(requireSession(response))
           return true
         })
         .catch(() => {
@@ -107,10 +120,10 @@ export const useAuthStore = defineStore('auth', {
       this.isLoading = true
 
       try {
-        const response = await authClient().post<AuthResponse>(discordApiPaths.auth.login(), {
+        const response = requireSession(await authLogin({
           email: credentials.email,
           password: credentials.password
-        })
+        }, apiOptions()))
         if (generation !== this.sessionGeneration) return
         this.acceptSession(response)
       } catch (error) {
@@ -133,11 +146,9 @@ export const useAuthStore = defineStore('auth', {
       const generation = this.sessionGeneration
       const token = this.accessToken
       try {
-        const response = await authClient().get<SessionsResponse>(discordApiPaths.auth.sessions(), {
-          bearerToken: token
-        })
+        const sessions = requireSessions(await authSessions(apiOptions(token)))
         if (generation !== this.sessionGeneration || token !== this.accessToken) return []
-        this.sessions = response.sessions
+        this.sessions = sessions
         return this.sessions
       } catch (error) {
         if (generation !== this.sessionGeneration || token !== this.accessToken) return []
@@ -153,9 +164,7 @@ export const useAuthStore = defineStore('auth', {
       const generation = this.sessionGeneration
       const token = this.accessToken
       try {
-        await authClient().delete<void>(discordApiPaths.auth.session(sessionId), {
-          bearerToken: token
-        })
+        await authRevokeSession(sessionId, apiOptions(token))
         if (generation !== this.sessionGeneration || token !== this.accessToken) return
         this.sessions = this.sessions.map((session) =>
           session.id === sessionId ? { ...session, revoked: true } : session
@@ -172,11 +181,7 @@ export const useAuthStore = defineStore('auth', {
       this.$patch({ accessToken: null, user: null, sessions: [], error: null, sessionError: null,
         restorePromise: null, isRestoring: false, isLoading: false })
       try {
-        await authClient().post<void>(
-          discordApiPaths.auth.logout(),
-          undefined,
-          token ? { bearerToken: token } : undefined
-        )
+        await authLogout(apiOptions(token ?? undefined))
       } catch {
         // Local state must be cleared even if the network path is unavailable.
       }

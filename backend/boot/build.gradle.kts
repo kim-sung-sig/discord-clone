@@ -42,6 +42,7 @@ dependencies {
     implementation("org.springframework:spring-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.kafka:spring-kafka")
     implementation("org.springframework.boot:spring-boot-kafka")
@@ -61,5 +62,23 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
-    systemProperty("message.pipeline.test.classpath", sourceSets.test.get().runtimeClasspath.asPath)
+    // The failure drill starts child JVMs on the test classpath. Passing it as a file keeps the test JVM command
+    // line under the Windows CreateProcess length limit as dependencies grow.
+    val classpathFile = layout.buildDirectory.file("message-pipeline/test-runtime-classpath.txt")
+    val testRuntimeClasspath = sourceSets.test.get().runtimeClasspath
+    doFirst {
+        classpathFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(testRuntimeClasspath.asPath)
+        }
+    }
+    systemProperty("message.pipeline.test.classpath.file", classpathFile.get().asFile.absolutePath)
+    // OpenApiContractTest compares against (or with -Popenapi.write=true rewrites) the committed contract.
+    val openApiWrite = providers.gradleProperty("openapi.write").getOrElse("false")
+    systemProperty("openapi.write", openApiWrite)
+    inputs.file(rootProject.file("docs/api/openapi.json")).withPropertyName("openApiContract")
+    if (openApiWrite == "true") {
+        outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
+    }
 }

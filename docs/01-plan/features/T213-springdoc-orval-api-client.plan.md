@@ -1,12 +1,12 @@
 # T213 springdoc + orval 기반 API 클라이언트 전환 계획 (다음 작업)
 
-- 상태: **다음 작업(backlog)**. T212(moderation lock 경합 제거)를 마친 뒤 착수한다. 2026-10-22 사용자 결정.
+- 상태: **진행 중(2026-10-23 착수)**. 1·2단계는 `docs/03-analysis/task_T213-springdoc-orval.blueprint.md`에서 진행한다. 3단계(나머지 도메인 전환)는 T215, 오류 형식·nullability 규칙은 T214로 분리한다.
 - 선행 task: T42(OpenAPI artifact·generated client types·CI drift check)
 
 ## 배경과 문제
 - 현재 OpenAPI 명세 원본은 사람이 직접 쓰는 `qa/openapi-contract.mjs`(약 510줄)이고, 여기서 `docs/api/openapi.json`과 `packages/api-client/src/generated/openapi-types.ts`를 생성한다.
 - 명세에는 24개 path, 29개 operation만 있다. 반면 백엔드 boot 컨트롤러의 매핑 어노테이션(`@Get/Post/Put/Patch/DeleteMapping`)은 약 110개라서, 명세가 실제 API의 1/4 정도만 덮는다.
-- 화면은 `apps/web/services/discord-api.ts`에 path builder 약 35개를 직접 쓴다. 그래서 로드맵 위험 항목 "생성된 `ApiPath`에 없는 경로"가 계속 남아 있다.
+- 화면은 `apps/web/services/discord-api.ts`에 path builder 48개(T212 리뷰 집계)를 직접 쓴다. 그래서 로드맵 위험 항목 "생성된 `ApiPath`에 없는 경로"가 계속 남아 있다.
 - 명세를 손으로 쓰는 한, orval 같은 생성기를 붙여도 어긋남의 위치만 옮겨갈 뿐 사라지지 않는다.
 
 ## 목표 구조
