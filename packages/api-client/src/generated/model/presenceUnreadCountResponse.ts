@@ -6,5 +6,5 @@
  */
 
 export interface PresenceUnreadCountResponse {
-  unreadCount?: number;
+  unreadCount: number;
 }

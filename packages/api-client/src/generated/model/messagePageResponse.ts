@@ -7,6 +7,7 @@
 import type { MessageResponse } from './messageResponse';
 
 export interface MessagePageResponse {
-  messages?: MessageResponse[];
-  nextCursor?: string;
+  messages: MessageResponse[];
+  /** @nullable */
+  nextCursor: string | null;
 }

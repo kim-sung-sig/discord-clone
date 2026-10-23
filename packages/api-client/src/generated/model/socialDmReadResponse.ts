@@ -6,5 +6,5 @@
  */
 
 export interface SocialDmReadResponse {
-  lastReadSequence?: number;
+  lastReadSequence: number;
 }

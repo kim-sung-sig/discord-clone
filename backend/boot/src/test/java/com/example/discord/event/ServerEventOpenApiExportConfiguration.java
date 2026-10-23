@@ -17,8 +17,4 @@ class ServerEventOpenApiExportConfiguration {
         return new ServerEventController(users, guilds, mock(JdbcServerEventService.class));
     }
 
-    @Bean
-    ServerEventControllerAdvice serverEventControllerAdvice() {
-        return new ServerEventControllerAdvice();
-    }
 }

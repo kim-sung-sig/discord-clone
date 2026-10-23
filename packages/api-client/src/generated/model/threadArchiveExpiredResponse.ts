@@ -6,5 +6,5 @@
  */
 
 export interface ThreadArchiveExpiredResponse {
-  archivedCount?: number;
+  archivedCount: number;
 }

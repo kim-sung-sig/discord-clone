@@ -7,5 +7,5 @@
 import type { AuthSessionResponse } from './authSessionResponse';
 
 export interface AuthSessionsResponse {
-  sessions?: AuthSessionResponse[];
+  sessions: AuthSessionResponse[];
 }

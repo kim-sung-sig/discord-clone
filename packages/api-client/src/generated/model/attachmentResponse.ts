@@ -7,16 +7,17 @@
 import type { AttachmentResponseStatus } from './attachmentResponseStatus';
 
 export interface AttachmentResponse {
-  channelId?: string;
-  contentType?: string;
-  createdAt?: string;
-  filename?: string;
-  guildId?: string;
-  id?: string;
-  messageId?: string;
-  objectKey?: string;
-  ownerId?: string;
-  sizeBytes?: number;
-  status?: AttachmentResponseStatus;
-  updatedAt?: string;
+  channelId: string;
+  contentType: string;
+  createdAt: string;
+  filename: string;
+  guildId: string;
+  id: string;
+  /** @nullable */
+  messageId: string | null;
+  objectKey: string;
+  ownerId: string;
+  sizeBytes: number;
+  status: AttachmentResponseStatus;
+  updatedAt: string;
 }

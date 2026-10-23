@@ -12,8 +12,6 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -46,6 +43,7 @@ class ModerationController {
     }
 
     @PostMapping("/onboarding/questions")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<OnboardingQuestionResponse> createOnboardingQuestion(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -92,6 +90,7 @@ class ModerationController {
     }
 
     @PostMapping("/automod/rules")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<AutoModRuleResponse> createAutoModRule(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -137,6 +136,7 @@ class ModerationController {
     }
 
     @PostMapping("/channels/{channelId}/messages/{messageId}/reports")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<MessageReportResponse> reportMessage(
         @PathVariable UUID guildId,
         @PathVariable UUID channelId,
@@ -347,19 +347,4 @@ class ModerationController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = ModerationController.class)
-class ModerationControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<ModerationController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new ModerationController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<ModerationController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new ModerationController.ErrorResponse("invalid request"));
-    }
 }

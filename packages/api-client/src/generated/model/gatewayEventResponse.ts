@@ -7,10 +7,12 @@
 import type { GatewayEventResponsePayload } from './gatewayEventResponsePayload';
 
 export interface GatewayEventResponse {
-  channelId?: string;
-  createdAt?: string;
-  guildId?: string;
-  payload?: GatewayEventResponsePayload;
-  sequence?: number;
-  type?: string;
+  /** @nullable */
+  channelId: string | null;
+  createdAt: string;
+  /** @nullable */
+  guildId: string | null;
+  payload: GatewayEventResponsePayload;
+  sequence: number;
+  type: string;
 }

@@ -94,8 +94,9 @@ describe('auth store transport (generated API client)', () => {
     expect(auth.sessionError).toBe('Session expired. Sign in again.')
   })
 
-  it('rejects an incomplete login response instead of storing a partial session', async () => {
-    const calls = stubFetch(() => json({ accessToken: 'token-without-user' }))
+  it('accepts the required generated login response', async () => {
+    const user = { id: 'u1', username: 'user', displayName: 'User' }
+    const calls = stubFetch(() => json({ accessToken: 'access', user }))
     const auth = useAuthStore()
 
     await auth.login({ email: 'user@example.com', password: 'secret' })
@@ -104,8 +105,21 @@ describe('auth store transport (generated API client)', () => {
     expect(calls[0]?.init.method).toBe('POST')
     expect(calls[0]?.init.body).toBe(JSON.stringify({ email: 'user@example.com', password: 'secret' }))
     expect(headerOf(calls[0], 'Content-Type')).toBe('application/json')
+    expect(auth.accessToken).toBe('access')
+    expect(auth.user).toEqual(user)
+    expect(auth.error).toBeNull()
+  })
+
+  it.each([
+    ['LOGIN_LOCKED', 'Account locked. Try again later.'],
+    ['INVALID_CREDENTIALS', 'Unable to sign in with those credentials.'],
+    ['FORBIDDEN', 'Unable to sign in. Access denied.']
+  ])('distinguishes %s by code regardless of the server sentence', async (code, expected) => {
+    stubFetch(() => json({ type: 'about:blank', title: 'Forbidden', status: 403,
+      detail: 'Same sentence for every case', instance: '/api/auth/login', code, requestId: 'request-login' }, 403))
+    const auth = useAuthStore()
+    await auth.login({ email: 'user@example.com', password: 'secret' })
+    expect(auth.error).toBe(expected)
     expect(auth.accessToken).toBeNull()
-    expect(auth.user).toBeNull()
-    expect(auth.error).toBe('Unable to reach the Discord API. Try again.')
   })
 })

@@ -12,8 +12,6 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -47,6 +44,7 @@ class StageController {
     }
 
     @PostMapping("/api/stage/channels/{channelId}/sessions")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<StageSessionResponse> startSession(
         @PathVariable UUID channelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -184,24 +182,4 @@ class StageController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = StageController.class)
-class StageControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<StageController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new StageController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(IllegalStateException.class)
-    ResponseEntity<StageController.ErrorResponse> invalidState(IllegalStateException exception) {
-        return ResponseEntity.badRequest().body(new StageController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<StageController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new StageController.ErrorResponse("invalid request"));
-    }
 }

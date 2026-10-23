@@ -7,8 +7,8 @@
 import type { ModerationOnboardingAnswerResponse } from './moderationOnboardingAnswerResponse';
 
 export interface ModerationOnboardingQuestionResponse {
-  answers?: ModerationOnboardingAnswerResponse[];
-  guildId?: string;
-  id?: string;
-  prompt?: string;
+  answers: ModerationOnboardingAnswerResponse[];
+  guildId: string;
+  id: string;
+  prompt: string;
 }

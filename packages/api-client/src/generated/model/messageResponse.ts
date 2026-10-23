@@ -7,17 +7,17 @@
 import type { MessageEditResponse } from './messageEditResponse';
 
 export interface MessageResponse {
-  authorId?: string;
-  channelId?: string;
-  content?: string;
-  createdAt?: string;
-  deleted?: boolean;
-  editHistory?: MessageEditResponse[];
-  edited?: boolean;
-  guildId?: string;
-  id?: string;
-  mentions?: string[];
-  pinned?: boolean;
-  sequence?: number;
-  updatedAt?: string;
+  authorId: string;
+  channelId: string;
+  content: string;
+  createdAt: string;
+  deleted: boolean;
+  editHistory: MessageEditResponse[];
+  edited: boolean;
+  guildId: string;
+  id: string;
+  mentions: string[];
+  pinned: boolean;
+  sequence: number;
+  updatedAt: string;
 }

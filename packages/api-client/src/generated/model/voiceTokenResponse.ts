@@ -6,9 +6,9 @@
  */
 
 export interface VoiceTokenResponse {
-  expiresAt?: string;
-  participant?: string;
-  provider?: string;
-  room?: string;
-  token?: string;
+  expiresAt: string;
+  participant: string;
+  provider: string;
+  room: string;
+  token: string;
 }

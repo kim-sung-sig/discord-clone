@@ -1247,7 +1247,8 @@ enableAutoUnmount(afterEach)
     const auth = useAuthStore()
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'bad-token'
-    vi.stubGlobal('fetch', async () => jsonResponse({ message: 'forbidden' }, 403))
+    vi.stubGlobal('fetch', async () => jsonResponse({ type: 'about:blank', title: 'Forbidden', status: 403,
+      detail: 'Membership required', instance: '/api/guilds', code: 'FORBIDDEN', requestId: 'server-request' }, 403))
     const shell = useShellStore()
     shell.$reset()
     const originalGuild = { ...shell.guild }
@@ -1256,6 +1257,9 @@ enableAutoUnmount(afterEach)
 
     expect(shell.guild).toEqual(originalGuild)
     expect(shell.apiError).toContain('Discord API rejected the request')
+    expect(shell.apiError).toContain('Membership required')
+    expect(shell.apiError).toContain('FORBIDDEN')
+    expect(shell.apiError).toContain('server-request')
     expect(shell.apiError).toContain(shell.apiLastRequestId)
   })
 

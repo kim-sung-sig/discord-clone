@@ -5,6 +5,14 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 describe('discordFetch mutator', () => {
+  it('exposes ProblemDetail fields for both generated and handwritten callers', () => {
+    const body = { type: 'about:blank', title: 'Forbidden', status: 403, detail: 'Membership required',
+      instance: '/api/guilds', code: 'FORBIDDEN', requestId: 'server-request' }
+    const error = new DiscordRestError('Request failed', 403, body)
+    expect(error).toMatchObject({ detail: 'Membership required', code: 'FORBIDDEN', requestId: 'server-request', body })
+    expect(new DiscordRestError('Proxy failed', 502, { detail: {}, code: 12, requestId: null }))
+      .toMatchObject({ detail: undefined, code: undefined, requestId: undefined })
+  })
   it('joins the base url and sends credentials, bearer and request id headers', async () => {
     const fetcher = vi.fn(async () => json({ ok: true }))
 

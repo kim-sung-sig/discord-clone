@@ -71,6 +71,48 @@ class OpenApiContractTest {
     }
 
     @Test
+    void responseContractsDescribeStatusesProblemsAndRequiredValues() {
+        assertThat(spec.at("/paths/~1api~1auth~1signup/post/responses").has("201")).isTrue();
+        assertThat(spec.at("/paths/~1api~1auth~1logout/post/responses").has("204")).isTrue();
+        assertThat(spec.at("/paths/~1api~1auth~1logout/post/responses/204").has("content")).isFalse();
+        JsonNode problem = spec.at("/components/schemas/ApiProblem");
+        assertThat(problem.path("required")).containsExactlyInAnyOrder(
+            mapper.valueToTree("type"), mapper.valueToTree("title"), mapper.valueToTree("status"),
+            mapper.valueToTree("detail"), mapper.valueToTree("instance"), mapper.valueToTree("code"),
+            mapper.valueToTree("requestId"));
+        assertThat(spec.at("/components/schemas/AuthResponse/required"))
+            .contains(mapper.valueToTree("accessToken"), mapper.valueToTree("user"));
+        assertThat(spec.at("/components/schemas/GuildChannelResponse/properties/parentId/type").toString())
+            .contains("null");
+        assertThat(spec.at("/components/schemas/GuildCreateChannelRequest/required").toString())
+            .doesNotContain("parentId");
+        spec.path("paths").forEach(path -> path.properties().stream()
+            .filter(entry -> HTTP_METHODS.contains(entry.getKey()))
+            .forEach(entry -> assertThat(entry.getValue().at("/responses/500/content/application~1problem+json/schema/$ref").asText())
+                .isEqualTo("#/components/schemas/ApiProblem")));
+    }
+
+    @Test
+    void responseFieldsAreRequiredAndNoContentResponsesHaveNoBody() {
+        spec.at("/components/schemas").properties().forEach(entry -> {
+            JsonNode schema = entry.getValue();
+            if (!entry.getKey().endsWith("Request") && schema.has("properties")) {
+                List<String> required = new ArrayList<>();
+                schema.path("required").forEach(value -> required.add(value.asText()));
+                assertThat(required).as(entry.getKey()).containsExactlyInAnyOrderElementsOf(
+                    new ArrayList<>(schema.path("properties").properties().stream().map(Map.Entry::getKey).toList()));
+            }
+        });
+        spec.path("paths").forEach(path -> path.forEach(operation -> {
+            JsonNode responses = operation.path("responses");
+            if (responses.has("204")) {
+                assertThat(responses.path("204").has("content")).isFalse();
+                assertThat(responses.has("200")).isFalse();
+            }
+        }));
+    }
+
+    @Test
     void describesTheApiAndItsBearerScheme() {
         assertThat(spec.at("/info/title").asText()).isEqualTo("Discord Clone API");
         assertThat(spec.at("/info/version").asText()).isEqualTo("v1");
@@ -111,7 +153,7 @@ class OpenApiContractTest {
                     bearerOperations++;
                 }
                 operation.getValue().path("responses").forEach(response -> response.path("content").fieldNames()
-                    .forEachRemaining(media -> assertThat(media).isEqualTo("application/json")));
+                    .forEachRemaining(media -> assertThat(media).isIn("application/json", "application/problem+json")));
             }
         }
         assertThat(headerParameters).doesNotContain("Authorization", "User-Agent");
@@ -139,6 +181,8 @@ class OpenApiContractTest {
         };
         var scanner = new ClassPathScanningCandidateComponentProvider(false, everyProfile);
         scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        // Framework fallback /error is deliberately hidden; it is not a public client API.
+        scanner.addExcludeFilter(new AnnotationTypeFilter(io.swagger.v3.oas.annotations.Hidden.class));
         Set<String> expected = new HashSet<>();
         for (var candidate : scanner.findCandidateComponents("com.example.discord")) {
             String location = String.valueOf(candidate.getResourceDescription()).replace('\\', '/');

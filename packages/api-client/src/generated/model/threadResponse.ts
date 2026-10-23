@@ -7,15 +7,15 @@
 import type { ThreadResponseType } from './threadResponseType';
 
 export interface ThreadResponse {
-  archived?: boolean;
-  autoArchiveMinutes?: number;
-  createdAt?: string;
-  guildId?: string;
-  id?: string;
-  lastActivityAt?: string;
-  name?: string;
-  ownerId?: string;
-  parentChannelId?: string;
-  type?: ThreadResponseType;
-  updatedAt?: string;
+  archived: boolean;
+  autoArchiveMinutes: number;
+  createdAt: string;
+  guildId: string;
+  id: string;
+  lastActivityAt: string;
+  name: string;
+  ownerId: string;
+  parentChannelId: string;
+  type: ThreadResponseType;
+  updatedAt: string;
 }

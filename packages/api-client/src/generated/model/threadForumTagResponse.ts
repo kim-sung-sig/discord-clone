@@ -6,8 +6,8 @@
  */
 
 export interface ThreadForumTagResponse {
-  forumChannelId?: string;
-  guildId?: string;
-  id?: string;
-  name?: string;
+  forumChannelId: string;
+  guildId: string;
+  id: string;
+  name: string;
 }

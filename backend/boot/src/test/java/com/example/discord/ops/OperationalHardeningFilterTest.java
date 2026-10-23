@@ -186,7 +186,11 @@ class OperationalHardeningFilterTest {
             .andExpect(header().exists("Retry-After"))
             .andExpect(header().string("X-RateLimit-Limit", "2"))
             .andExpect(header().string("X-RateLimit-Remaining", "0"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.type").value("about:blank"))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(jsonPath("$.status").value(429))
+            .andExpect(jsonPath("$.requestId").isString())
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test
@@ -224,7 +228,7 @@ class OperationalHardeningFilterTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "2"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test
@@ -262,7 +266,7 @@ class OperationalHardeningFilterTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "2"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test
@@ -295,7 +299,7 @@ class OperationalHardeningFilterTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "20"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test
@@ -310,7 +314,7 @@ class OperationalHardeningFilterTest {
                 .header("X-Forwarded-For", "203.0.113.202"))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "10"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test
@@ -342,7 +346,7 @@ class OperationalHardeningFilterTest {
                     """))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("X-RateLimit-Limit", "30"))
-            .andExpect(jsonPath("$.message").value("rate limit exceeded"));
+            .andExpect(jsonPath("$.detail").value("rate limit exceeded"));
     }
 
     @Test

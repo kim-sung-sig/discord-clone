@@ -6,9 +6,9 @@
  */
 
 export interface SoundboardSoundResponse {
-  creatorId?: string;
-  guildId?: string;
-  id?: string;
-  name?: string;
-  objectKey?: string;
+  creatorId: string;
+  guildId: string;
+  id: string;
+  name: string;
+  objectKey: string;
 }

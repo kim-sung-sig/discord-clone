@@ -9,8 +9,6 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -18,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -38,6 +35,7 @@ class ThreadController {
     }
 
     @PostMapping("/api/channels/{parentChannelId}/threads")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ThreadResponse> createThread(
         @PathVariable UUID parentChannelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -58,6 +56,7 @@ class ThreadController {
     }
 
     @PostMapping("/api/channels/{forumChannelId}/forum-posts")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ForumPostResponse> createForumPost(
         @PathVariable UUID forumChannelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -79,6 +78,7 @@ class ThreadController {
     }
 
     @PostMapping("/api/channels/{forumChannelId}/forum-tags")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ForumTagResponse> createForumTag(
         @PathVariable UUID forumChannelId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -93,6 +93,7 @@ class ThreadController {
     }
 
     @PostMapping("/api/threads/{threadId}/messages")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<ThreadWriteResponse> write(
         @PathVariable UUID threadId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -249,29 +250,4 @@ class ThreadController {
     record ArchiveExpiredResponse(int archivedCount) {
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = ThreadController.class)
-class ThreadControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<ThreadController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new ThreadController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<ThreadController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new ThreadController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(ThreadNotFoundException.class)
-    ResponseEntity<ThreadController.ErrorResponse> missingThread(ThreadNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ThreadController.ErrorResponse(exception.getMessage()));
-    }
-
-    @ExceptionHandler(IllegalStateException.class)
-    ResponseEntity<ThreadController.ErrorResponse> forbiddenState(IllegalStateException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ThreadController.ErrorResponse(exception.getMessage()));
-    }
 }

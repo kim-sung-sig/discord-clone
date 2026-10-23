@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { useRuntimeConfig } from '#app'
 import { DiscordRestError } from '@discord-clone/api-client'
-import type { AuthResponse as ApiAuthResponse, AuthSessionResponse, AuthSessionsResponse } from '@discord-clone/api-client'
+import type { AuthResponse as ApiAuthResponse, AuthSessionResponse, AuthUserResponse } from '@discord-clone/api-client'
 import { authLogin, authLogout, authRefresh, authRevokeSession, authSessions } from '@discord-clone/api-client/endpoints/auth'
 import { useShellStore } from './shell'
 
@@ -10,24 +10,11 @@ type LoginCredentials = {
   password: string
 }
 
-type AuthUser = {
-  id: string
-  username: string
-  displayName: string
-}
+type AuthUser = Pick<AuthUserResponse, 'id' | 'username' | 'displayName'>
 
-type AuthResponse = {
-  accessToken: string
-  user: AuthUser
-}
+type AuthResponse = Pick<ApiAuthResponse, 'accessToken'> & { user: AuthUser }
 
-export type AuthSession = {
-  id: string
-  deviceName: string
-  createdAt: string
-  expiresAt: string
-  revoked: boolean
-}
+export type AuthSession = AuthSessionResponse
 
 const isClient = () => typeof window !== 'undefined'
 
@@ -35,25 +22,6 @@ const apiOptions = (bearerToken?: string) => ({
   baseUrl: useRuntimeConfig().public.apiBaseUrl,
   ...(bearerToken ? { bearerToken } : {})
 })
-
-// The generated contract cannot express non-null fields yet (T214), so validate before storing a session.
-function requireSession(response: ApiAuthResponse): AuthResponse {
-  const { accessToken, user } = response
-  if (!accessToken || !user?.id || !user.username || typeof user.displayName !== 'string') {
-    throw new Error('Discord API returned an incomplete session')
-  }
-  return { accessToken, user: { id: user.id, username: user.username, displayName: user.displayName } }
-}
-
-function requireSessions(response: AuthSessionsResponse): AuthSession[] {
-  return (response.sessions ?? []).map((session: AuthSessionResponse) => {
-    const { id, deviceName, createdAt, expiresAt, revoked } = session
-    if (!id || typeof deviceName !== 'string' || !createdAt || !expiresAt || typeof revoked !== 'boolean') {
-      throw new Error('Discord API returned an incomplete session list')
-    }
-    return { id, deviceName, createdAt, expiresAt, revoked }
-  })
-}
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -93,7 +61,7 @@ export const useAuthStore = defineStore('auth', {
       this.restorePromise = authRefresh(apiOptions())
         .then((response) => {
           if (generation !== this.sessionGeneration) return false
-          this.acceptSession(requireSession(response))
+          this.acceptSession(response)
           return true
         })
         .catch(() => {
@@ -120,10 +88,10 @@ export const useAuthStore = defineStore('auth', {
       this.isLoading = true
 
       try {
-        const response = requireSession(await authLogin({
+        const response = await authLogin({
           email: credentials.email,
           password: credentials.password
-        }, apiOptions()))
+        }, apiOptions())
         if (generation !== this.sessionGeneration) return
         this.acceptSession(response)
       } catch (error) {
@@ -146,7 +114,7 @@ export const useAuthStore = defineStore('auth', {
       const generation = this.sessionGeneration
       const token = this.accessToken
       try {
-        const sessions = requireSessions(await authSessions(apiOptions(token)))
+        const { sessions } = await authSessions(apiOptions(token))
         if (generation !== this.sessionGeneration || token !== this.accessToken) return []
         this.sessions = sessions
         return this.sessions
@@ -190,6 +158,12 @@ export const useAuthStore = defineStore('auth', {
 })
 
 function loginErrorMessage(error: unknown): string {
+  if (error instanceof DiscordRestError && error.code === 'LOGIN_LOCKED') {
+    return 'Account locked. Try again later.'
+  }
+  if (error instanceof DiscordRestError && error.code === 'FORBIDDEN') {
+    return 'Unable to sign in. Access denied.'
+  }
   if (error instanceof DiscordRestError && (error.status === 401 || error.status === 403)) {
     return 'Unable to sign in with those credentials.'
   }

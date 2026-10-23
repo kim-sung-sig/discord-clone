@@ -6,6 +6,6 @@
  */
 
 export interface SocialGroupCallResponse {
-  active?: boolean;
-  participants?: string[];
+  active: boolean;
+  participants: string[];
 }

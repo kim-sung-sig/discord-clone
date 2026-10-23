@@ -7,12 +7,13 @@
 import type { PremiumEntitlementResponseStatus } from './premiumEntitlementResponseStatus';
 
 export interface PremiumEntitlementResponse {
-  expiresAt?: string;
-  featureKey?: string;
-  guildId?: string;
-  id?: string;
-  provider?: string;
-  providerSubscriptionId?: string;
-  status?: PremiumEntitlementResponseStatus;
-  userId?: string;
+  /** @nullable */
+  expiresAt: string | null;
+  featureKey: string;
+  guildId: string;
+  id: string;
+  provider: string;
+  providerSubscriptionId: string;
+  status: PremiumEntitlementResponseStatus;
+  userId: string;
 }

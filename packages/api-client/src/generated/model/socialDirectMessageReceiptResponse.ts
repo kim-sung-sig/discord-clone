@@ -6,10 +6,10 @@
  */
 
 export interface SocialDirectMessageReceiptResponse {
-  acceptedAt?: string;
-  channelId?: string;
-  content?: string;
-  id?: string;
-  senderId?: string;
-  targetUserId?: string;
+  acceptedAt: string;
+  channelId: string;
+  content: string;
+  id: string;
+  senderId: string;
+  targetUserId: string;
 }

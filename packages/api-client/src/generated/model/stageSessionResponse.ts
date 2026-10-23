@@ -6,12 +6,12 @@
  */
 
 export interface StageSessionResponse {
-  audienceIds?: string[];
-  channelId?: string;
-  guildId?: string;
-  id?: string;
-  moderatorIds?: string[];
-  pendingSpeakerIds?: string[];
-  speakerIds?: string[];
-  topic?: string;
+  audienceIds: string[];
+  channelId: string;
+  guildId: string;
+  id: string;
+  moderatorIds: string[];
+  pendingSpeakerIds: string[];
+  speakerIds: string[];
+  topic: string;
 }

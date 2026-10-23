@@ -7,11 +7,13 @@
 import type { ModerationAuditLogEntryResponseAction } from './moderationAuditLogEntryResponseAction';
 
 export interface ModerationAuditLogEntryResponse {
-  action?: ModerationAuditLogEntryResponseAction;
-  actorId?: string;
-  createdAt?: string;
-  guildId?: string;
-  id?: string;
-  reason?: string;
-  targetId?: string;
+  action: ModerationAuditLogEntryResponseAction;
+  actorId: string;
+  createdAt: string;
+  guildId: string;
+  id: string;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  targetId: string | null;
 }

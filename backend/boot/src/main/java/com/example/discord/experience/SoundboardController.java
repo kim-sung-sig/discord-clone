@@ -9,15 +9,12 @@ import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -40,6 +37,7 @@ class SoundboardController {
     }
 
     @PostMapping("/api/soundboard/guilds/{guildId}/sounds")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<SoundboardSoundResponse> createSound(
         @PathVariable UUID guildId,
         @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -119,19 +117,4 @@ class SoundboardController {
         }
     }
 
-    record ErrorResponse(String message) {
-    }
-}
-
-@RestControllerAdvice(assignableTypes = SoundboardController.class)
-class SoundboardControllerAdvice {
-    @ExceptionHandler(IllegalArgumentException.class)
-    ResponseEntity<SoundboardController.ErrorResponse> invalidRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(new SoundboardController.ErrorResponse("invalid request"));
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<SoundboardController.ErrorResponse> unreadableRequest(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(new SoundboardController.ErrorResponse("invalid request"));
-    }
 }

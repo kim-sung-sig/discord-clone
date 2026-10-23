@@ -6,8 +6,8 @@
  */
 
 export interface PresenceReadMarkerResponse {
-  channelId?: string;
-  lastReadSequence?: number;
-  updatedAt?: string;
-  userId?: string;
+  channelId: string;
+  lastReadSequence: number;
+  updatedAt: string;
+  userId: string;
 }

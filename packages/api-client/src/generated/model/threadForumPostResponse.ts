@@ -7,6 +7,6 @@
 import type { ThreadResponse } from './threadResponse';
 
 export interface ThreadForumPostResponse {
-  tagIds?: string[];
-  thread?: ThreadResponse;
+  tagIds: string[];
+  thread: ThreadResponse;
 }

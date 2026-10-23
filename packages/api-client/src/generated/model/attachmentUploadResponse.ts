@@ -6,7 +6,7 @@
  */
 
 export interface AttachmentUploadResponse {
-  attachmentId?: string;
-  objectKey?: string;
-  uploadUrl?: string;
+  attachmentId: string;
+  objectKey: string;
+  uploadUrl: string;
 }

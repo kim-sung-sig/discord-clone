@@ -21,7 +21,7 @@
     "e2e:real-backend": "node qa/real-backend-e2e.mjs"
   },
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=22.18.0",
     "npm": ">=10.0.0"
   },
   "devDependencies": {

@@ -1,5 +1,7 @@
 package com.example.discord.ops;
 
+import com.example.discord.api.ApiProblems;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,12 +52,15 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
     private final RateLimitStore rateLimitStore;
     private final Environment environment;
     private final TrustedProxyPolicy trustedProxyPolicy;
+    private final ObjectMapper objectMapper;
 
-    public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore, Environment environment) {
+    public OperationalHardeningFilter(MeterRegistry meterRegistry, RateLimitStore rateLimitStore, Environment environment,
+                                      ObjectMapper objectMapper) {
         this.meterRegistry = meterRegistry;
         this.rateLimitStore = rateLimitStore;
         this.environment = environment;
         this.trustedProxyPolicy = TrustedProxyPolicy.from(environment);
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -100,7 +105,7 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
                     Instant.now()
                 );
                 if (!decision.allowed()) {
-                    writeRateLimitResponse(response, decision);
+                    writeRateLimitResponse(request, response, decision);
                     return;
                 }
             }
@@ -249,15 +254,17 @@ public class OperationalHardeningFilter extends OncePerRequestFilter {
         }
     }
 
-    private static void writeRateLimitResponse(HttpServletResponse response, RateLimitDecision decision) throws IOException {
+    private void writeRateLimitResponse(HttpServletRequest request, HttpServletResponse response,
+                                        RateLimitDecision decision) throws IOException {
         long retryAfterSeconds = Math.max(1, (decision.retryAfter().toMillis() + 999) / 1000);
         response.setStatus(429);
-        response.setContentType("application/json");
+        response.setContentType("application/problem+json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
         response.setHeader("X-RateLimit-Limit", Integer.toString(decision.limit()));
         response.setHeader("X-RateLimit-Remaining", Integer.toString(decision.remaining()));
-        response.getWriter().write("{\"message\":\"rate limit exceeded\"}");
+        objectMapper.writeValue(response.getWriter(), ApiProblems.create(
+            org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "rate limit exceeded", request, response));
     }
 
     private static void clearMdc() {

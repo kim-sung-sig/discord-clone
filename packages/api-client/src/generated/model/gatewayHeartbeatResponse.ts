@@ -8,6 +8,6 @@ import type { GatewayEventResponse } from './gatewayEventResponse';
 import type { GatewaySessionResponse } from './gatewaySessionResponse';
 
 export interface GatewayHeartbeatResponse {
-  ack?: GatewayEventResponse;
-  session?: GatewaySessionResponse;
+  ack: GatewayEventResponse;
+  session: GatewaySessionResponse;
 }

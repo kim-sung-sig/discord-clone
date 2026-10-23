@@ -6,7 +6,7 @@
  */
 
 export interface ModerationOnboardingAnswerResponse {
-  id?: string;
-  label?: string;
-  roleGrantIds?: string[];
+  id: string;
+  label: string;
+  roleGrantIds: string[];
 }

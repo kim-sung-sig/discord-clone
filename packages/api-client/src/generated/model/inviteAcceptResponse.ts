@@ -6,9 +6,9 @@
  */
 
 export interface InviteAcceptResponse {
-  alreadyAccepted?: boolean;
-  guildId?: string;
-  memberId?: string;
-  roleIds?: string[];
-  uses?: number;
+  alreadyAccepted: boolean;
+  guildId: string;
+  memberId: string;
+  roleIds: string[];
+  uses: number;
 }
