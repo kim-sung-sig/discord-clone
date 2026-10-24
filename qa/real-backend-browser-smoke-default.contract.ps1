@@ -42,7 +42,6 @@ $specSnippets = @(
   'runs login, guild/channel/message, voice, and stage through the real backend',
   'REAL_BACKEND_E2E',
   'REAL_BACKEND_BASE_URL',
-  'login-success',
   'real-backend-smoke',
   'guild-name',
   'chat-viewport',

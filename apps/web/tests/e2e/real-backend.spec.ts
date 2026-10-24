@@ -5,6 +5,9 @@ const runRealBackend = process.env.REAL_BACKEND_E2E === '1'
 
 test.skip(!runRealBackend, 'Set REAL_BACKEND_E2E=1 to run real-backend frontend smoke')
 
+// The login form follows the browser language; pin English so the label selectors below stay stable.
+test.use({ locale: 'en-US' })
+
 test('runs login, guild/channel/message, voice, and stage through the real backend', async ({ page, request }) => {
   const stamp = Date.now()
   const email = `web-real-${stamp}@example.com`
@@ -27,9 +30,7 @@ test('runs login, guild/channel/message, voice, and stage through the real backe
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByTestId('login-success')).toContainText('Signed in with backend session')
-
-  await page.getByTestId('open-workspace').click()
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByTestId('workspace')).toBeVisible()
 
   await page.getByTestId('real-backend-smoke').click()

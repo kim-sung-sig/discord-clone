@@ -3,6 +3,7 @@ import { useRuntimeConfig } from '#app'
 import { DiscordRestError } from '@discord-clone/api-client'
 import type { AuthResponse as ApiAuthResponse, AuthSessionResponse, AuthUserResponse } from '@discord-clone/api-client'
 import { authLogin, authLogout, authRefresh, authRevokeSession, authSessions } from '@discord-clone/api-client/endpoints/auth'
+import { usePreferencesStore } from './preferences'
 import { useShellStore } from './shell'
 
 type LoginCredentials = {
@@ -158,16 +159,17 @@ export const useAuthStore = defineStore('auth', {
 })
 
 function loginErrorMessage(error: unknown): string {
+  const preferences = usePreferencesStore()
   if (error instanceof DiscordRestError && error.code === 'LOGIN_LOCKED') {
-    return 'Account locked. Try again later.'
+    return preferences.t('login.error.locked')
   }
   if (error instanceof DiscordRestError && error.code === 'FORBIDDEN') {
-    return 'Unable to sign in. Access denied.'
+    return preferences.t('login.error.forbidden')
   }
   if (error instanceof DiscordRestError && (error.status === 401 || error.status === 403)) {
-    return 'Unable to sign in with those credentials.'
+    return preferences.t('login.error.invalidCredentials')
   }
-  return 'Unable to reach the Discord API. Try again.'
+  return preferences.t('login.error.unreachable')
 }
 
 function sessionErrorMessage(error: unknown): string {
