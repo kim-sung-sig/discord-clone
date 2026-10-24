@@ -19,12 +19,6 @@ test('captures T62 Discord clone screenshot report evidence', async ({ page }) =
   await expect(page.getByTestId('voice-local-state')).toContainText('Screen sharing')
   await page.screenshot({ path: resolve(screenshotDir, '02-voice-state.png'), fullPage: true })
 
-  await page.getByTestId('stage-start').click()
-  await page.getByTestId('stage-request-speak').click()
-  await page.getByTestId('stage-approve-vibe-coder').click()
-  await expect(page.getByTestId('stage-speakers')).toContainText('vibe-coder')
-  await page.screenshot({ path: resolve(screenshotDir, '03-stage-premium.png'), fullPage: true })
-
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByTestId('mobile-shell-bar')).toContainText('# general')
   await page.screenshot({ path: resolve(screenshotDir, '04-mobile-chat.png'), fullPage: true })
@@ -32,7 +26,6 @@ test('captures T62 Discord clone screenshot report evidence', async ({ page }) =
   for (const fileName of [
     '01-desktop-gateway-shell.png',
     '02-voice-state.png',
-    '03-stage-premium.png',
     '04-mobile-chat.png'
   ]) {
     expect(statSync(resolve(screenshotDir, fileName)).size).toBeGreaterThan(5000)

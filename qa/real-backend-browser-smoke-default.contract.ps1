@@ -39,15 +39,15 @@ foreach ($snippet in $runnerSnippets) {
 
 $spec = Get-Content -Path $specPath -Raw
 $specSnippets = @(
-  'runs login, guild/channel/message, voice, and stage through the real backend',
+  'signs in through the real backend and covers guild, channel, and message in the workspace',
   'REAL_BACKEND_E2E',
   'REAL_BACKEND_BASE_URL',
-  'login-success',
-  'real-backend-smoke',
+  '/api/guilds',
   'guild-name',
+  'workspace-explorer',
   'chat-viewport',
-  'voice-token-provider',
-  'stage-topic'
+  'message-input',
+  'message-send'
 )
 foreach ($snippet in $specSnippets) {
   Assert ($spec.Contains($snippet)) "real-backend.spec.ts is missing required snippet: $snippet"

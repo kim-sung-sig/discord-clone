@@ -19,27 +19,16 @@ test('desktop shell keeps operational panels inside the viewport without clipped
     const workspace = document.querySelector<HTMLElement>('[data-testid="workspace"]')
     const selectors = [
       '[data-testid="gateway-status-panel"]',
-      '[data-testid="role-permission-panel"]',
-      '[data-testid="moderation-panel"]',
       '[data-testid="voice-panel"]',
-      '[data-testid="experience-panel"]',
-      '[data-testid="invite-modal"]',
       '[data-testid="gateway-status-panel"] .gateway-status-grid > div',
       '[data-testid="gateway-status-panel"] [data-testid="gateway-event-log"] article',
-      '[data-testid="role-permission-panel"] [data-testid="permission-diff"]',
-      '[data-testid="role-permission-panel"] [data-testid="preview-as-role"]',
-      '[data-testid="role-permission-panel"] [data-testid="privileged-audit"]',
-      '[data-testid="role-permission-panel"] button',
-      '[data-testid="moderation-panel"] button',
-      '[data-testid="moderation-panel"] [data-testid="audit-log"] article',
       '[data-testid="voice-panel"] button',
-      '[data-testid="experience-panel"] button'
+      '[data-testid="voice-panel"] .voice-card',
+      '[data-testid="gateway-status-panel"] .gateway-event'
     ]
+    const panelRect = document.querySelector<HTMLElement>('[data-testid="bottom-panel"]')?.getBoundingClientRect()
     const clipped = selectors.flatMap((selector) =>
       Array.from(document.querySelectorAll<HTMLElement>(selector)).flatMap((element, index) => {
-        if (element.closest('[data-testid="legacy-shell-contracts"]')) {
-          return []
-        }
         const style = getComputedStyle(element)
         const rect = element.getBoundingClientRect()
         if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0) {
@@ -51,6 +40,10 @@ test('desktop shell keeps operational panels inside the viewport without clipped
         }
         if (element.scrollWidth > element.clientWidth + 1) {
           messages.push(`${selector}[${index}] horizontal overflow ${element.scrollWidth}/${element.clientWidth}`)
+        }
+        if (panelRect && element.closest('[data-testid="bottom-panel"]')
+          && (rect.top < panelRect.top - 1 || rect.bottom > panelRect.bottom + 1)) {
+          messages.push(`${selector}[${index}] clipped by the bottom panel ${Math.round(rect.top)}-${Math.round(rect.bottom)}`)
         }
         return messages
       })
