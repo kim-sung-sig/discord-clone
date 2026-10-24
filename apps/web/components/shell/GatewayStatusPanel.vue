@@ -13,7 +13,7 @@ const preferences = usePreferencesStore()
       <strong data-testid="gateway-status">{{ shell.gateway.status }}</strong>
     </header>
 
-    <dl class="gateway-status-grid">
+    <dl v-if="shell.gateway.sessionId" class="gateway-status-grid">
       <div>
         <dt>{{ preferences.t('gateway.session') }}</dt>
         <dd>{{ shell.gateway.sessionId }}</dd>
@@ -32,7 +32,7 @@ const preferences = usePreferencesStore()
       </div>
     </dl>
 
-    <section class="gateway-event-log" aria-label="Gateway events">
+    <section v-if="shell.gateway.events.length" class="gateway-event-log" aria-label="Gateway events">
       <article
         v-for="event in shell.gateway.events"
         :key="event.sequence"

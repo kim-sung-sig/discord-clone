@@ -5,7 +5,7 @@ import ReactionBar from './ReactionBar.vue'
 import TypingIndicator from './TypingIndicator.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
-import { useShellStore, type ShellMessage } from '../../stores/shell'
+import { useShellStore } from '../../stores/shell'
 
 const shell = useShellStore()
 const auth = useAuthStore()
@@ -32,6 +32,7 @@ const canLoadOlderMessages = computed(() => Boolean(auth.accessToken && shell.ac
 
 onMounted(() => {
   composerReady.value = true
+  scrollToBottom()
 })
 
 watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
@@ -41,9 +42,7 @@ watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.bac
   if (!auth.accessToken || !shell.backendWorkspace || typeof IntersectionObserver === 'undefined') {
     return
   }
-  const latest = shell.activeMessages.reduce<ShellMessage | null>(
-    (current, message) => !current || message.sequence > current.sequence ? message : current, null
-  )
+  const latest = shell.activeReadMarkerMessage
   if (!latest || latest.sequence <= (shell.presence.readMarkers[latest.channelId]?.lastReadSequence ?? 0)) {
     return
   }
@@ -77,8 +76,40 @@ onBeforeUnmount(() => {
   readObserver?.disconnect()
 })
 
+const bottomThresholdPx = 48
+let stickToBottom = true
+
+function scrollToBottom() {
+  const list = messageListRef.value
+  if (list) {
+    list.scrollTop = list.scrollHeight
+  }
+}
+
+function trackScrollPosition() {
+  const list = messageListRef.value
+  if (list) {
+    stickToBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= bottomThresholdPx
+  }
+}
+
+watch(() => shell.activeChannelId, () => {
+  stickToBottom = true
+  scrollToBottom()
+}, { flush: 'post' })
+
+watch(() => shell.activeMessages.at(-1)?.id, () => {
+  if (stickToBottom) {
+    scrollToBottom()
+  }
+}, { flush: 'post' })
+
 async function submitMessage() {
-  await shell.sendMessage(auth.accessToken)
+  stickToBottom = true
+  const sent = shell.sendMessage(auth.accessToken)
+  await nextTick()
+  scrollToBottom()
+  await sent
 }
 
 async function loadOlderMessages() {
@@ -96,7 +127,13 @@ async function loadOlderMessages() {
       <h2 data-testid="active-channel">{{ activeChannelLabel }}</h2>
       <p>{{ preferences.t('editor.channelDescription') }}</p>
     </header>
-    <div ref="messageListRef" class="message-list" data-testid="message-list" aria-live="polite">
+    <div
+      ref="messageListRef"
+      class="message-list"
+      data-testid="message-list"
+      aria-live="polite"
+      @scroll.passive="trackScrollPosition"
+    >
       <button
         v-if="canLoadOlderMessages"
         class="load-older-messages"

@@ -49,6 +49,7 @@
 5. **메시지 순서**
    - 서버 sequence 여부를 메시지에 남긴다. 서버가 sequence를 주지 않아 client가 번호를 붙인 메시지에는 `localSequence: true`를 붙인다(local 전송, optimistic, sequence 없는 REST·Gateway 응답). 서버 sequence가 있는 메시지에는 필드를 붙이지 않는다. 그래서 기존 `toEqual` 단언은 바뀌지 않는다. 이 필드는 `author:` 줄과 떨어진 위치(객체 끝)에 둔다(T221 병합 충돌 방지).
    - 비교 함수 `compareShellMessages`: 전송 중(`sending`)·실패(`failed`) 메시지는 맨 뒤. 둘 다 서버 sequence가 있으면 sequence 오름차순. 아니면 `createdAt` 오름차순, 같으면 sequence, id 순.
+   - Gateway `MESSAGE_CREATE`에 `clientEventId`가 없을 때 기존 코드는 `candidate.clientEventId === clientEventId`가 `undefined === undefined`로 참이 되어 `clientEventId`가 없는 메시지(REST로 불러온 메시지 전부)를 지우고, 그중 첫 메시지를 `existing`으로 잘못 골랐다. 구현 중 test로 확인했다. echo 판정은 `clientEventId`가 있을 때만 하도록 고친다(`isEcho`). `author:` 줄은 건드리지 않는다.
    - `activeMessages` getter가 필터 결과를 이 함수로 정렬한다. 저장 배열 순서(REST page의 최신순, 이전 page 앞붙이기, 전송·Gateway 뒤붙이기)와 무관하게 화면 순서가 정해진다.
    - scroll: `ChatViewport`가 목록이 맨 아래 근처(48px)인지 추적한다. 채널을 바꾸거나 메시지를 보내면 맨 아래 고정을 켠다. 마지막 메시지가 바뀌었을 때 고정 상태면 맨 아래로 scroll한다. 이전 page를 불러오면 마지막 메시지가 그대로라 scroll되지 않는다. 사용자가 위로 올려 읽는 중에 새 메시지가 와도 끌어내리지 않는다.
 6. **read marker**: `activeReadMarkerMessage` getter가 활성 채널에서 서버 sequence가 있는 메시지(전송 중·실패·`localSequence` 제외) 중 sequence가 가장 큰 것을 고른다. `ChatViewport`의 watcher는 이 getter만 쓴다. optimistic 메시지의 local sequence(서버 MAX보다 큼)로 PUT해 400이 나던 경로가 없어진다.
@@ -71,7 +72,7 @@
   - `apps/web/tests/fixtures/shell-demo-state.ts`(신규)
   - `apps/web/tests/components/shell-real-workspace.test.ts`(신규)
   - `apps/web/tests/components/app-shell.test.ts`, `apps/web/tests/components/shell-contracts.test.ts`(명시적 seed, 바뀐 화면 단언)
-  - `apps/web/tests/e2e/app-shell.spec.ts`, `apps/web/tests/e2e/real-backend.spec.ts`, `apps/web/tests/e2e/pwa-mobile.spec.ts`(없어진 요소·데모 기본값 단언 정리. CI 미실행)
+  - `apps/web/tests/e2e/app-shell.spec.ts`, `apps/web/tests/e2e/real-backend.spec.ts`, `apps/web/tests/e2e/pwa-mobile.spec.ts`, `apps/web/tests/e2e/visual-smoke.spec.ts`, `apps/web/tests/e2e/t62-screenshot-report.spec.ts`(없어진 요소·데모 기본값 단언 정리. CI 미실행)
 
 ## 검증 계획
 - implementer: `cd apps/web && npx vitest run tests/components/shell-real-workspace.test.ts tests/components/app-shell.test.ts tests/components/shell-contracts.test.ts tests/components/story-index.test.ts`
