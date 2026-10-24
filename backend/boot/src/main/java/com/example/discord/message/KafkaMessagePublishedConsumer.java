@@ -105,11 +105,17 @@ final class KafkaMessagePublishedConsumer {
     }
 
     private MessagePublishedRecord decode(String payload) {
+        MessagePublishedRecord record;
         try {
-            return objectMapper.readValue(payload, MessagePublishedRecord.class);
+            record = objectMapper.readValue(payload, MessagePublishedRecord.class);
         } catch (JsonProcessingException | IllegalArgumentException failure) {
             throw new IllegalArgumentException("invalid message publication record", failure);
         }
+        // JSON null decodes to null; reject it as invalid so it is dead-lettered at once instead of retried as an NPE.
+        if (record == null) {
+            throw new IllegalArgumentException("invalid message publication record");
+        }
+        return record;
     }
 
     private static Map<String, Object> gatewayPayload(Message message) {

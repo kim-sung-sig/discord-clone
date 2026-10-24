@@ -1,27 +1,31 @@
 {
-  "runAt": "2026-10-21T10:12:59.861Z",
-  "source": "backend/boot/build/test-results/test/TEST-com.example.discord.message.MessagePublicationFailureIntegrationTest.xml",
-  "command": "$env:DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS='true'; .\\gradlew.bat :backend:boot:test --tests com.example.discord.message.MessagePublicationFailureIntegrationTest",
+  "runAt": "2026-10-23T23:07:30.977Z",
+  "task": "T216 message pipeline follow-ups",
+  "source": "backend/boot/build/test-results/test/TEST-com.example.discord.message.MessagePublicationFailureIntegrationTest.xml (path right after the run; later Gradle test runs overwrite it, so it no longer holds this run)",
+  "sourceCopy": "C:\\tmp\\t216-evidence\\drill-green.xml (local artifact, not in the repository; testsuite timestamp 2026-10-23T23:07:30.977Z)",
+  "command": "$env:DISCORD_RUN_MESSAGE_PIPELINE_FAILURE_TESTS='true'; .\\gradlew.bat :backend:boot:test --tests com.example.discord.message.MessagePublicationFailureIntegrationTest --rerun",
   "suite": {
-    "tests": 4,
+    "tests": 11,
     "skipped": 0,
     "failures": 0,
-    "errors": 0
+    "errors": 0,
+    "seconds": 78.818
   },
   "scenarios": {
     "duplicateAfterListenerRestart": {
-      "duplicateEvents": 1,
-      "gatewayEffects": 1,
+      "duplicateEventsScenarioDelta": 1,
+      "endToEndSamplesScenarioDelta": 1,
+      "endToEndScenarioTotalMs": 265.844,
       "inboxRows": 1
     },
     "postgresUnavailable": {
       "gatewayConsumerFailedAttempts": 3,
-      "retryCallbacksAcrossGatewayAndNotificationGroups": 6,
+      "retriesAcrossGatewayAndNotificationGroups": 4,
       "deadLetterRecords": 2,
-      "failureToDeadLetterMs": 10756
+      "failureToDeadLetterMs": 13876
     },
     "replayAfterPostgresRecovery": {
-      "replayToInboxMs": 140,
+      "replayToInboxMs": 195,
       "gatewayEffects": 1
     },
     "consumerLag": {
@@ -31,17 +35,56 @@
     },
     "malformedEvent": {
       "deadLettered": true,
-      "gatewayListenerClassification": "non-retryable IllegalArgumentException",
+      "classification": "IllegalArgumentException on the message publication topic, including the cause chain and JSON null, is dead-lettered without retries in both gateway-service-v1 and notification-service-v1",
+      "jsonNullTestSeconds": 4.435,
       "payloadBodyIncluded": false
     },
     "crashWindow": {
-      "method": "unit-test fault injection after gateway append and before inbox completion",
+      "method": "child JVM hard kill after the Gateway SQL append and before inbox completion, plus unit-test fault injection",
+      "hardKillTestSeconds": 25.734,
       "deduplicatedByStableEventId": true
     }
   },
+  "previousSnapshots": [
+    {
+      "runAt": "2026-10-21T10:12:59.861Z",
+      "tests": 4,
+      "duplicateEvents": 1,
+      "retryCallbacksAcrossGatewayAndNotificationGroups": 6,
+      "deadLetterRecords": 2,
+      "failureToDeadLetterMs": 10756,
+      "replayToInboxMs": 140,
+      "note": "Before T216 the retries counter counted every failed-delivery callback, including the exhausted attempt; 6 callbacks correspond to 4 retries under the current definition."
+    }
+  ],
+  "followUpRuns": [
+    {
+      "runAt": "2026-10-23T23:32:29.436Z",
+      "task": "T216 P3 follow-ups",
+      "sourceCopy": "C:\\tmp\\t216-evidence\\p3\\drill-full-green.xml (local artifact)",
+      "tests": 11,
+      "failures": 0,
+      "seconds": 74.946,
+      "poisonRecords": {
+        "scenarios": [
+          "broken JSON",
+          "JSON null",
+          "tombstone"
+        ],
+        "retriesScenarioDelta": 0,
+        "failedDeliveriesPerGroup": 1,
+        "note": "Asserted directly per scenario for gateway-service-v1 and notification-service-v1. Before the follow-up, tombstone counted 2 retries without retrying, and JSON null without its guard counts 4."
+      },
+      "postgresUnavailableRetries": 4,
+      "note": "consumer.retries now counts only backoffs that schedule another attempt; the snapshot values above keep their meaning under this definition."
+    }
+  ],
   "measurementLimits": [
     "Local Docker PostgreSQL Testcontainers and Redpanda run; not production traffic or an SLO measurement.",
-    "Listener stop/start was tested; hard process termination was not.",
-    "Retry and dead-letter callback counts include both gateway-service-v1 and notification-service-v1 groups."
+    "Hard process termination is covered by hardKilledConsumerReplaysFromKafkaUsingTheSameDurableDatabase; broker process stop/restart is not.",
+    "Retry and dead-letter counts include both gateway-service-v1 and notification-service-v1 groups.",
+    "consumer.retries does not count the immediate redelivery after a failed dead-letter publish; that outage shows as a missing dead_letter increment and error handler logs.",
+    "processed and end-to-end samples are per consumer attempt; two concurrent deliveries of one event can both be counted.",
+    "The shared recoverer writes exhausted records from every listener, including authorization projection listeners, to the message dead-letter topic; filter by the topic field."
   ]
 }

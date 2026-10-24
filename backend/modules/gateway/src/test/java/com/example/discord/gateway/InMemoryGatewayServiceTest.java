@@ -24,6 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -443,6 +448,39 @@ class InMemoryGatewayServiceTest {
         );
 
         assertThat(event.busEventId()).isEqualTo(sourceEventId.toString());
+    }
+
+    @Test
+    void hasAppendedDoesNotWaitForTheGatewayMonitor() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        Guild guild = guildService.createGuild("Discord Clone", ownerId);
+        UUID sourceEventId = UUID.randomUUID();
+        CountDownLatch listenerEntered = new CountDownLatch(1);
+        CountDownLatch releaseListener = new CountDownLatch(1);
+        gatewayService.addEventListener(event -> {
+            listenerEntered.countDown();
+            try {
+                releaseListener.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            // Listeners run inside publish, so this publisher holds the gateway monitor until released.
+            Future<GatewayEvent> publisher = executor.submit(() -> gatewayService.publish(
+                sourceEventId, "GUILD_UPDATE", guild.id(), null, Map.of("name", "held")));
+            assertThat(listenerEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Future<Boolean> check = executor.submit(() -> gatewayService.hasAppended(sourceEventId));
+
+            assertThat(check.get(2, TimeUnit.SECONDS)).isTrue();
+            releaseListener.countDown();
+            assertThat(publisher.get(5, TimeUnit.SECONDS).busEventId()).isEqualTo(sourceEventId.toString());
+        } finally {
+            releaseListener.countDown();
+            executor.shutdownNow();
+        }
     }
 
     private void denyEveryoneView(Guild guild, Channel channel) {

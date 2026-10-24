@@ -20,12 +20,15 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.listener.RetryListener;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.BackOffExecution;
 import org.springframework.util.backoff.FixedBackOff;
 
 @Configuration
 @Profile("kafka")
 class MessageKafkaConfiguration {
+    private static final long MAX_RETRIES = 2L;
+
     @Bean
     AdminClient messagePublicationLagAdminClient(KafkaAdmin kafkaAdmin) {
         return AdminClient.create(kafkaAdmin.getConfigurationProperties());
@@ -54,10 +57,9 @@ class MessageKafkaConfiguration {
         @Value("${discord.kafka.topic-prefix:discord}") String topicPrefix,
         @Value("${discord.kafka.message-dlq-timeout-ms:5000}") long dlqTimeoutMillis
     ) {
-        String dlqTopic = (topicPrefix == null || topicPrefix.isBlank() ? "discord" : topicPrefix.trim())
-            + ".message.published.v1.dead-letter";
         String messageTopic = (topicPrefix == null || topicPrefix.isBlank() ? "discord" : topicPrefix.trim())
             + ".message.published.v1";
+        String dlqTopic = messageTopic + ".dead-letter";
         ConsumerRecordRecoverer recoverer = (record, failure) -> {
             try {
                 kafka.send(
@@ -75,16 +77,34 @@ class MessageKafkaConfiguration {
                 metrics.counter("discord.message.publication.consumer.events", "outcome", "dead_letter").increment();
             }
         };
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, 2L));
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1_000L, MAX_RETRIES));
         // The handler is shared by every @KafkaListener, so only invalid message publication records skip retries.
-        handler.setBackOffFunction((record, failure) -> messageTopic.equals(record.topic())
-            && causedBy(failure, IllegalArgumentException.class) ? new FixedBackOff(0L, 0L) : null);
-        handler.setRetryListeners((RetryListener) (record, failure, deliveryAttempt) -> {
-            if (messageTopic.equals(record.topic())) {
-                metrics.counter("discord.message.publication.consumer.retries").increment();
+        // Spring Kafka calls this function only for failures it classifies as retryable, and only when a record starts
+        // a new backoff cycle, so a retry is counted exactly when the backoff schedules another attempt.
+        handler.setBackOffFunction((record, failure) -> {
+            if (!messageTopic.equals(record.topic())) {
+                return null;
             }
+            if (causedBy(failure, IllegalArgumentException.class)) {
+                return new FixedBackOff(0L, 0L);
+            }
+            return countingRetries(new FixedBackOff(1_000L, MAX_RETRIES),
+                () -> metrics.counter("discord.message.publication.consumer.retries").increment());
         });
         return handler;
+    }
+
+    private static BackOff countingRetries(BackOff backOff, Runnable onRetry) {
+        return () -> {
+            BackOffExecution execution = backOff.start();
+            return () -> {
+                long interval = execution.nextBackOff();
+                if (interval != BackOffExecution.STOP) {
+                    onRetry.run();
+                }
+                return interval;
+            };
+        };
     }
 
     private static boolean causedBy(Throwable failure, Class<? extends Throwable> type) {

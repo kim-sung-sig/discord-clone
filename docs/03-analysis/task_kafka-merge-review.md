@@ -71,13 +71,13 @@
 
 - P2(이관): Gateway 연산 1회의 guild 로드 수가 연산에 등장하는 **서로 다른 guild 수**에 비례한다. 이벤트·세션 수의 곱으로 늘던 문제는 해소됐다.
 - P2(이관): 메시지마다 `JdbcModerationService.evaluateMessage`가 guild 행 `FOR UPDATE`를 잡고, 이 lock이 `JdbcGuildStore.get`의 `FOR SHARE`와 경합한다. 수정 방향: lock 없이 평가하고 차단이 확정될 때만 lock을 잡는다. 읽기는 `REPEATABLE READ READ ONLY`로 바꾼다.
-- P3 요약
-  - drill이 공유 `MeterRegistry`의 절대값을 단언한다(delta로 바꿔야 함). `end_to_end_ms` marker가 누적값이다.
-  - 동시 중복 전달 시 `processed`가 2회 집계된다(base와 같음). conflict 분기에 단위 테스트가 없다.
-  - 재시도 없이 즉시 DLQ로 가는 경로에서도 `consumer.retries`가 +1 된다.
-  - JSON `null` payload가 NPE로 3회 재시도된 뒤 DLQ로 간다.
-  - `JdbcGatewayEventLog.contains`가 payload까지 읽는다.
-  - evidence JSON과 portfolio 수치가 오래됐다. 공유 recoverer가 authz listener의 소진 record를 message DLQ로 보내는 점이 문서에 없다.
+- P3 요약 (2026-10-24: T216 `babc6fe`와 후속 commit에서 해소된 항목에 "→ T216 해소"를 붙였다. 원문은 merge 시점 기록으로 남긴다. 근거는 `docs/03-analysis/task_T216-message-pipeline-followups.blueprint.md`.)
+  - drill이 공유 `MeterRegistry`의 절대값을 단언한다(delta로 바꿔야 함). `end_to_end_ms` marker가 누적값이다. → T216 해소
+  - 동시 중복 전달 시 `processed`가 2회 집계된다(base와 같음). conflict 분기에 단위 테스트가 없다. → conflict 분기 시험은 T216 해소. `processed` 2회 집계는 문서화만 했다(미해소).
+  - 재시도 없이 즉시 DLQ로 가는 경로에서도 `consumer.retries`가 +1 된다. → T216 해소(framework 기본 not-retryable 예외까지 포함)
+  - JSON `null` payload가 NPE로 3회 재시도된 뒤 DLQ로 간다. → T216 해소
+  - `JdbcGatewayEventLog.contains`가 payload까지 읽는다. → T216 해소
+  - evidence JSON과 portfolio 수치가 오래됐다. 공유 recoverer가 authz listener의 소진 record를 message DLQ로 보내는 점이 문서에 없다. → T216 해소(recoverer는 문서화만 했고 topic별 DLQ 분리는 미해소)
   - moderation의 500건 보존 정책 때문에 OPEN 신고가 밀려날 수 있다.
   - `InMemoryGuildService` test double의 동시성, FQN·import 스타일.
 - profile 미지정 로컬 실행은 지원하지 않는다(`GuildService`/`ModerationService` bean이 없음).

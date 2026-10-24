@@ -2,7 +2,11 @@ package com.example.discord.gateway;
 
 import java.util.List;
 
-/** Durable boundary for Gateway event sequence and idempotent append. */
+/**
+ * Durable boundary for Gateway event sequence and idempotent append.
+ * Implementations must be thread-safe: {@link InMemoryGatewayService#hasAppended} calls {@link #contains}
+ * outside the gateway monitor.
+ */
 public interface GatewayEventLog {
     long allocateSequence();
 

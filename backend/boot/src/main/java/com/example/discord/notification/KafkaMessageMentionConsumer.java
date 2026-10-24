@@ -31,6 +31,9 @@ final class KafkaMessageMentionConsumer {
         } catch (JsonProcessingException | IllegalArgumentException failure) {
             throw new IllegalArgumentException("invalid message publication record", failure);
         }
+        if (record == null) {
+            throw new IllegalArgumentException("invalid message publication record");
+        }
         projector.project(new ChannelMessageTarget(record.guildId(), record.channelId()), record.messageId());
     }
 }
