@@ -14,6 +14,12 @@ onMounted(() => {
   isHydrated.value = true
 })
 
+function groupLabel(group: { id: string, name: string }) {
+  if (group.id === 'text-channels') return preferences.t('channels.text')
+  if (group.id === 'voice-channels') return preferences.t('channels.voice')
+  return group.name
+}
+
 function selectChannel(channelId: string) {
   if (auth.accessToken) {
     void shell.selectBackendChannel(channelId, auth.accessToken)
@@ -27,11 +33,11 @@ function selectChannel(channelId: string) {
   <aside class="channel-sidebar" data-testid="channel-sidebar" aria-label="Channels">
     <h1 data-testid="guild-name">{{ shell.guild.name }}</h1>
     <section
-      v-for="group in shell.channelGroups"
+      v-for="group in shell.channelGroups.filter((candidate) => candidate.channels.length > 0)"
       :key="group.id"
       class="channel-group"
     >
-      <h2>{{ group.name }}</h2>
+      <h2>{{ groupLabel(group) }}</h2>
       <p
         v-if="!isHydrated"
         id="channel-hydration-status"

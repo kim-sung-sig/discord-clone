@@ -103,6 +103,36 @@ describe('Discord app shell', () => {
     expect(bar.get('[data-testid="activity-settings"]').attributes('title')).toBe('설정')
   })
 
+  it('lists each channel under its own localized group heading without fixed explorer labels', async () => {
+    const wrapper = await mountSuspended(App)
+    const explorer = wrapper.get('[data-testid="workspace-explorer"]')
+
+    expect(explorer.findAll('.explorer-section-label')).toHaveLength(0)
+    const groups = explorer.findAll('.channel-group')
+    expect(groups).toHaveLength(2)
+    expect(groups[0]!.get('h2').text()).toBe('Text Channels')
+    expect(groups[0]!.find('[data-testid="channel-general"]').exists()).toBe(true)
+    expect(groups[0]!.find('[data-testid="channel-war-room"]').exists()).toBe(false)
+    expect(groups[1]!.get('h2').text()).toBe('Voice Channels')
+    expect(groups[1]!.find('[data-testid="channel-war-room"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="locale-select"]').setValue('ko-KR')
+    await nextTick()
+
+    expect(explorer.findAll('.channel-group h2').map((heading) => heading.text())).toEqual(['텍스트 채널', '음성 채널'])
+  })
+
+  it('does not render a heading for a channel group without channels', async () => {
+    const wrapper = await mountSuspended(App)
+    const shell = useShellStore()
+    shell.channelGroups = shell.channelGroups.map((group) =>
+      group.id === 'voice-channels' ? { ...group, channels: [] } : group)
+    await nextTick()
+
+    const headings = wrapper.get('[data-testid="workspace-explorer"]').findAll('.channel-group h2')
+    expect(headings.map((heading) => heading.text())).toEqual(['Text Channels'])
+  })
+
   it('keeps the signed-in user panel reachable from the settings view', async () => {
     const wrapper = await mountSuspended(App)
 

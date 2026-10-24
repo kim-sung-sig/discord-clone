@@ -5,7 +5,7 @@ const runRealBackend = process.env.REAL_BACKEND_E2E === '1'
 
 test.skip(!runRealBackend, 'Set REAL_BACKEND_E2E=1 to run real-backend frontend smoke')
 
-test('signs in through the real backend and opens a workspace without developer tooling', async ({ page, request }) => {
+test('signs in through the real backend and covers guild, channel, and message in the workspace', async ({ page, request }) => {
   const stamp = Date.now()
   const email = `web-real-${stamp}@example.com`
   const username = `webreal${String(stamp).slice(-8)}`
@@ -21,6 +21,24 @@ test('signs in through the real backend and opens a workspace without developer 
   })
   expect(signup.ok()).toBeTruthy()
 
+  // The workspace has no developer panel anymore, so seed the guild, channels, and first message through the API.
+  const { accessToken } = await signup.json()
+  const authorization = { Authorization: `Bearer ${accessToken}` }
+  const guildName = `Web Real Guild ${stamp}`
+  const guild = await (await request.post(`${backendBaseUrl}/api/guilds`, {
+    headers: authorization, data: { name: guildName }
+  })).json()
+  const textChannel = await (await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
+    headers: authorization, data: { name: 'real-text', type: 'GUILD_TEXT', parentId: null }
+  })).json()
+  const voiceChannel = await (await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
+    headers: authorization, data: { name: 'real-voice', type: 'GUILD_VOICE', parentId: null }
+  })).json()
+  const seeded = await request.post(`${backendBaseUrl}/api/channels/${textChannel.id}/messages`, {
+    headers: authorization, data: { content: 'real backend hello', idempotencyKey: `web-real-seed-${stamp}` }
+  })
+  expect(seeded.ok()).toBeTruthy()
+
   await page.goto('/login')
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('login-submit')).toBeEnabled()
@@ -35,6 +53,17 @@ test('signs in through the real backend and opens a workspace without developer 
   await expect(page.getByTestId('real-api-panel')).toHaveCount(0)
   await expect(page.getByTestId('real-backend-smoke')).toHaveCount(0)
   await expect(page.getByTestId('user-panel')).toContainText('Web Real')
+
+  await expect(page.getByTestId('workspace-explorer')).toContainText(guildName)
+  await expect(page.getByTestId('guild-name')).toContainText(guildName)
+  await expect(page.getByTestId(textChannel.id)).toContainText('real-text')
+  await expect(page.getByTestId(voiceChannel.id)).toContainText('real-voice')
+  await expect(page.getByTestId('chat-viewport')).toContainText('real backend hello')
+
+  await page.getByTestId('message-input').fill('sent from the workspace composer')
+  await page.getByTestId('message-send').click()
+  await expect(page.getByTestId('chat-viewport')).toContainText('sent from the workspace composer')
+  await expect(page.getByTestId('message-input')).toHaveValue('')
 
   const persistedClientState = await page.evaluate(() => ({
     localStorage: { ...window.localStorage },

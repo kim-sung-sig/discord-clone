@@ -483,9 +483,7 @@ onBeforeUnmount(() => {
           <p>{{ preferences.t('activity.explorer') }}</p>
           <h2>{{ shell.guild.name }}</h2>
         </header>
-        <p class="explorer-section-label">{{ preferences.t('channels.text') }}</p>
         <ChannelSidebar @click.capture="activeMobilePane = 'chat'" />
-        <p class="explorer-section-label">{{ preferences.t('channels.voice') }}</p>
         <UserPanel />
       </aside>
       <section

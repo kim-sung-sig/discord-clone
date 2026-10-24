@@ -37,20 +37,25 @@
    - 편집기(`.editor-workbench`)를 높이가 정해진 grid로 만들어 메시지 목록이 안쪽에서 스크롤되게 하고, `.chat-viewport`의 레거시 `grid-column: 3`을 중화한다(모바일에서 채팅이 둘째 열로 밀려 한 글자씩 줄바꿈되던 원인).
 4. **활동 막대**
    - 버튼 아이콘 규칙이 영어 `title="Explorer"`에 묶여 있고 같은 규칙이 네 군데 중복돼 있다. 중복을 지우고 `data-testid`에 묶인 규칙 하나로 정리한다. `title`은 기존 로케일 키(`activity.*`)로 바꾸고, 시각적으로 숨겨진 영어 `<span>` 라벨은 삭제한다(접근성 이름은 `<strong>`이 맡는다).
-   - 버튼은 `background: transparent`, `border: 0`, `color: var(--workbench-muted)`, hover/active는 전경색과 배경 혼합, focus-visible은 안쪽 outline.
-   - ServerRail: `font-size: 0`을 풀고 `DC` 글자를 보이게 하며 36px 둥근 칩으로 그린다.
+   - 버튼은 `background: transparent`, `border: 0`, 기본 색 `var(--activity-fg)`(`#c5c5c5`), hover/active는 `var(--activity-fg-active)`(`#ffffff`)와 배경 혼합. 활동 막대는 세 테마 모두 어둡고 light 테마의 `--workbench-fg`는 어두운 색이라 테마 전경색 대신 이 두 토큰을 `main.css` `:root`에 정의한다.
+   - focus-visible은 안쪽 2px outline이며 색은 `--activity-fg-active`(흰색)다(활동 막대 배경 대비 12.6:1 이상, WCAG 1.4.11의 3:1 충족).
+   - ServerRail: `font-size: 0`을 풀고 `DC` 글자를 보이게 하며 34px 둥근 칩으로 그린다.
 5. **하단 패널**: 레거시 `grid-column`(3/5, 5/7)을 `1`, `2`로 명시해서 2열 패널 안에 들어오게 하고, 패널 높이를 키우고(최대 360px) 안쪽 카드는 compact grid로 배치한다. 넘칠 때를 대비해 안쪽은 스크롤.
 6. **상태 표시줄**: `display: flex`, `gap: 12px`, 항목은 줄임표.
 7. **사용자 패널 이름**: `white-space: nowrap`, `overflow: hidden`, `text-overflow: ellipsis`, `min-width: 0`.
 8. **모바일(720px 이하)**
    - `workbench-density.css`의 모바일 블록에서 `[data-platform-surface="pwa-mobile"]` 선택자를 제거하고 `.vscode-shell.app-shell .workbench.workspace ...`(특이도 0,5,0 이상, 데스크톱 규칙보다 뒤)로 바꾼다. `data-platform-surface` 속성은 그대로 두되 스타일은 이에 의존하지 않는다.
    - 보내기 열은 `auto`로 해서 한국어 라벨도 잘리지 않게 한다. 하단 패널의 음성 창은 `opacity: 0`, `pointer-events: none`, `transform` 때문에 안 보이던 것을 정적 배치로 되돌린다.
-   - 721~1023px 구간은 열 폭만 줄인다(탐색기 220px, 사이드 패널 180px).
+   - 721~1023px 구간은 별도 규칙을 두지 않는다(브리프는 720px 이하와 1024px 이상만 다룬다).
 9. **인라인 스타일 제거**: `shellThemeStyle` computed와 `:style` 바인딩을 삭제한다. SSR 첫 페인트 색은 `main.css` `:root`에 vscode-dark 기본 토큰을 정의해 보장한다(`applyTheme`이 documentElement와 셸 요소에 CSSOM으로 덮어쓴다).
 10. **시험**
    - 레거시 패널을 app 안에서 검사하던 시험(`app-shell.test.ts`의 role/invite/dm/forum/moderation/experience 항목)은 컴포넌트를 직접 mount하도록 옮기고, app이 레거시 영역·개발 패널·등록 버튼·초기 열린 대화상자를 렌더하지 않음을 새 시험으로 고정한다.
    - 셸 자식 구성(암시적 행을 만드는 자식이 없음)과 CSS 계약(모바일 블록이 속성 독립, 상태 표시줄 flex, 아이콘이 testid 기준)을 단위 시험으로 고정한다.
-   - e2e(`app-shell`, `real-backend`, `layout-compression`, `app-theme`, `t62-screenshot-report`, `pwa-mobile`)는 제거된 요소에 의존하는 단계를 고친다. e2e는 CI에서 돌지 않는다.
+   - e2e(`app-shell`, `layout-compression`, `app-theme`, `t62-screenshot-report`, `pwa-mobile`)는 제거된 요소에 의존하는 단계를 고친다. 이 파일들은 CI에서 돌지 않는다.
+   - `real-backend.spec.ts`는 CI(qa-runtime)가 `qa/real-backend-e2e.ps1`로 실행하고, `qa/real-backend-browser-smoke-default.contract.ps1`이 그 문구를 검사한다. 개발 패널이 없어졌으므로 spec은 API로 guild, 텍스트·음성 채널, 첫 메시지를 만들고(가입 응답의 토큰 사용) 브라우저에서 로그인한 뒤 탐색기의 guild 이름, 채널 항목, `chat-viewport`의 메시지, 작성기로 보낸 메시지를 확인한다. 계약 스크립트의 필수 문구도 이에 맞춘다.
+   - 음성·스테이지 확인은 spec에서 뺀다. 이 둘은 제거된 개발 패널로만 만들 수 있었고, 화면의 음성 참여 버튼은 데모 채널 id(`channel-war-room`)에 고정돼 있어 실제 backend 채널로는 UI 검증이 안 된다. 계약 스크립트에서도 `voice-token-provider`, `stage-topic`, `real-backend-smoke`를 뺀다.
+11. **탐색기 구역 제목**: 고정 라벨 둘(`Text Channels`, `Voice Channels`)은 채널을 한 목록으로 그리는 `ChannelSidebar` 앞뒤에 붙어 있어서 음성 채널이 텍스트 라벨 아래에 있고 음성 라벨 아래는 비어 있었다. app.vue의 고정 라벨을 지우고, `ChannelSidebar`의 그룹 제목(기존 로케일 키 `channels.text`, `channels.voice`로 현지화, 채널이 없는 그룹은 제목도 숨김)을 구역 제목으로 보이게 한다. 새 문구는 없다.
+12. **CSS 정리**: 제거된 요소만 겨냥하는 규칙(`.real-api-panel`, 활동 막대 `button span`, 배너 버튼)과 그룹 제목 숨김 규칙을 삭제한다.
 
 ## Expected Changed Files
 - `docs/03-analysis/task_T219-shell-layout.blueprint.md`(이 문서)
@@ -58,13 +63,16 @@
 - `apps/web/assets/css/main.css`
 - `apps/web/assets/css/workbench-density.css`
 - `apps/web/assets/css/discord-vscode-theme.css`(필요한 경우에만)
+- `apps/web/components/shell/ChannelSidebar.vue`(그룹 제목 현지화, 빈 그룹 숨김)
 - `apps/web/components/shell/ServerRail.vue`, `apps/web/components/shell/UserPanel.vue`(필요한 경우에만)
+- `qa/real-backend-browser-smoke-default.contract.ps1`(CI가 `real-backend.spec.ts` 문구를 검사)
 - `apps/web/tests/components/app-shell.test.ts`
 - `apps/web/tests/components/shell-css-contract.test.ts`(신규)
 - `apps/web/tests/e2e/app-shell.spec.ts`, `real-backend.spec.ts`, `layout-compression.spec.ts`, `app-theme.spec.ts`, `t62-screenshot-report.spec.ts`, `pwa-mobile.spec.ts`
 
 ## 검증 계획
 컨트롤러가 실행한다.
+- `pwsh qa/real-backend-browser-smoke-default.contract.ps1`(spec 문구 계약, 파일만 읽는다)
 - `npm run lint`
 - `cd apps/web && npx vitest run`
 - `npm run build --workspace @discord-clone/web`

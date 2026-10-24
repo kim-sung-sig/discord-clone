@@ -29,6 +29,9 @@
   --workbench-muted: #9da5b4;
   --workbench-accent: #0078d4;
   --workbench-border: #3c3c3c;
+  /* The activity bar is dark in every theme, so its icon colours do not follow --workbench-fg. */
+  --activity-fg: #c5c5c5;
+  --activity-fg-active: #ffffff;
 }
 
 /* Workbench visual polish: keep this at EOF so legacy shell rules cannot override it. */
@@ -56,7 +59,6 @@
 }
 
 .vscode-shell.app-shell .activity-bar .brand,
-.vscode-shell.app-shell .activity-bar button span,
 .vscode-shell.app-shell .activity-bar button strong {
   position: absolute !important;
   width: 1px !important;
@@ -80,8 +82,7 @@
   grid-template-rows: minmax(0, 1fr) 148px 24px;
 }
 
-.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
-.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1 {
   display: none !important;
 }
 
@@ -181,15 +182,6 @@
   justify-content: flex-start;
   padding: 0 16px;
   background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
-}
-
-.vscode-shell.app-shell .workbench-banner button {
-  height: 22px;
-  padding: 0 10px;
-  color: var(--workbench-fg);
-  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
-  border-radius: 3px;
 }
 
 .vscode-shell.app-shell .activity-bar {
@@ -956,34 +948,6 @@ input {
   background: rgba(255, 107, 107, 0.16);
   border: 1px solid rgba(255, 107, 107, 0.32);
   border-radius: 16px;
-}
-
-.real-api-panel {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 12px 16px;
-  color: var(--ink);
-  background: rgba(84, 166, 255, 0.13);
-  border: 1px solid rgba(84, 166, 255, 0.28);
-}
-
-.real-api-panel p {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 800;
-}
-
-.real-api-panel button {
-  padding: 10px 14px;
-  color: #06131d;
-  font-weight: 900;
-  cursor: pointer;
-  background: linear-gradient(145deg, var(--accent), #54a6ff);
-  border: 0;
-  border-radius: 12px;
 }
 
 .server-rail {
@@ -2864,7 +2828,6 @@ input {
 }
 
 .vscode-shell.app-shell .activity-bar .brand,
-.vscode-shell.app-shell .activity-bar button span,
 .vscode-shell.app-shell .activity-bar button strong {
   position: absolute !important;
   width: 1px !important;
@@ -2888,8 +2851,7 @@ input {
   grid-template-rows: minmax(0, 1fr) 148px 24px;
 }
 
-.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
-.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1 {
   display: none !important;
 }
 
@@ -2973,15 +2935,6 @@ input {
   justify-content: flex-start;
   padding: 0 16px;
   background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
-}
-
-.vscode-shell.app-shell .workbench-banner button {
-  height: 22px;
-  padding: 0 10px;
-  color: var(--workbench-fg);
-  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
-  border-radius: 3px;
 }
 
 .vscode-shell.app-shell .activity-bar {

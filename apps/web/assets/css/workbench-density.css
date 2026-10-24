@@ -9,7 +9,6 @@
   font-size: 12px;
 }
 
-.vscode-shell.app-shell .workbench-banner button,
 .vscode-shell.app-shell .message-composer button,
 .vscode-shell.app-shell .attachment-stage-button,
 .vscode-shell.app-shell .workbench-field input,
@@ -166,9 +165,10 @@
 }
 
 /*
- * T219 shell grid. Every shell child and every workspace child owns an explicit grid cell, so nothing
- * falls into an implicit row. These selectors sit after the legacy polish blocks in main.css and are at
- * least as specific as they are (0,3,0)-(0,4,0).
+ * T219 shell grid. This file is loaded last and is the authoritative layer for the shell and workspace
+ * grid (columns, rows, and child placement); the older polish blocks in main.css only provide fallbacks.
+ * Every shell child and every workspace child owns an explicit grid cell, so nothing falls into an
+ * implicit row. These selectors are at least as specific as the legacy ones (0,3,0)-(0,4,0).
  */
 .vscode-shell.app-shell {
   grid-template-columns: 50px minmax(0, 1fr);
@@ -307,7 +307,7 @@
 }
 
 .vscode-shell.app-shell .workspace-explorer > header p,
-.vscode-shell.app-shell .workspace-explorer .explorer-section-label {
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
   margin: 0;
   color: var(--workbench-muted);
   font-size: 11px;
@@ -319,8 +319,12 @@
   margin: 0;
 }
 
-.vscode-shell.app-shell .workspace-explorer .explorer-section-label {
-  padding: 8px 14px 2px;
+.vscode-shell.app-shell .workspace-explorer .channel-group {
+  margin-top: 8px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+  padding: 0 6px 4px;
 }
 
 .vscode-shell.app-shell .workspace-explorer .channel-sidebar {
@@ -406,7 +410,7 @@
 }
 
 .vscode-shell.app-shell .activity-bar button:focus-visible {
-  outline: 2px solid var(--workbench-accent);
+  outline: 2px solid var(--activity-fg-active, #ffffff);
   outline-offset: -2px;
 }
 
@@ -606,17 +610,6 @@
 
 .vscode-shell.app-shell .bottom-panel .voice-panel-header h2 {
   font-size: 14px;
-}
-
-/* Tablet widths: narrower side columns. */
-@media (min-width: 721px) and (max-width: 1023px) {
-  .vscode-shell.app-shell .workbench.workspace {
-    grid-template-columns: 220px minmax(0, 1fr) 180px;
-  }
-
-  .vscode-shell.app-shell .bottom-panel {
-    left: 220px;
-  }
 }
 
 /*

@@ -48,8 +48,22 @@ describe('T219 shell CSS contracts', () => {
     expect(densityCss).toContain('.vscode-shell.app-shell .activity-bar button:hover {')
     expect(densityCss).toContain('.vscode-shell.app-shell .activity-bar button[aria-current="page"] {')
     expect(densityCss).toContain('.vscode-shell.app-shell .activity-bar button:focus-visible {')
+    // WCAG 1.4.11: the focus ring is white on the dark activity bar (>= 3:1 in all three themes)
+    expect(ruleBody(densityCss, '.vscode-shell.app-shell .activity-bar button:focus-visible'))
+      .toMatch(/outline: 2px solid var\(--activity-fg-active, #ffffff\);/)
+    expect(mainCss).toMatch(/--activity-fg: #c5c5c5;/)
+    expect(mainCss).toMatch(/--activity-fg-active: #ffffff;/)
     const pill = ruleBody(densityCss, '.vscode-shell.app-shell .activity-bar .server-pill')
     expect(pill).toMatch(/font-size: 13px;/)
+  })
+
+  it('has no rules left for the removed dev panel, banner button, or hidden activity labels', () => {
+    for (const css of [mainCss, densityCss]) {
+      expect(css).not.toContain('.real-api-panel')
+      expect(css).not.toMatch(/workbench-banner button/)
+      expect(css).not.toMatch(/activity-bar button span/)
+    }
+    expect(mainCss).not.toMatch(/\.channel-group h2 \{\n  display: none/)
   })
 
   it('keys activity icons on test ids, not on English titles', () => {
