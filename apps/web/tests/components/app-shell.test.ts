@@ -3,6 +3,12 @@ import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../../pages/app.vue'
+import InviteModal from '../../components/invite/InviteModal.vue'
+import DmSidebar from '../../components/social/DmSidebar.vue'
+import ExperiencePanel from '../../components/shell/ExperiencePanel.vue'
+import ForumPanel from '../../components/shell/ForumPanel.vue'
+import ModerationPanel from '../../components/shell/ModerationPanel.vue'
+import RolePermissionPanel from '../../components/shell/RolePermissionPanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
@@ -32,7 +38,78 @@ describe('Discord app shell', () => {
     expect(wrapper.get('[data-testid="editor-chat"]').find('[data-testid="message-input"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="bottom-panel"]').text()).toContain('Gateway')
     expect(wrapper.get('[data-testid="status-bar"]').text()).toContain('READY')
-    expect(wrapper.get('[data-testid="legacy-shell-contracts"]').attributes('aria-hidden')).toBe('true')
+    expect(wrapper.get('[data-testid="workspace-explorer"]').find('[data-testid="user-panel"]').exists()).toBe(true)
+  })
+
+  it('does not render developer tooling, legacy contract panels, or an auto-opened dialog in the app', async () => {
+    const wrapper = await mountSuspended(App)
+    const auth = useAuthStore()
+    await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
+    auth.accessToken = 'access-token'
+    await nextTick()
+
+    expect(wrapper.find('.real-api-panel').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="real-api-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="real-backend-smoke"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="legacy-shell-contracts"]').exists()).toBe(false)
+    expect(wrapper.find('.legacy-shell-contracts').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="account-banner"] button').exists()).toBe(false)
+    for (const testId of [
+      'invite-modal', 'dm-sidebar', 'forum-panel', 'moderation-panel', 'experience-panel', 'role-permission-panel'
+    ]) {
+      expect(wrapper.find(`[data-testid="${testId}"]`).exists()).toBe(false)
+    }
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.activeElement?.closest('[data-testid="invite-modal"]') ?? null).toBeNull()
+    expect(wrapper.text()).not.toContain('Run backend smoke')
+    expect(wrapper.text()).not.toContain('Real backend flow')
+  })
+
+  it('gives every workspace child an explicit grid cell by rendering only the placed workbench regions', async () => {
+    const wrapper = await mountSuspended(App)
+    const workspaceChildren = () => Array.from(wrapper.get('[data-testid="workspace"]').element.children)
+      .map((child) => child.getAttribute('data-testid'))
+
+    expect(workspaceChildren()).toEqual([
+      'workspace-explorer', 'editor-chat', 'side-panel', 'bottom-panel', 'status-bar'
+    ])
+
+    for (const [activity, view] of [
+      ['activity-search', 'workbench-search-view'],
+      ['activity-inbox', 'workbench-inbox-view'],
+      ['activity-calls', 'workbench-calls-view'],
+      ['activity-settings', 'workbench-settings-view']
+    ]) {
+      await wrapper.get(`[data-testid="${activity}"]`).trigger('click')
+      expect(workspaceChildren()).toEqual([view, 'status-bar'])
+    }
+  })
+
+  it('keeps activity bar labels and tooltips localized and the first rail item labelled', async () => {
+    const wrapper = await mountSuspended(App)
+    const bar = wrapper.get('[data-testid="activity-bar"]')
+
+    expect(bar.get('[data-testid="activity-explorer"]').attributes('title')).toBe('Explorer')
+    expect(bar.get('.server-pill').text()).toBe('DC')
+    expect(bar.findAll('button span')).toHaveLength(0)
+
+    await wrapper.get('[data-testid="locale-select"]').setValue('ko-KR')
+    await nextTick()
+
+    expect(bar.get('[data-testid="activity-explorer"]').attributes('title')).toBe('탐색기')
+    expect(bar.get('[data-testid="activity-search"]').attributes('title')).toBe('검색')
+    expect(bar.get('[data-testid="activity-inbox"]').attributes('title')).toBe('받은 알림')
+    expect(bar.get('[data-testid="activity-calls"]').attributes('title')).toBe('통화')
+    expect(bar.get('[data-testid="activity-settings"]').attributes('title')).toBe('설정')
+  })
+
+  it('keeps the signed-in user panel reachable from the settings view', async () => {
+    const wrapper = await mountSuspended(App)
+
+    await wrapper.get('[data-testid="activity-settings"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="workbench-settings-view"]').find('[data-testid="user-panel"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="user-panel"]')).toHaveLength(1)
   })
 
   it('switches VS Code activity views without leaving the authenticated app shell', async () => {
@@ -536,7 +613,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('switches locale and theme from JSON-backed user preferences', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(App, { attachTo: document.body })
 
     await wrapper.get('[data-testid="locale-select"]').setValue('ko-KR')
     await wrapper.get('[data-testid="theme-select"]').setValue('cosmos')
@@ -1287,7 +1364,7 @@ enableAutoUnmount(afterEach)
     expect(wrapper.get('[data-testid="message-attachment-attachment-demo-image"]').text()).toContain('qa-snapshot.png')
   })
 
-  it('provides keyboard skip path and traps focus inside invite modal', async () => {
+  it('provides keyboard skip path in the workspace composer', async () => {
     const wrapper = await mountSuspended(App)
 
     expect(wrapper.get('[data-testid="skip-to-workspace"]').attributes('href')).toBe('#workspace-content')
@@ -1295,8 +1372,13 @@ enableAutoUnmount(afterEach)
     expect(wrapper.get('[data-testid="workspace"]').attributes('tabindex')).toBe('-1')
     expect(wrapper.get('[data-testid="message-input"]').attributes('aria-label')).toBe('Message composer')
     expect(wrapper.get('[data-testid="attachment-stage-demo"]').text()).toContain('Attach image')
+  })
+
+  it('traps focus inside the invite modal when it is mounted on its own', async () => {
+    const wrapper = await mountSuspended(InviteModal, { attachTo: document.body })
 
     const acceptButton = wrapper.get('[data-testid="invite-accept"]')
+    ;(acceptButton.element as HTMLElement).focus()
     const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     acceptButton.element.dispatchEvent(tabEvent)
 
@@ -1320,7 +1402,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('renders role permissions, member assignments, and active channel overwrites', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(RolePermissionPanel)
 
     expect(wrapper.get('[data-testid="role-permission-panel"]').text()).toContain('Role permissions')
     expect(wrapper.get('[data-testid="role-moderator"]').text()).toContain('Moderator')
@@ -1332,11 +1414,10 @@ enableAutoUnmount(afterEach)
     expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Moderator')
     expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Allow SEND_MESSAGES')
     expect(wrapper.get('[data-testid="active-channel-overwrite"]').text()).toContain('Deny MANAGE_CHANNELS')
-    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="role-permission-panel"]').exists()).toBe(true)
   })
 
   it('renders admin permission diff, preview-as-role, and privileged audit feedback', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(RolePermissionPanel)
     const rolePanel = wrapper.get('[data-testid="role-permission-panel"]')
 
     expect(rolePanel.get('[data-testid="permission-diff"]').text()).toContain('Moderator')
@@ -1354,11 +1435,10 @@ enableAutoUnmount(afterEach)
     expect(rolePanel.get('[data-testid="privileged-audit"]').text()).toContain('Moderator MANAGE_CHANNELS')
   })
 
-  it('renders the invite preview modal with limits, role grants, and accept CTA inside the workspace', async () => {
-    const wrapper = await mountSuspended(App)
+  it('renders the invite preview modal with limits, role grants, and accept CTA', async () => {
+    const wrapper = await mountSuspended(InviteModal)
     const inviteModal = wrapper.get('[data-testid="invite-modal"]')
 
-    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="invite-modal"]').exists()).toBe(true)
     expect(inviteModal.attributes('role')).toBe('dialog')
     expect(inviteModal.attributes('aria-modal')).toBe('true')
     expect(inviteModal.attributes('tabindex')).toBe('-1')
@@ -1421,11 +1501,10 @@ enableAutoUnmount(afterEach)
     expect(wrapper.get('[data-gateway-sequence="43"]').text()).not.toContain('MESSAGE_UPDATE')
   })
 
-  it('renders direct and group DM lists inside the workspace', async () => {
-    const wrapper = await mountSuspended(App)
+  it('renders direct and group DM lists from the direct message sidebar', async () => {
+    const wrapper = await mountSuspended(DmSidebar)
     const dmSidebar = wrapper.get('[data-testid="dm-sidebar"]')
 
-    expect(wrapper.get('[data-testid="workspace"]').find('[data-testid="dm-sidebar"]').exists()).toBe(true)
     expect(dmSidebar.text()).toContain('Direct messages')
     expect(dmSidebar.get('[data-testid="dm-friend-cto-bot"]').text()).toContain('cto-bot')
     expect(dmSidebar.get('[data-testid="dm-friend-cto-bot"]').text()).toContain('Friend')
@@ -1435,7 +1514,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('surfaces blocked users and prevents selecting their DM', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(DmSidebar)
 
     await wrapper.get('[data-testid="dm-friend-spam-drone"]').trigger('click')
 
@@ -1445,7 +1524,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('adds and removes group DM members through store-backed shell actions', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(DmSidebar)
     const shell = useShellStore()
 
     ;(shell as any).addGroupDmMember?.('group-dm-t07-strike-team', 'qa-scout')
@@ -1460,7 +1539,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('renders a group call skeleton and toggles participant state', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(DmSidebar)
 
     expect(wrapper.get('[data-testid="group-call-skeleton"]').text()).toContain('Group call')
     expect(wrapper.get('[data-testid="group-call-status"]').text()).toContain('Call idle')
@@ -1512,7 +1591,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('renders forum guidelines, tags, public/private threads, and archive state', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(ForumPanel)
     useShellStore().$reset()
     await nextTick()
 
@@ -1527,7 +1606,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('prevents archived thread writes until reopened', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(ForumPanel)
     useShellStore().$reset()
     await nextTick()
 
@@ -1544,7 +1623,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('requires a forum tag before creating a forum post', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(ForumPanel)
     const shell = useShellStore()
     shell.$reset()
     await nextTick()
@@ -1560,7 +1639,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('renders moderation onboarding, automod, and audit state', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(ModerationPanel)
     useShellStore().$reset()
     await nextTick()
 
@@ -1572,7 +1651,8 @@ enableAutoUnmount(afterEach)
   })
 
   it('submits onboarding answers, blocks AutoMod content, and appends audit entries', async () => {
-    const wrapper = await mountSuspended(App)
+    const app = await mountSuspended(App)
+    const wrapper = await mountSuspended(ModerationPanel)
     useShellStore().$reset()
     await nextTick()
 
@@ -1585,7 +1665,7 @@ enableAutoUnmount(afterEach)
 
     expect(wrapper.get('[data-testid="automod-decision"]').text()).toContain('Blocked before persist')
     expect(wrapper.get('[data-testid="audit-log"]').text()).toContain('AUTOMOD_MESSAGE_BLOCKED')
-    expect(wrapper.get('[data-testid="chat-viewport"]').text()).not.toContain('leak the release token')
+    expect(app.get('[data-testid="chat-viewport"]').text()).not.toContain('leak the release token')
   })
 
   it('renders voice token provider, participants, controls, and event records', async () => {
@@ -1629,7 +1709,7 @@ enableAutoUnmount(afterEach)
   })
 
   it('runs stage, soundboard, and premium skeleton flows', async () => {
-    const wrapper = await mountSuspended(App)
+    const wrapper = await mountSuspended(ExperiencePanel)
     useShellStore().$reset()
     await nextTick()
 

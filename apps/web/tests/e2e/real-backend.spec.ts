@@ -5,7 +5,7 @@ const runRealBackend = process.env.REAL_BACKEND_E2E === '1'
 
 test.skip(!runRealBackend, 'Set REAL_BACKEND_E2E=1 to run real-backend frontend smoke')
 
-test('runs login, guild/channel/message, voice, and stage through the real backend', async ({ page, request }) => {
+test('signs in through the real backend and opens a workspace without developer tooling', async ({ page, request }) => {
   const stamp = Date.now()
   const email = `web-real-${stamp}@example.com`
   const username = `webreal${String(stamp).slice(-8)}`
@@ -32,12 +32,9 @@ test('runs login, guild/channel/message, voice, and stage through the real backe
   await page.getByTestId('open-workspace').click()
   await expect(page.getByTestId('workspace')).toBeVisible()
 
-  await page.getByTestId('real-backend-smoke').click()
-
-  await expect(page.getByTestId('guild-name')).toContainText('Web Real Guild')
-  await expect(page.getByTestId('chat-viewport')).toContainText('real backend hello')
-  await expect(page.getByTestId('voice-token-provider')).toContainText('LIVEKIT_SKELETON')
-  await expect(page.getByTestId('stage-topic')).toContainText('Web Real Stage')
+  await expect(page.getByTestId('real-api-panel')).toHaveCount(0)
+  await expect(page.getByTestId('real-backend-smoke')).toHaveCount(0)
+  await expect(page.getByTestId('user-panel')).toContainText('Web Real')
 
   const persistedClientState = await page.evaluate(() => ({
     localStorage: { ...window.localStorage },
