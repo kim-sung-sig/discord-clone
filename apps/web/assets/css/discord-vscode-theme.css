@@ -347,8 +347,7 @@ a:focus-visible {
   background: var(--discord-brand);
 }
 
-.presence-badge-online .presence-dot,
-.storage-health-ready {
+.presence-badge-online .presence-dot {
   background: var(--discord-green);
 }
 
@@ -364,6 +363,12 @@ a:focus-visible {
 .dm-row strong,
 .expression-toggle {
   color: var(--vscode-focus);
+}
+
+.security-summary-card strong,
+.directive-list strong,
+.security-report-card strong {
+  color: #4dabff;
 }
 
 @media (max-width: 720px) {
