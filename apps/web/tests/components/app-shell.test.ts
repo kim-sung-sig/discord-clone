@@ -543,7 +543,7 @@ enableAutoUnmount(afterEach)
     await nextTick()
 
     expect(wrapper.get('[data-testid="workspace-explorer"]').text()).toContain('텍스트 채널')
-    expect(wrapper.get('[data-testid="editor-empty-hint"]').text()).toContain('VS Code 스타일')
+    expect(wrapper.find('[data-testid="editor-empty-hint"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="member-sidebar"]').text()).not.toContain('Members')
     expect(wrapper.get('[data-testid="gateway-status-panel"]').text()).not.toContain('Gateway')
     expect(wrapper.get('[data-testid="voice-token-provider"]').text()).not.toContain('Provider')

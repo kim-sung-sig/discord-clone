@@ -544,10 +544,8 @@ onBeforeUnmount(() => {
       >
         <header class="editor-titlebar" data-testid="editor-titlebar">
           <span>{{ activeChannelLabel }}</span>
-          <small>{{ preferences.t('editor.hint') }}</small>
         </header>
         <ChatViewport />
-        <p class="editor-empty-hint" data-testid="editor-empty-hint">{{ preferences.t('editor.hint') }}</p>
       </section>
       <aside v-if="activeWorkbenchView === 'explorer'" class="side-panel" data-testid="side-panel">
         <MemberSidebar />
