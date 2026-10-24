@@ -7,7 +7,10 @@ import com.example.discord.moderation.ModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -37,6 +40,7 @@ class MessageController {
     private final GuildService guildService;
     private final ModerationService moderationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final MessageAuthorDirectory authorDirectory;
 
     MessageController(
         PublishMessageUseCase publishMessage,
@@ -47,7 +51,8 @@ class MessageController {
         ChannelMessageReadModelPort readModels,
         GuildService guildService,
         ModerationService moderationService,
-        AuthenticatedUserResolver authenticatedUserResolver
+        AuthenticatedUserResolver authenticatedUserResolver,
+        MessageAuthorDirectory authorDirectory
     ) {
         this.publishMessage = publishMessage;
         this.editMessage = editMessage;
@@ -58,6 +63,7 @@ class MessageController {
         this.guildService = guildService;
         this.moderationService = moderationService;
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.authorDirectory = authorDirectory;
     }
 
     @PostMapping
@@ -82,7 +88,11 @@ class MessageController {
             new IdempotencyKey(request.idempotencyKey()),
             correlationId
         )).message();
-        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(message, readModels.sequenceOf(message.id())));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.from(
+            message,
+            readModels.sequenceOf(message.id()),
+            authorDisplayName(message)
+        ));
     }
 
     @GetMapping
@@ -100,7 +110,7 @@ class MessageController {
             before,
             limit
         ));
-        return MessagePageResponse.from(page);
+        return MessagePageResponse.from(page, authorDisplayNames(page.messages()));
     }
 
     @PatchMapping("/{messageId}")
@@ -118,7 +128,7 @@ class MessageController {
             new MessageContent(request.content()),
             mentionTargetsFrom(request.mentions())
         )).message();
-        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()), authorDisplayName(message));
     }
 
     @DeleteMapping("/{messageId}")
@@ -150,7 +160,7 @@ class MessageController {
             true
         )).message();
         moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_PINNED, requesterId, messageId, "message pinned");
-        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()), authorDisplayName(message));
     }
 
     @DeleteMapping("/{messageId}/pin")
@@ -166,7 +176,7 @@ class MessageController {
             false
         )).message();
         moderationService.appendAudit(message.guildId(), AuditLogAction.MESSAGE_UNPINNED, requesterId, messageId, "message unpinned");
-        return MessageResponse.from(message, readModels.sequenceOf(message.id()));
+        return MessageResponse.from(message, readModels.sequenceOf(message.id()), authorDisplayName(message));
     }
 
     @GetMapping("/search")
@@ -178,14 +188,28 @@ class MessageController {
     ) {
         UUID requesterId = authenticatedUserResolver.requireUserId(authorization);
         UUID guildId = guildIdFor(channelId);
-        return messageQueries.search(new ChannelMessageQuery(
-                new UserMessageAuthor(requesterId),
-                new ChannelMessageTarget(guildId, channelId),
-                null,
-                limit
-            ), q, limit).stream()
-            .map(MessageResponse::from)
+        List<MessageReadModel> messages = messageQueries.search(new ChannelMessageQuery(
+            new UserMessageAuthor(requesterId),
+            new ChannelMessageTarget(guildId, channelId),
+            null,
+            limit
+        ), q, limit);
+        Map<UUID, String> authorNames = authorDisplayNames(messages);
+        return messages.stream()
+            .map(message -> MessageResponse.from(message, authorNames.get(message.authorId())))
             .toList();
+    }
+
+    private String authorDisplayName(Message message) {
+        if (message.author() instanceof UserMessageAuthor author) {
+            return authorDirectory.displayName(author.userId()).orElse(null);
+        }
+        return null;
+    }
+
+    private Map<UUID, String> authorDisplayNames(List<MessageReadModel> messages) {
+        Set<UUID> authorIds = messages.stream().map(MessageReadModel::authorId).collect(Collectors.toSet());
+        return authorIds.isEmpty() ? Map.of() : authorDirectory.displayNames(authorIds);
     }
 
     private UUID guildIdFor(UUID channelId) {
@@ -240,9 +264,11 @@ class MessageController {
     }
 
     record MessagePageResponse(List<MessageResponse> messages, String nextCursor) {
-        static MessagePageResponse from(MessageReadPage page) {
+        static MessagePageResponse from(MessageReadPage page, Map<UUID, String> authorNames) {
             return new MessagePageResponse(
-                page.messages().stream().map(MessageResponse::from).toList(),
+                page.messages().stream()
+                    .map(message -> MessageResponse.from(message, authorNames.get(message.authorId())))
+                    .toList(),
                 page.nextCursor()
             );
         }
@@ -254,6 +280,7 @@ class MessageController {
         UUID channelId,
         Long sequence,
         UUID authorId,
+        String authorDisplayName,
         String content,
         List<String> mentions,
         boolean pinned,
@@ -263,13 +290,14 @@ class MessageController {
         Instant createdAt,
         Instant updatedAt
     ) {
-        static MessageResponse from(Message message, long sequence) {
+        static MessageResponse from(Message message, long sequence, String authorDisplayName) {
             return new MessageResponse(
                 message.id(),
                 message.guildId(),
                 message.channelId(),
                 sequence,
                 message.authorId(),
+                authorDisplayName,
                 message.content().value(),
                 message.mentions().stream().map(MessageResponse::mentionToken).toList(),
                 message.pinned(),
@@ -281,13 +309,14 @@ class MessageController {
             );
         }
 
-        static MessageResponse from(MessageReadModel message) {
+        static MessageResponse from(MessageReadModel message, String authorDisplayName) {
             return new MessageResponse(
                 message.id(),
                 message.guildId(),
                 message.channelId(),
                 message.sequence(),
                 message.authorId(),
+                authorDisplayName,
                 message.content(),
                 message.mentions(),
                 message.pinned(),

@@ -218,6 +218,88 @@ class MessageControllerTest {
     }
 
     @Test
+    void exposesAuthorDisplayNameOnEveryMessageResponse() throws Exception {
+        AuthSession owner = signup("message_name_owner", "Owner Display");
+        AuthSession member = signup("message_name_member", "Member Display");
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+        addMember(guildId, member.userId(), owner);
+        grantRole(guildId, member.userId(), "name_sender", "SEND_MESSAGES", owner);
+
+        MvcResult created = mockMvc.perform(post("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "owner hello",
+                      "idempotencyKey": "name-%s"
+                    }
+                    """.formatted(UUID.randomUUID())))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.authorId").value(owner.userId().toString()))
+            .andExpect(jsonPath("$.authorDisplayName").value("Owner Display"))
+            .andReturn();
+        String ownerMessageId = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+        String memberMessageId = createMessage(channelId, "member hello", member);
+
+        MvcResult latestPage = mockMvc.perform(get("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .param("limit", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.messages", hasSize(1)))
+            .andExpect(jsonPath("$.nextCursor").isString())
+            .andReturn();
+        String latestBody = latestPage.getResponse().getContentAsString();
+        MvcResult olderPage = mockMvc.perform(get("/api/channels/{channelId}/messages", channelId)
+                .header("Authorization", owner.bearer())
+                .param("before", JsonPath.<String>read(latestBody, "$.nextCursor"))
+                .param("limit", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.messages", hasSize(1)))
+            .andReturn();
+        String olderBody = olderPage.getResponse().getContentAsString();
+        assertThat(java.util.Map.of(
+            JsonPath.<String>read(latestBody, "$.messages[0].id"),
+            JsonPath.<String>read(latestBody, "$.messages[0].authorDisplayName"),
+            JsonPath.<String>read(olderBody, "$.messages[0].id"),
+            JsonPath.<String>read(olderBody, "$.messages[0].authorDisplayName")
+        )).containsOnly(
+            java.util.Map.entry(ownerMessageId, "Owner Display"),
+            java.util.Map.entry(memberMessageId, "Member Display")
+        );
+
+        mockMvc.perform(patch("/api/channels/{channelId}/messages/{messageId}", channelId, memberMessageId)
+                .header("Authorization", member.bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "member hello edited"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.authorDisplayName").value("Member Display"));
+
+        mockMvc.perform(put("/api/channels/{channelId}/messages/{messageId}/pin", channelId, memberMessageId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.authorId").value(member.userId().toString()))
+            .andExpect(jsonPath("$.authorDisplayName").value("Member Display"));
+
+        mockMvc.perform(delete("/api/channels/{channelId}/messages/{messageId}/pin", channelId, memberMessageId)
+                .header("Authorization", owner.bearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.authorDisplayName").value("Member Display"));
+
+        mockMvc.perform(get("/api/channels/{channelId}/messages/search", channelId)
+                .header("Authorization", owner.bearer())
+                .param("q", "member hello"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(memberMessageId))
+            .andExpect(jsonPath("$[0].authorDisplayName").value("Member Display"));
+    }
+
+    @Test
     void rejectsAuthorMutationAfterChannelViewIsRevoked() throws Exception {
         AuthSession owner = signup("message_revoked_owner");
         AuthSession author = signup("message_revoked_author");
@@ -436,6 +518,10 @@ class MessageControllerTest {
     }
 
     private AuthSession signup(String username) throws Exception {
+        return signup(username, username);
+    }
+
+    private AuthSession signup(String username, String displayName) throws Exception {
         MvcResult signup = mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -445,7 +531,7 @@ class MessageControllerTest {
                       "displayName": "%s",
                       "password": "correct horse battery staple"
                     }
-                    """.formatted(username, username, username)))
+                    """.formatted(username, username, displayName)))
             .andExpect(status().isCreated())
             .andReturn();
 

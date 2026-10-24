@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 class KafkaMessagePublishedConsumerTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-08-22T00:00:00Z"), ZoneOffset.UTC);
+    private static final MessageAuthorDirectory NO_AUTHOR_NAMES = userIds -> Map.of();
 
     @Test
     void inboxDeduplicatesGatewaySideEffectAndKeepsOriginalEventId() throws Exception {
@@ -63,7 +65,8 @@ class KafkaMessagePublishedConsumerTest {
             (target, ignored) -> message,
             gateway,
             new InMemoryMessagePublicationInbox(),
-            metrics
+            metrics,
+            userIds -> Map.of(userId, "Author Display")
         );
         String payload = new ObjectMapper().findAndRegisterModules().writeValueAsString(
             MessagePublishedRecord.from(new MessagePublished(
@@ -82,6 +85,9 @@ class KafkaMessagePublishedConsumerTest {
 
         assertThat(sent).hasSize(1);
         assertThat(sent.getFirst().eventId()).isEqualTo(eventId.toString());
+        assertThat(sent.getFirst().payload())
+            .containsEntry("authorId", userId.toString())
+            .containsEntry("authorDisplayName", "Author Display");
         assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "processed").counter().count())
             .isEqualTo(1);
         assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter().count())
@@ -138,10 +144,10 @@ class KafkaMessagePublishedConsumerTest {
         ), "payload-hash"));
 
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
-        KafkaMessagePublishedConsumer firstProcess = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, persistentInbox, metrics);
+        KafkaMessagePublishedConsumer firstProcess = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, persistentInbox, metrics, NO_AUTHOR_NAMES);
         assertThatThrownBy(() -> firstProcess.consume(payload)).isInstanceOf(AssertionError.class);
 
-        KafkaMessagePublishedConsumer restartedProcess = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, persistentInbox, metrics);
+        KafkaMessagePublishedConsumer restartedProcess = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, persistentInbox, metrics, NO_AUTHOR_NAMES);
         restartedProcess.consume(payload);
 
         assertThat(sent).hasSize(1);
@@ -187,9 +193,9 @@ class KafkaMessagePublishedConsumerTest {
         ), "payload-hash"));
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         KafkaMessagePublishedConsumer beforeRestart = new KafkaMessagePublishedConsumer(
-            mapper, (target, ignored) -> message, gateway, inbox, metrics);
+            mapper, (target, ignored) -> message, gateway, inbox, metrics, NO_AUTHOR_NAMES);
         KafkaMessagePublishedConsumer afterRestart = new KafkaMessagePublishedConsumer(
-            mapper, (target, ignored) -> message, gateway, inbox, metrics);
+            mapper, (target, ignored) -> message, gateway, inbox, metrics, NO_AUTHOR_NAMES);
 
         assertThatThrownBy(() -> beforeRestart.consume(payload)).isInstanceOf(AssertionError.class);
         afterRestart.consume(payload);
@@ -240,7 +246,7 @@ class KafkaMessagePublishedConsumerTest {
         ), "payload-hash"));
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(
-            mapper, (target, ignored) -> current.get(), gateway, inbox, metrics);
+            mapper, (target, ignored) -> current.get(), gateway, inbox, metrics, NO_AUTHOR_NAMES);
 
         assertThatThrownBy(() -> consumer.consume(payload)).isInstanceOf(DataAccessResourceFailureException.class);
         current.set(edited);
@@ -264,7 +270,8 @@ class KafkaMessagePublishedConsumerTest {
             new InMemoryGatewayService(
                 new InMemoryGuildService(), CLOCK, Duration.ofSeconds(30), new InMemoryGatewayEventBus(CLOCK)),
             new InMemoryMessagePublicationInbox(),
-            metrics
+            metrics,
+            NO_AUTHOR_NAMES
         );
 
         assertThatThrownBy(() -> consumer.consume("{broken"))
@@ -283,7 +290,8 @@ class KafkaMessagePublishedConsumerTest {
             new InMemoryGatewayService(
                 new InMemoryGuildService(), CLOCK, Duration.ofSeconds(30), new InMemoryGatewayEventBus(CLOCK)),
             new InMemoryMessagePublicationInbox(),
-            metrics
+            metrics,
+            NO_AUTHOR_NAMES
         );
 
         // The shared error handler dead-letters IllegalArgumentException at once; an NPE would be retried twice.
@@ -373,7 +381,7 @@ class KafkaMessagePublishedConsumerTest {
         ), "payload-hash"));
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(
-            mapper, (target, ignored) -> current.get(), gateway, inbox, metrics);
+            mapper, (target, ignored) -> current.get(), gateway, inbox, metrics, NO_AUTHOR_NAMES);
 
         assertThatThrownBy(() -> consumer.consume(payload)).isInstanceOf(DataAccessResourceFailureException.class);
         current.set(edited);
@@ -422,7 +430,7 @@ class KafkaMessagePublishedConsumerTest {
         ), "payload-hash"));
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         InMemoryMessagePublicationInbox inbox = new InMemoryMessagePublicationInbox();
-        KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, inbox, metrics);
+        KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(mapper, lookup, gateway, inbox, metrics, NO_AUTHOR_NAMES);
 
         assertThatThrownBy(() -> consumer.consume(payload)).isInstanceOf(DataAccessResourceFailureException.class);
         databaseUnavailable.set(false);

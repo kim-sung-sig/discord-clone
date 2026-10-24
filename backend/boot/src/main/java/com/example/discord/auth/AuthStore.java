@@ -6,6 +6,7 @@ import com.example.discord.user.UserProfile;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 interface AuthStore {
@@ -14,6 +15,8 @@ interface AuthStore {
     Optional<AuthAccount> findByEmail(EmailAddress email);
 
     Optional<UserProfile> findById(UUID id);
+
+    List<UserProfile> findProfilesByIds(Set<UUID> ids);
 
     void revokeAccessToken(String token);
 
