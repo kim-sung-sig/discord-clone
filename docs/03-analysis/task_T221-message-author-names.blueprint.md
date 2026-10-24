@@ -34,7 +34,7 @@
    - `JdbcAuthStore`: `SELECT id, username, display_name, created_at FROM users WHERE id = ANY(?)`(uuid 배열 binding, 기존 `createArrayOf("uuid", …)` 관례). 빈 입력이면 query하지 않는다. 기존 `mapProfile`을 재사용한다.
    - `InMemoryAuthStore`: `accountsById`에서 찾는다.
    - 조회 크기 상한: 호출자는 한 page의 서로 다른 작성자 id만 넘긴다. page는 최대 100건(`pageSize`), 검색은 최대 50건이다. 그래서 query는 page마다 1회이고 bounded다. N+1 조회를 하지 않는다.
-3. **응답 조립은 controller에서 한다.** `MessageResponse` record에 `String authorDisplayName`을 `authorId` 바로 뒤에 추가한다. `MessageReadModel`과 store 구현(`JdbcMessageStore`, `InMemoryMessageService`)은 바꾸지 않는다. read projection은 메시지 사실만 담고, 사용자 이름은 응답 시점에 port로 붙인다. 이름이 바뀌어도 projection을 다시 쓸 필요가 없다.
+3. **응답 조립은 controller에서 한다.** OpenAPI에서는 `OpenApiConfiguration.NULLABLE_RESPONSES`에 `MessageResponse.authorDisplayName`을 추가해 required + `string | null`로 표기한다(응답 field는 항상 있고, 작성자가 없을 때만 null). `MessageResponse` record에 `String authorDisplayName`을 `authorId` 바로 뒤에 추가한다. `MessageReadModel`과 store 구현(`JdbcMessageStore`, `InMemoryMessageService`)은 바꾸지 않는다. read projection은 메시지 사실만 담고, 사용자 이름은 응답 시점에 port로 붙인다. 이름이 바뀌어도 projection을 다시 쓸 필요가 없다.
    - 목록·검색은 page의 작성자 id 집합으로 port를 1회 호출한다.
    - 생성·수정·고정은 단건 조회다. 작성자가 `UserMessageAuthor`가 아니면(현재 controller 경로에는 없음) `null`이다.
 4. **Gateway payload**: `authorId` 다음에 `authorDisplayName`을 넣는다. 이름이 없으면 key를 생략한다. `GatewayEvent`가 `Map.copyOf`로 payload를 복사하므로 `null` 값을 넣으면 NPE가 난다. `GatewayPayloadSanitizer`의 민감 key 목록(token, secret 등)에 걸리지 않는 이름이다.
@@ -56,6 +56,7 @@
   - `backend/boot/src/main/java/com/example/discord/message/MessageController.java`
   - `backend/boot/src/main/java/com/example/discord/message/MessageConfiguration.java`
   - `backend/boot/src/main/java/com/example/discord/message/KafkaMessagePublishedConsumer.java`
+  - `backend/boot/src/main/java/com/example/discord/openapi/OpenApiConfiguration.java`(`MessageResponse.authorDisplayName`을 required이면서 nullable로 표기. 이 표기가 없으면 생성 타입이 `string`으로만 나와 web이 null을 놓친다)
 - Backend test
   - `backend/modules/message/src/test/java/com/example/discord/message/MessageAuthorDirectoryTest.java`(신규)
   - `backend/boot/src/test/java/com/example/discord/auth/AuthStoreMessageAuthorDirectoryTest.java`(신규, in-memory 경로)
@@ -64,6 +65,7 @@
   - `backend/boot/src/test/java/com/example/discord/message/MessageConfigurationTest.java`(local Gateway payload)
   - `backend/boot/src/test/java/com/example/discord/message/KafkaMessagePublishedConsumerTest.java`(Kafka Gateway payload, 생성자 인자)
   - `backend/boot/src/test/java/com/example/discord/message/MessagePublicationFailureIntegrationTest.java`(생성자 인자)
+  - `backend/boot/src/test/java/com/example/discord/openapi/OpenApiContractTest.java`(nullable 표기 고정)
 - 명세·생성물(controller가 `npm run openapi:write`로 재생성해 commit한다. 직접 수정하지 않는다)
   - `docs/api/openapi.json`
   - `packages/api-client/src/generated/**`(`model/messageResponse.ts` 등)

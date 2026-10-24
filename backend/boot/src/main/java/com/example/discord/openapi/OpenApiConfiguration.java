@@ -50,6 +50,7 @@ class OpenApiConfiguration {
         Map.entry("UserGuildChannelResponse", Set.of("parentId")),
         Map.entry("InviteResponse", Set.of("expiresAt")),
         Map.entry("MessagePageResponse", Set.of("nextCursor")),
+        Map.entry("MessageResponse", Set.of("authorDisplayName")),
         Map.entry("GatewayEventResponse", Set.of("guildId", "channelId")),
         Map.entry("PremiumEntitlementResponse", Set.of("expiresAt")),
         Map.entry("AttachmentResponse", Set.of("messageId")),
