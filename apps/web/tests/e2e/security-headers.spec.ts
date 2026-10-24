@@ -7,6 +7,8 @@ test('serves CSP reporting headers and accepts redacted violation reports', asyn
   const csp = response?.headers()['content-security-policy'] ?? ''
   expect(csp).toContain("script-src 'self' 'nonce-")
   expect(csp).not.toContain("script-src 'self' 'unsafe-inline'")
+  // style-src: dev (nuxt dev webServer) allows Vite's injected <style>; production build stays 'self' only.
+  expect(csp).toMatch(/style-src 'self'( 'unsafe-inline')?(;|$)/)
   expect(csp).toContain('report-to csp-endpoint')
   expect(csp).toContain('report-uri /api/security/csp-report')
   expect(response?.headers()['content-security-policy-report-only']).toContain("style-src 'self'")
