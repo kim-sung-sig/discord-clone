@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import LoginForm from '../components/auth/LoginForm.vue'
+import { usePreferencesStore } from '../stores/preferences'
+
+const preferences = usePreferencesStore()
 </script>
 
 <template>
-  <main class="login-page" aria-label="Login">
+  <main class="login-page" :aria-label="preferences.t('login.pageLabel')">
     <LoginForm />
   </main>
 </template>

@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test'
 
+test('shows the login form in the browser language without developer copy', async ({ page }) => {
+  await page.goto('/login')
+  await page.waitForLoadState('networkidle')
+
+  await expect(page.locator('html')).toHaveAttribute('lang', /^(en-US|ko-KR)$/)
+  await expect(page.getByTestId('login-form')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/Spring Boot|httpOnly|access token/i)
+  await expect(page.getByTestId('login-token-policy')).toHaveCount(0)
+})
+
 test('logs in through the API from the login page with memory-only access token and refresh cookie', async ({ page }) => {
   await page.route('**/api/auth/login', async (route) => {
     await route.fulfill({
@@ -26,11 +36,9 @@ test('logs in through the API from the login page with memory-only access token 
   await page.getByLabel('Password').fill('correct horse battery staple')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  await expect(page.getByTestId('login-success')).toContainText('Signed in with backend session')
-  await expect(page.getByTestId('login-token-policy')).toContainText(
-    'Access token stays in memory. Refresh is handled by an httpOnly cookie.'
-  )
-  await expect(page.getByTestId('open-workspace')).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('workspace')).toBeVisible()
+  await expect(page.getByTestId('login-form')).toHaveCount(0)
 
   const persistedClientState = await page.evaluate(() => {
     const entriesFor = (storage: Storage) =>
