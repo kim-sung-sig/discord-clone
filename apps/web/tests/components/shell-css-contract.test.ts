@@ -63,7 +63,7 @@ describe('T219 shell CSS contracts', () => {
       expect(css).not.toMatch(/workbench-banner button/)
       expect(css).not.toMatch(/activity-bar button span/)
     }
-    expect(mainCss).not.toMatch(/\.channel-group h2 \{\n  display: none/)
+    expect(mainCss).not.toMatch(/\.channel-group h2 \{\n {2}display: none/)
   })
 
   it('keys activity icons on test ids, not on English titles', () => {
