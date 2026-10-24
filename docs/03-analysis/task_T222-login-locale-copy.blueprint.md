@@ -68,6 +68,7 @@
   - `apps/web/tests/components/preferences-locale.test.ts` (신규)
   - `apps/web/tests/components/app-shell.test.ts` (`editor-empty-hint` 단언 한 곳)
   - `apps/web/tests/e2e/login.spec.ts`, `apps/web/tests/e2e/real-backend.spec.ts`
+  - `qa/real-backend-browser-smoke-default.contract.ps1` (필수 snippet에서 제거된 `login-success` 한 줄만 삭제. CI qa-runtime job이 실행한다)
 
 ## 검증 계획
 controller가 실행한다.
@@ -75,6 +76,7 @@ controller가 실행한다.
 - `cd apps/web && npx vitest run`
 - `npm run build --workspace @discord-clone/web`
 - `git diff --check origin/main HEAD`
+- `pwsh -NoProfile -File qa/real-backend-browser-smoke-default.contract.ps1` (`REAL_BACKEND_BROWSER_SMOKE_DEFAULT_CONTRACT_PASS`)
 - production build 대상 Playwright 스크린샷 투어(1440x900, 390x844): 브라우저 언어 `ko-KR`/`en-US` 각각에서 로그인 화면 문구, 로그인 후 `/` 이동, 인증 상태에서 `/login` 재방문 시 이동, `<html lang>` 값을 확인한다.
 
 implementer가 실행하는 focused 테스트:

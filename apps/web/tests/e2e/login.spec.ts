@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test'
 
+// The login form follows the browser language; pin English so the label selectors below stay stable.
+test.use({ locale: 'en-US' })
+
 test('shows the login form in the browser language without developer copy', async ({ page }) => {
   await page.goto('/login')
   await page.waitForLoadState('networkidle')
