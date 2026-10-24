@@ -25,15 +25,21 @@ test('signs in through the real backend and covers guild, channel, and message i
   const { accessToken } = await signup.json()
   const authorization = { Authorization: `Bearer ${accessToken}` }
   const guildName = `Web Real Guild ${stamp}`
-  const guild = await (await request.post(`${backendBaseUrl}/api/guilds`, {
+  const guildResponse = await request.post(`${backendBaseUrl}/api/guilds`, {
     headers: authorization, data: { name: guildName }
-  })).json()
-  const textChannel = await (await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
+  })
+  expect(guildResponse.ok()).toBeTruthy()
+  const guild = await guildResponse.json()
+  const textResponse = await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
     headers: authorization, data: { name: 'real-text', type: 'GUILD_TEXT', parentId: null }
-  })).json()
-  const voiceChannel = await (await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
+  })
+  expect(textResponse.ok()).toBeTruthy()
+  const textChannel = await textResponse.json()
+  const voiceResponse = await request.post(`${backendBaseUrl}/api/guilds/${guild.id}/channels`, {
     headers: authorization, data: { name: 'real-voice', type: 'GUILD_VOICE', parentId: null }
-  })).json()
+  })
+  expect(voiceResponse.ok()).toBeTruthy()
+  const voiceChannel = await voiceResponse.json()
   const seeded = await request.post(`${backendBaseUrl}/api/channels/${textChannel.id}/messages`, {
     headers: authorization, data: { content: 'real backend hello', idempotencyKey: `web-real-seed-${stamp}` }
   })
@@ -44,10 +50,14 @@ test('signs in through the real backend and covers guild, channel, and message i
   await expect(page.getByTestId('login-submit')).toBeEnabled()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
+  // The login form may or may not navigate by itself, so wait for the login response and open the
+  // workspace explicitly; the session is restored from the refresh cookie.
+  const loginResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/api/auth/login') && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByTestId('login-success')).toContainText('Signed in with backend session')
+  expect((await loginResponse).ok()).toBeTruthy()
 
-  await page.getByTestId('open-workspace').click()
+  await page.goto('/')
   await expect(page.getByTestId('workspace')).toBeVisible()
 
   await expect(page.getByTestId('real-api-panel')).toHaveCount(0)

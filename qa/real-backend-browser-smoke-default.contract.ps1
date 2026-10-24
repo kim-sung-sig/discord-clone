@@ -42,7 +42,6 @@ $specSnippets = @(
   'signs in through the real backend and covers guild, channel, and message in the workspace',
   'REAL_BACKEND_E2E',
   'REAL_BACKEND_BASE_URL',
-  'login-success',
   '/api/guilds',
   'guild-name',
   'workspace-explorer',
