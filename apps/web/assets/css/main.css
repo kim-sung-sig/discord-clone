@@ -12,6 +12,25 @@
   font-family: "Segoe UI", "Pretendard", sans-serif;
 }
 
+/*
+ * Workbench theme token defaults (vscode-dark, same values as themes/vscode-dark.json).
+ * The app shell no longer carries an inline style (CSP style-src 'self'); the preferences
+ * store overrides these through CSSOM (style.setProperty) once the client is hydrated.
+ */
+:root {
+  --workbench-bg: #1e1e1e;
+  --activity-bg: #333333;
+  --sidebar-bg: #252526;
+  --editor-bg: #1e1e1e;
+  --workbench-panel-bg: #181818;
+  --status-bg: #007acc;
+  --title-bg: #3c3c3c;
+  --workbench-fg: #d4d4d4;
+  --workbench-muted: #9da5b4;
+  --workbench-accent: #0078d4;
+  --workbench-border: #3c3c3c;
+}
+
 /* Workbench visual polish: keep this at EOF so legacy shell rules cannot override it. */
 .vscode-shell.app-shell {
   height: 100vh;
@@ -54,22 +73,6 @@
   color: currentColor;
   font-size: 20px;
   line-height: 1;
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  content: "▦";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  content: "⌕";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  content: "◉";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  content: "⚙";
 }
 
 .vscode-shell.app-shell .workbench.workspace {
@@ -225,38 +228,6 @@
   height: 18px;
   margin: auto;
   content: "";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  border: 1px solid currentColor;
-  box-shadow:
-    inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
-    inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow: 7px 8px 0 -6px currentColor;
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  width: 17px;
-  height: 17px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  width: 16px;
-  height: 16px;
-  background:
-    radial-gradient(circle, transparent 0 4px, currentColor 4px 6px, transparent 6px),
-    conic-gradient(from 0deg, currentColor 0 12%, transparent 12% 25%, currentColor 25% 37%, transparent 37% 50%, currentColor 50% 62%, transparent 62% 75%, currentColor 75% 87%, transparent 87%);
-  border-radius: 50%;
 }
 
 .vscode-shell.app-shell .workbench.workspace {
@@ -1711,6 +1682,18 @@ input {
   align-items: center;
 }
 
+.user-panel-identity {
+  min-width: 0;
+}
+
+.user-panel-identity strong,
+.user-panel-identity .voice-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .session-panel {
   position: relative;
   flex-wrap: wrap;
@@ -2900,22 +2883,6 @@ input {
   line-height: 1;
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  content: "▦";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  content: "⌕";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  content: "◉";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  content: "⚙";
-}
-
 .vscode-shell.app-shell .workbench.workspace {
   grid-template-columns: 276px minmax(520px, 1fr) 224px;
   grid-template-rows: minmax(0, 1fr) 148px 24px;
@@ -3059,14 +3026,14 @@ input {
   content: "";
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-explorer"]::before {
   border: 1px solid currentColor;
   box-shadow:
     inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
     inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-search"]::before {
   width: 14px;
   height: 14px;
   border: 2px solid currentColor;
@@ -3074,7 +3041,7 @@ input {
   box-shadow: 7px 8px 0 -6px currentColor;
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-calls"]::before {
   width: 17px;
   height: 17px;
   border: 2px solid currentColor;
@@ -3082,7 +3049,7 @@ input {
   box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-settings"]::before {
   width: 16px;
   height: 16px;
   background:
