@@ -45,7 +45,7 @@
      - `messageAuthorLabel(author, viewer, knownLabel?)`: `authorDisplayName`(공백 제외) → 작성자가 로그인 사용자면 auth user의 `displayName`, 없으면 `username` → `knownLabel`(이미 서버에서 확인된 이전 표시 이름) → `UNKNOWN_MESSAGE_AUTHOR`.
      - `UNKNOWN_MESSAGE_AUTHOR = '알 수 없는 사용자'`: locale에 unknown user key가 없고, T221은 locale key를 추가하지 않는다(전역 제약 4).
      - `messageAuthorInitials(name)`: 앞뒤 공백을 빼고 code point 기준 앞 두 글자를 대문자로 만든다. 한글과 emoji surrogate pair가 깨지지 않는다. 빈 이름이면 `?`.
-   - `shell.ts` 4곳의 `author:`는 `messageAuthorLabel(message, useAuthStore().user)`를 쓴다. Gateway 생성 이벤트는 payload의 `authorDisplayName`을 쓰고, 없으면 같은 규칙을 적용한다. 이때 전송 중(`status: 'sending'`)이 아닌 기존 메시지의 `author`를 `knownLabel`로 넘긴다. 근거 없는 legacy `author` payload key fallback과 `'unknown'` literal은 제거한다.
+   - `shell.ts` 4곳의 `author:`는 `messageAuthorLabel(message, useAuthStore().user)`를 쓴다. Gateway 생성 이벤트는 payload의 `authorDisplayName`을 쓰고, 없으면 같은 규칙을 적용한다. 이때 id가 같은 기존 메시지이고 전송 중(`status: 'sending'`)이 아닐 때만 그 `author`를 `knownLabel`로 넘긴다. 기존 `existing` 조회는 `clientEventId`가 둘 다 `undefined`이면 id가 다른 메시지와도 일치하므로, id 일치를 따로 확인해 다른 사람의 이름을 빌려 오지 않게 한다. 근거 없는 legacy `author` payload key fallback과 `'unknown'` literal은 제거한다.
    - `ChatViewport.vue` avatar는 `messageAuthorInitials(message.author)`를 쓴다. 이름 줄은 이미 `message.author`를 표시하므로 그대로 둔다.
 
 ## Expected Changed Files
@@ -73,14 +73,13 @@
   - `apps/web/services/message-author.ts`(신규)
   - `apps/web/stores/shell.ts`(`BackendMessageResponse` 타입, mapping 4곳, import)
   - `apps/web/components/shell/ChatViewport.vue`(avatar 이니셜, import)
-  - `apps/web/tests/components/message-author.test.ts`(신규)
-  - `apps/web/tests/components/shell-contracts.test.ts`(store mapping test 추가)
+  - `apps/web/tests/components/message-author.test.ts`(신규: helper, store mapping 4곳, avatar 렌더링. T220과 충돌하지 않도록 `shell-contracts.test.ts`는 건드리지 않는다)
 - 문서
   - 이 blueprint
   - merge 전 evidence `docs/03-analysis/task_T221-merge-review.md`(controller)
 
 ## 검증 계획
-- 구현자: `cd apps/web && npx vitest run tests/components/message-author.test.ts tests/components/shell-contracts.test.ts`
+- 구현자: `cd apps/web && npx vitest run tests/components/message-author.test.ts tests/components/shell-contracts.test.ts tests/components/app-shell.test.ts tests/components/story-index.test.ts`
 - controller
   - `npm run lint`
   - `cd apps/web && npx vitest run`
@@ -100,4 +99,5 @@
 - 이미 배포된 client가 `authorDisplayName`을 모르면 무시한다. field 추가라 하위 호환이다.
 - web 문구 `알 수 없는 사용자`는 locale을 거치지 않으므로 en-US 화면에서도 한국어로 보인다. locale key 추가는 T222 영역이라 이번에는 literal을 쓴다(brief 지시).
 - 전송 중 메시지의 작성자 표시와 mention chip의 id 표시는 남는다(범위 밖, 후속).
+- 기존 결함(범위 밖, 보고만 함): `applyGatewayMessageCreate`는 payload에 `clientEventId`가 없으면 `candidate.clientEventId !== clientEventId`가 `undefined !== undefined`로 거짓이 되어, `clientEventId`가 없는 다른 메시지(REST로 읽은 메시지 전부)를 목록에서 지운다. backend Gateway payload에는 `clientEventId`가 없다. 메시지 상태·순서를 다루는 T220 또는 후속 task에서 고쳐야 한다. 이번 변경은 이 조회 결과로 작성자 이름을 잘못 가져오지 않도록만 막았다.
 - `shell.ts`와 `ChatViewport.vue`는 T220과 같은 file이다. hunk는 mapping 줄과 avatar 줄로 한정했다.
