@@ -40,7 +40,7 @@
    - `LoginForm.vue`도 mount 시 `preferences.hydrate()`를 호출한다(로그인 페이지는 `app.vue` 셸 밖이라 지금은 hydrate가 호출되지 않는다).
 3. **로그인 문구**
    - 새 key: `login.pageLabel`, `login.kicker`, `login.title`, `login.description`, `login.email`, `login.password`, `login.submit`, `login.submitting`, `login.error.invalidCredentials`, `login.error.locked`, `login.error.forbidden`, `login.error.unreachable`.
-   - 안내 문구는 한 줄(`login.description`: "계정으로 로그인해 워크스페이스를 시작하세요.")만 남기고 `login-token-policy` 문단은 삭제한다.
+   - 안내 문구는 한 줄(`login.description`: "계정으로 로그인해 시작해 보세요.")만 남기고 `login-token-policy` 문단은 삭제한다.
    - 오류 문구는 `stores/auth.ts`의 `loginErrorMessage`가 `usePreferencesStore().t(...)`로 만든다. 기본 로케일(en-US)의 영어 문구는 기존과 글자까지 같게 유지해 `auth-api-client.test.ts`가 그대로 통과한다. 세션 목록 오류(`sessionErrorMessage`)는 범위 밖이다.
 4. **placeholder 값**
    - `editor.channelDescription`: 채널에 topic 데이터가 없다. `ChatViewport.vue`의 `<p>` 한 줄을 삭제하고 key를 제거한다.
@@ -49,7 +49,7 @@
    - `banner.register`: 버튼이 남아 있으므로 key 유지. ko "회원가입".
 5. **번역 검토 원칙**
    - 문장은 해요체, 라벨은 명사형으로 통일한다. 번역투(예: "~할 수 있습니다", "큐", "워크벤치", "셸 컨텍스트", "길드", "음성 룸")를 쓰지 않는다.
-   - 용어: 서버(guild), 채널, 메시지, 멤버, 알림함(inbox), 음성 채널(voice room). 앱 이름은 "워크스페이스"를 유지한다.
+   - 용어: 서버(guild), 채널, 메시지, 멤버, 알림함(inbox), 음성 채널(voice room, 활동 막대의 "통화" 항목 포함). 앱 이름(brand)은 번역하지 않고 en/ko 모두 "Discord Clone"으로 통일한다(`app.title`, 로그인 제목, 페이지 title과 동일). "워크스페이스"는 앱 전체를 가리키는 일반 명사로만 쓰고, 서버는 항상 "서버"/"Server"다(`view.settings.guild`).
    - 값 변경은 task report에 전후 표로 남긴다.
 
 ## Expected Changed Files

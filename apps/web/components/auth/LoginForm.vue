@@ -20,6 +20,8 @@ onMounted(() => {
     if (restored) {
       await openWorkspace()
     }
+  }).catch(() => {
+    // A failed restore or navigation leaves the user on the form.
   }).finally(() => {
     isHydrated.value = true
   })
@@ -89,6 +91,8 @@ async function submitLogin() {
 .login-card {
   width: min(100%, 440px);
   padding: 34px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   background: rgba(23, 32, 51, 0.9);
   border: 1px solid var(--line);
   border-radius: 28px;

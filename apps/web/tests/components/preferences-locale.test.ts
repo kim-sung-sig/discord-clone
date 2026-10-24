@@ -122,6 +122,16 @@ describe('locale catalogs', () => {
     }
   })
 
+  it('use one brand name and consistent terminology', () => {
+    expect(koKr['app.title']).toBe(enUs['app.title'])
+    expect(koKr['login.title']).toContain(koKr['app.title'])
+    expect(enUs['login.title']).toContain(enUs['app.title'])
+    expect(koKr['activity.calls']).toBe(koKr['view.calls.title'])
+    expect(koKr['voice.joinWarRoom']).not.toMatch(/war-room/i)
+    expect(koKr['view.settings.guild']).toBe('서버')
+    expect(enUs['view.settings.guild']).toBe('Server')
+  })
+
   it('do not leak developer wording to users', () => {
     const forbidden = /Spring Boot|httpOnly|access token|skeleton|SFU|bootstrap|VS Code|스켈레톤|부트스트랩/i
     for (const catalog of [enUs, koKr]) {

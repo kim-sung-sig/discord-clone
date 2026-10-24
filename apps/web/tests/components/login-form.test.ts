@@ -126,6 +126,24 @@ describe('LoginForm', () => {
     expect(nuxtMocks.navigateTo).toHaveBeenCalledWith('/', { replace: true })
   })
 
+  it('keeps the form usable when navigating after a restored session fails', async () => {
+    nuxtMocks.navigateTo.mockRejectedValueOnce(new Error('navigation aborted'))
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({
+      accessToken: 'restored-access-token',
+      user: { id: 'user-1', username: 'user', displayName: 'User' }
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    }))
+    const wrapper = await mountSuspended(LoginForm, {
+      global: { plugins: [pinia] }
+    })
+    await flushPromises()
+
+    expect(nuxtMocks.navigateTo).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="login-submit"]').attributes('disabled')).toBeUndefined()
+  })
+
   it('stays on the form when there is no session to restore', async () => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ message: 'refresh token invalid' }), {
       status: 401,
