@@ -7,15 +7,6 @@ const shell = useShellStore()
 const isHydrated = ref(false)
 
 const activeGroup = computed(() => shell.activeGroupDm)
-const canAddQaScout = computed(
-  () => isHydrated.value && Boolean(activeGroup.value) && !activeGroup.value?.memberIds.includes('qa-scout')
-)
-
-const addQaScout = () => {
-  if (activeGroup.value) {
-    shell.addGroupDmMember(activeGroup.value.id, 'qa-scout')
-  }
-}
 
 onMounted(() => {
   isHydrated.value = true
@@ -29,7 +20,11 @@ onMounted(() => {
       <h2>Direct messages</h2>
     </header>
 
-    <section class="dm-section" aria-labelledby="direct-message-title">
+    <section
+      v-if="shell.socialDirectSummaries.length"
+      class="dm-section"
+      aria-labelledby="direct-message-title"
+    >
       <h3 id="direct-message-title">Friends</h3>
       <button
         v-for="dm in shell.socialDirectSummaries"
@@ -54,7 +49,11 @@ onMounted(() => {
       </button>
     </section>
 
-    <section class="dm-section" aria-labelledby="group-message-title">
+    <section
+      v-if="shell.social.groupDms.length"
+      class="dm-section"
+      aria-labelledby="group-message-title"
+    >
       <h3 id="group-message-title">Group DMs</h3>
       <button
         v-for="groupDm in shell.social.groupDms"
@@ -82,17 +81,7 @@ onMounted(() => {
       data-testid="group-dm-members"
       aria-labelledby="group-members-title"
     >
-      <div class="dm-section-heading">
-        <h3 id="group-members-title">Members</h3>
-        <button
-          type="button"
-          data-testid="add-group-member"
-          :disabled="!canAddQaScout"
-          @click="addQaScout"
-        >
-          Add qa-scout
-        </button>
-      </div>
+      <h3 id="group-members-title">Members</h3>
 
       <article
         v-for="memberId in activeGroup.memberIds"

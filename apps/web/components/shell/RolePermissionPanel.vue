@@ -37,7 +37,7 @@ const shell = useShellStore()
       </button>
     </section>
 
-    <section class="role-panel-section" aria-labelledby="preview-role-title">
+    <section v-if="shell.roles.length" class="role-panel-section" aria-labelledby="preview-role-title">
       <h3 id="preview-role-title">Preview as role</h3>
       <article class="preview-as-role" data-testid="preview-as-role">
         <strong>Preview as {{ shell.previewAsRole.roleName }}</strong>
@@ -46,7 +46,7 @@ const shell = useShellStore()
       </article>
     </section>
 
-    <section class="role-panel-section" aria-labelledby="role-list-title">
+    <section v-if="shell.roles.length" class="role-panel-section" aria-labelledby="role-list-title">
       <h3 id="role-list-title">Roles</h3>
       <article
         v-for="role in shell.roles"
@@ -67,7 +67,11 @@ const shell = useShellStore()
       </article>
     </section>
 
-    <section class="role-panel-section" aria-labelledby="member-role-title">
+    <section
+      v-if="shell.memberRoleSummaries.length"
+      class="role-panel-section"
+      aria-labelledby="member-role-title"
+    >
       <h3 id="member-role-title">Member roles</h3>
       <p
         v-for="member in shell.memberRoleSummaries"
@@ -80,7 +84,11 @@ const shell = useShellStore()
       </p>
     </section>
 
-    <section class="role-panel-section" aria-labelledby="overwrite-title">
+    <section
+      v-if="shell.activeChannelOverwriteSummaries.length"
+      class="role-panel-section"
+      aria-labelledby="overwrite-title"
+    >
       <h3 id="overwrite-title">Active channel overwrites</h3>
       <article
         v-for="overwrite in shell.activeChannelOverwriteSummaries"
@@ -95,7 +103,11 @@ const shell = useShellStore()
       </article>
     </section>
 
-    <section class="role-panel-section" aria-labelledby="privileged-audit-title">
+    <section
+      v-if="shell.privilegedAuditLogs.length"
+      class="role-panel-section"
+      aria-labelledby="privileged-audit-title"
+    >
       <h3 id="privileged-audit-title">Privileged audit</h3>
       <article
         v-for="entry in shell.privilegedAuditLogs"

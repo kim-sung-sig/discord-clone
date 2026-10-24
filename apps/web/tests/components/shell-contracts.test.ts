@@ -1,7 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../pages/app.vue'
 import { discordApiPaths, createDiscordRestClient } from '../../services/discord-api'
 import {
@@ -11,11 +11,16 @@ import {
   toShellGatewayEvent
 } from '../../services/gateway-client'
 import { useShellStore } from '../../stores/shell'
+import { seedShellDemoState } from '../fixtures/shell-demo-state'
 import { useAuthStore } from '../../stores/auth'
 
 enableAutoUnmount(afterEach)
 
 describe('Discord shell API and Gateway contracts', () => {
+  beforeEach(() => {
+    seedShellDemoState()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
     useAuthStore().$reset()
@@ -104,7 +109,7 @@ describe('Discord shell API and Gateway contracts', () => {
     const auth = useAuthStore()
     auth.$reset()
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     auth.acceptSession({ accessToken: 'token-a', user: { id: 'user-a', username: 'a', displayName: 'A' } })
     let resolveBody!: (body: unknown) => void
     const response = new Response('{}')
@@ -358,7 +363,7 @@ describe('Discord shell API and Gateway contracts', () => {
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'access-token'
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     const userId = '123e4567-e89b-12d3-a456-426614174000'
     let requestBody: Record<string, unknown> | undefined
     vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -382,7 +387,7 @@ describe('Discord shell API and Gateway contracts', () => {
     auth.accessToken = 'access-token'
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ input, init })
@@ -439,7 +444,7 @@ describe('Discord shell API and Gateway contracts', () => {
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'access-token'
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify({ message: 'rate limited' }), {
         status: 429,
@@ -458,7 +463,7 @@ describe('Discord shell API and Gateway contracts', () => {
   it('detects gateway sequence gaps and refuses stale message updates', async () => {
     await mountSuspended(App)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     expect(shell.applyGatewayDispatch({
       sequence: 45,
@@ -508,7 +513,7 @@ describe('Discord shell API and Gateway contracts', () => {
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'access-token'
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     shell.resyncRequired = true
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
