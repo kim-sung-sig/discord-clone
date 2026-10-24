@@ -1,18 +1,29 @@
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { useShellStore } from '../../stores/shell'
 import { useAuthStore } from '../../stores/auth'
 
 const shell = useShellStore()
 const auth = useAuthStore()
+// The client middleware restores the session before hydration, but the server render has none.
+// Auth-dependent output waits for mount so the first client render matches the server HTML.
+const isHydrated = ref(false)
+const identityName = computed(() =>
+  isHydrated.value ? auth.user?.displayName ?? shell.currentUser : shell.currentUser
+)
+
+onMounted(() => {
+  isHydrated.value = true
+})
 </script>
 
 <template>
   <footer class="user-panel" data-testid="user-panel" aria-label="Current user">
     <div class="user-panel-identity">
-      <strong>{{ auth.user?.displayName ?? shell.currentUser }}</strong>
+      <strong>{{ identityName }}</strong>
       <span class="voice-state">{{ shell.voiceState }}</span>
     </div>
-    <section v-if="auth.accessToken" class="session-panel" data-testid="session-panel" aria-label="Signed-in sessions">
+    <section v-if="isHydrated && auth.accessToken" class="session-panel" data-testid="session-panel" aria-label="Signed-in sessions">
       <button type="button" class="session-action" data-testid="load-sessions" @click="auth.loadSessions()">
         Sessions
       </button>

@@ -81,9 +81,7 @@ onMounted(() => {
       data-testid="group-dm-members"
       aria-labelledby="group-members-title"
     >
-      <div class="dm-section-heading">
-        <h3 id="group-members-title">Members</h3>
-      </div>
+      <h3 id="group-members-title">Members</h3>
 
       <article
         v-for="memberId in activeGroup.memberIds"

@@ -1,6 +1,8 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { createSSRApp, nextTick, type Component } from 'vue'
+import { renderToString } from 'vue/server-renderer'
+import { getActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../../pages/app.vue'
 import ChatViewport from '../../components/shell/ChatViewport.vue'
@@ -8,6 +10,7 @@ import DmSidebar from '../../components/social/DmSidebar.vue'
 import GatewayStatusPanel from '../../components/shell/GatewayStatusPanel.vue'
 import MemberSidebar from '../../components/shell/MemberSidebar.vue'
 import RolePermissionPanel from '../../components/shell/RolePermissionPanel.vue'
+import UserPanel from '../../components/shell/UserPanel.vue'
 import VoicePanel from '../../components/shell/VoicePanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import { compareShellMessages, useShellStore, type ShellMessage } from '../../stores/shell'
@@ -73,6 +76,13 @@ const openBackendChannel = () => {
 }
 
 const activeIds = () => useShellStore().activeMessages.map((message) => message.id)
+
+// A render pass without mount hooks: what SSR produces and what hydration compares against.
+const renderFirstPass = (component: Component) => {
+  const app = createSSRApp(component)
+  app.use(getActivePinia()!)
+  return renderToString(app)
+}
 
 describe('real workspace data', () => {
   afterEach(() => {
@@ -153,6 +163,33 @@ describe('real workspace data', () => {
 
       expect(wrapper.get('[data-testid="chat-viewport"]').html()).toBe(before.chat)
       expect(wrapper.get('[data-testid="channel-sidebar"]').html()).toBe(before.channels)
+    })
+  })
+
+  describe('hydration', () => {
+    it('renders auth-dependent parts identically before and after the client session restore', async () => {
+      const shell = openBackendChannel()
+      shell.messagePageCursors = { 'channel-a': 'cursor-1' }
+      const components = [UserPanel, MemberSidebar, ChatViewport]
+
+      const serverHtml = await Promise.all(components.map(renderFirstPass))
+      signIn()
+      const firstClientHtml = await Promise.all(components.map(renderFirstPass))
+
+      expect(firstClientHtml).toEqual(serverHtml)
+      expect(firstClientHtml[0]).not.toContain('김성식')
+      expect(firstClientHtml[0]).not.toContain('session-panel')
+      expect(firstClientHtml[2]).not.toContain('load-older-messages')
+    })
+
+    it('shows the signed-in identity and sessions in the user panel once mounted', async () => {
+      useShellStore().$reset()
+      signIn()
+
+      const wrapper = await mountSuspended(UserPanel)
+
+      expect(wrapper.get('[data-testid="user-panel"]').text()).toContain('김성식')
+      expect(wrapper.find('[data-testid="session-panel"]').exists()).toBe(true)
     })
   })
 
@@ -364,6 +401,31 @@ describe('real workspace data', () => {
     })
   })
 
+  describe('older page scroll', () => {
+    it('keeps the reader position when an older page is prepended', async () => {
+      signIn()
+      const shell = openBackendChannel()
+      shell.messages = [shellMessage({ id: 'm3', sequence: 3, createdAt: '2026-10-01T10:03:00.000Z' })]
+      shell.messagePageCursors = { 'channel-a': 'cursor-1' }
+      vi.stubGlobal('fetch', async () => jsonResponse({ messages: [
+        backendMessage('m2', 2, '2026-10-01T10:02:00.000Z'),
+        backendMessage('m1', 1, '2026-10-01T10:01:00.000Z')
+      ], nextCursor: null }))
+      const wrapper = await mountSuspended(ChatViewport)
+      const list = wrapper.get('[data-testid="message-list"]').element as HTMLElement
+      Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => shell.messages.length * 200 })
+      Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => 100 })
+      list.scrollTop = 40
+      list.dispatchEvent(new Event('scroll'))
+
+      await wrapper.get('[data-testid="load-older-messages"]').trigger('click')
+      await flushPromises()
+
+      expect(activeIds()).toEqual(['m1', 'm2', 'm3'])
+      expect(list.scrollTop).toBe(440)
+    })
+  })
+
   describe('read marker', () => {
     it('selects only the newest server-confirmed message of the active channel', () => {
       const shell = openBackendChannel()
@@ -415,6 +477,41 @@ describe('real workspace data', () => {
 
       await vi.waitFor(() => expect(shell.presence.readMarkers['channel-a']?.lastReadSequence).toBe(5))
       expect(readBodies).toEqual([{ lastReadSequence: 5 }])
+    })
+
+    it('marks read when a message with the same id and sequence becomes server-confirmed', async () => {
+      const observers: Array<{ notify: () => void }> = []
+      vi.stubGlobal('IntersectionObserver', class {
+        constructor(callback: IntersectionObserverCallback) {
+          observers.push({ notify: () => { void callback([{ isIntersecting: true } as IntersectionObserverEntry], this as IntersectionObserver) } })
+        }
+        observe() {}
+        disconnect() {}
+      })
+      const readBodies: unknown[] = []
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(input)
+        if (path.endsWith('/api/presence/channels/channel-a/read') && init?.method === 'PUT') {
+          readBodies.push(JSON.parse(String(init.body)))
+          return jsonResponse({ lastReadSequence: 4 })
+        }
+        if (path.endsWith('/api/notifications')) return jsonResponse([])
+        if (path.endsWith('/api/notifications/unread-count')) return jsonResponse({ unreadCount: 0 })
+        if (path.endsWith('/api/notifications/channel-unread')) return jsonResponse({})
+        return jsonResponse({}, 404)
+      })
+      signIn()
+      const shell = openBackendChannel()
+      await mountSuspended(ChatViewport)
+      shell.messages = [shellMessage({ id: 'm4', sequence: 4, status: 'sent', localSequence: true })]
+      await flushPromises()
+      expect(observers).toHaveLength(0)
+
+      shell.messages = [shellMessage({ id: 'm4', sequence: 4, status: 'sent' })]
+      await vi.waitFor(() => expect(observers.length).toBeGreaterThan(0))
+      observers.at(-1)!.notify()
+
+      await vi.waitFor(() => expect(readBodies).toEqual([{ lastReadSequence: 4 }]))
     })
   })
 })

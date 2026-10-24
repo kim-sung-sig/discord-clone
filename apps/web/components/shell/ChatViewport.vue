@@ -28,14 +28,15 @@ const activeChannelLabel = computed(() => {
 const composerPlaceholder = computed(() => `${preferences.t('composer.placeholder')} ${activeChannelLabel.value}`)
 const activeTypingUserIds = computed(() => shell.activeTypingUserIds)
 const emptyStateText = computed(() => `${preferences.t('editor.emptyBody')} ${activeChannelLabel.value}`)
-const canLoadOlderMessages = computed(() => Boolean(auth.accessToken && shell.activeMessagePageCursor))
+// composerReady doubles as the mounted flag: the server render has no session.
+const canLoadOlderMessages = computed(() => Boolean(composerReady.value && auth.accessToken && shell.activeMessagePageCursor))
 
 onMounted(() => {
   composerReady.value = true
   scrollToBottom()
 })
 
-watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeReadMarkerMessage?.id, shell.activeReadMarkerMessage?.sequence, shell.activeReadMarkerMessage?.status, shell.activeReadMarkerMessage?.localSequence], async () => {
   const generation = ++readGeneration
   readObserver?.disconnect()
   readObserver = null
@@ -117,7 +118,16 @@ async function loadOlderMessages() {
     return
   }
 
+  // Keep the reader's position: prepended messages push content down by the height delta.
+  // Assign an absolute position so browsers with scroll anchoring are not compensated twice.
+  const list = messageListRef.value
+  const previousHeight = list?.scrollHeight ?? 0
+  const previousTop = list?.scrollTop ?? 0
   await shell.loadOlderActiveChannelMessages(auth.accessToken)
+  await nextTick()
+  if (list) {
+    list.scrollTop = previousTop + list.scrollHeight - previousHeight
+  }
 }
 </script>
 

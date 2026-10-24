@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
 
 // T220: the shell store no longer ships a demo workspace; it lives only in the unit-test seed
-// (tests/fixtures/shell-demo-state.ts). Specs that need demo channels, members, or DMs stay
-// test.fixme until they run against an authenticated, seeded workspace.
+// (tests/fixtures/shell-demo-state.ts). Specs that relied on the in-store demo data are test.fixme
+// until the follow-up rewrites them to seed via page.route auth mock (see the T220 blueprint risks).
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('loads Discord shell landmarks', async ({ page }) => {
   await page.goto('/')
 
@@ -48,6 +49,7 @@ test.fixme('loads Discord shell landmarks', async ({ page }) => {
   await expect(page.locator('[data-gateway-sequence]')).toHaveCount(0)
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('sends a message from the active channel composer', async ({ page }) => {
   await page.goto('/')
 
@@ -63,6 +65,7 @@ test.fixme('sends a message from the active channel composer', async ({ page }) 
   await expect(page.getByTestId('message-input')).toHaveValue('')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('stages and sends a deterministic image attachment from the composer', async ({ page }) => {
   await page.goto('/')
 
@@ -78,6 +81,7 @@ test.fixme('stages and sends a deterministic image attachment from the composer'
   await expect(page.getByTestId('message-attachment-attachment-demo-image')).toContainText('qa-snapshot.png')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('selects a text channel and updates active channel content', async ({ page }) => {
   await page.goto('/')
 
@@ -100,6 +104,7 @@ test.fixme('selects a text channel and updates active channel content', async ({
   await expect(page.getByTestId('chat-viewport')).not.toContainText('Scoped architecture note')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('clears a channel unread badge after selecting the channel', async ({ page }) => {
   await page.goto('/')
 
@@ -165,6 +170,7 @@ test('opens notification inbox and jumps to unread channel work', async ({ page 
   await expect(page.getByTestId('unread-badge-channel-architecture')).toHaveCount(0)
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('searches messages and resolves a moderation report from the workbench', async ({ page }) => {
   await page.route('**/api/auth/refresh', async (route) => {
     await route.fulfill({
@@ -189,6 +195,7 @@ test.fixme('searches messages and resolves a moderation report from the workbenc
   await expect(page.getByTestId('workbench-report-queue')).not.toContainText('Needs moderator review')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('shows active channel typing state in the message viewport', async ({ page }) => {
   await page.goto('/')
 
@@ -199,6 +206,7 @@ test.fixme('shows active channel typing state in the message viewport', async ({
   await expect(page.getByTestId('typing-indicator')).toHaveCount(0)
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('opens a group DM, mutates members, and starts the group call skeleton', async ({ page }) => {
   await page.goto('/')
 
@@ -217,6 +225,7 @@ test.fixme('opens a group DM, mutates members, and starts the group call skeleto
   await expect(page.getByTestId('group-call-participants')).toContainText('vibe-coder')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('adds and removes a reaction from the first visible message', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('message-input')).toBeEnabled()
@@ -235,6 +244,7 @@ test.fixme('adds and removes a reaction from the first visible message', async (
   await expect(page.getByTestId('reaction-chip-message-general-welcome-shipit')).toHaveCount(0)
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('manages forum tags and archived thread writes', async ({ page }) => {
   await page.goto('/')
 
@@ -261,6 +271,7 @@ test.fixme('manages forum tags and archived thread writes', async ({ page }) => 
   await expect(page.getByTestId('thread-forum-release-plan')).toContainText('Release plan')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('runs onboarding, AutoMod, and audit log moderation flow', async ({ page }) => {
   await page.goto('/')
 
@@ -279,6 +290,7 @@ test.fixme('runs onboarding, AutoMod, and audit log moderation flow', async ({ p
   await expect(page.getByTestId('chat-viewport')).not.toContainText('leak the release token')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('joins voice, toggles controls, screen shares, and leaves', async ({ page }) => {
   await page.goto('/')
 
@@ -309,6 +321,7 @@ test.fixme('joins voice, toggles controls, screen shares, and leaves', async ({ 
   await expect(callsView.getByTestId('voice-events')).toContainText('VOICE_LEAVE')
 })
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('runs stage, soundboard, and premium skeleton operations', async ({ page }) => {
   await page.goto('/')
 

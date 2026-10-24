@@ -3,11 +3,12 @@ import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 
 // T220: the shell store no longer ships a demo workspace; it lives only in the unit-test seed
-// (tests/fixtures/shell-demo-state.ts). Specs that need demo channels, members, or DMs stay
-// test.fixme until they run against an authenticated, seeded workspace.
+// (tests/fixtures/shell-demo-state.ts). Specs that relied on the in-store demo data are test.fixme
+// until the follow-up rewrites them to seed via page.route auth mock (see the T220 blueprint risks).
 
 const visualSmokeDir = resolve(process.cwd(), 'test-results', 'visual-smoke')
 
+// fixme(T220 follow-up): relied on the in-store demo workspace; seed via page.route auth mock
 test.fixme('captures desktop and mobile Discord shell smoke screenshots', async ({ page }) => {
   mkdirSync(visualSmokeDir, { recursive: true })
 

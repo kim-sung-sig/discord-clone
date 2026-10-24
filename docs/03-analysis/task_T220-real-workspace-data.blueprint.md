@@ -22,7 +22,7 @@
   - 메시지 작성자 표시 이름(T221). `shell.ts`의 `author:` 매핑 줄은 건드리지 않는다.
   - layout CSS와 `pages/app.vue`(T219). 숨겨진 legacy section 제거, status bar(`READY {lastSequence}`) 문구도 T219/T222 소관이다.
   - locale 파일(T222). 새 locale key를 추가하지 않는다. 빈 section은 숨긴다.
-  - `UserPanel`, `InviteModal`, `ForumPanel`, `ModerationPanel`, `ExperiencePanel`의 표시 변경. 이 컴포넌트들은 store 기본값이 비면 빈 값을 그린다. `InviteModal`과 legacy section은 T219가 다룬다.
+  - `InviteModal`, `ForumPanel`, `ModerationPanel`, `ExperiencePanel`의 표시 변경(`UserPanel`은 fix round 1에서 hydration 때문에 범위에 넣었다). 이 컴포넌트들은 store 기본값이 비면 빈 값을 그린다. `InviteModal`과 legacy section은 T219가 다룬다.
   - Gateway 실제 연결(`services/gateway-client.ts`는 UI에서 연결되지 않는다). 패널은 연결되지 않은 실제 상태를 보여 준다.
 
 ## 설계 결정
@@ -54,6 +54,16 @@
    - scroll: `ChatViewport`가 목록이 맨 아래 근처(48px)인지 추적한다. 채널을 바꾸거나 메시지를 보내면 맨 아래 고정을 켠다. 마지막 메시지가 바뀌었을 때 고정 상태면 맨 아래로 scroll한다. 이전 page를 불러오면 마지막 메시지가 그대로라 scroll되지 않는다. 사용자가 위로 올려 읽는 중에 새 메시지가 와도 끌어내리지 않는다.
 6. **read marker**: `activeReadMarkerMessage` getter가 활성 채널에서 서버 sequence가 있는 메시지(전송 중·실패·`localSequence` 제외) 중 sequence가 가장 큰 것을 고른다. `ChatViewport`의 watcher는 이 getter만 쓴다. optimistic 메시지의 local sequence(서버 MAX보다 큼)로 PUT해 400이 나던 경로가 없어진다.
 7. **hydration**: SSR과 client 모두 빈 기본 state에서 시작한다. client에서 `middleware/auth.global.ts`가 `restoreSession()` → `acceptSession()` → `resetAccountState()`를 불러도 결과가 같은 빈 state라 shell 영역의 첫 render가 같다. 실제 workspace는 mount 뒤 `bootstrapCurrentUserWorkspace`가 채운다. middleware는 바꾸지 않는다.
+   - fix round 1: client middleware는 hydration 전에 session을 복원한다. 그래서 render 중 `auth.*`를 읽는 컴포넌트는 SSR(세션 없음)과 첫 client render가 달라진다. 이 task 범위의 컴포넌트는 auth 의존 출력을 mount 뒤로 미룬다.
+     - `UserPanel`: 이름 줄(`auth.user?.displayName`)과 `session-panel`(`v-if="auth.accessToken"`)을 `isHydrated` 뒤에 그린다. mount 전에는 SSR과 같이 `shell.currentUser`(기본 `''`)를 그린다.
+     - `ChatViewport`: "이전 메시지" 버튼(`auth.accessToken` 조건)은 mount 뒤에만 그린다(`composerReady`를 mounted flag로 쓴다).
+     - `MemberSidebar`: 처음부터 mount 뒤에만 그린다.
+     - test는 `vue/server-renderer`로 mount hook 없는 render를 두 번 한다(auth 비움, auth 채움). 두 결과의 HTML이 같은지 확인한다.
+     - 남는 후보: `pages/app.vue`의 `real-api-panel`(`v-if="auth.accessToken"`)은 첫 화면에서 auth를 읽는다. T219가 legacy section과 함께 지우므로 이 task는 바꾸지 않는다. 같은 파일의 inbox section(`auth.accessToken`)은 inbox view에서만 그려져 첫 render에 들어가지 않는다.
+8. **fix round 1 추가 결정**
+   - 이전 page를 불러올 때 scroll 위치를 보존한다. load 전 `scrollHeight`와 `scrollTop`을 저장하고, load 뒤 `scrollTop = 이전 scrollTop + (새 scrollHeight - 이전 scrollHeight)`로 절대값을 대입한다. 절대값을 쓰므로 scroll anchoring을 지원하는 브라우저에서 이미 보정된 경우에도 두 번 더해지지 않는다(Safari는 `overflow-anchor`가 없다).
+   - read marker watcher의 key는 선택된 `activeReadMarkerMessage`의 id, sequence, status, `localSequence`다. 같은 id·sequence의 메시지가 local에서 서버 확정으로 바뀌어도 다시 실행된다.
+   - `DmSidebar`: 버튼을 지워 `h3` 하나만 남은 `.dm-section-heading` wrapper를 없앤다. CSS의 `.dm-section-heading`은 flex 정렬과 버튼 모양만 정의하므로 `h3` 단독에는 필요 없다.
 
 ## Expected Changed Files
 - 문서
@@ -67,6 +77,7 @@
   - `apps/web/components/shell/RolePermissionPanel.vue`
   - `apps/web/components/shell/VoicePanel.vue`
   - `apps/web/components/social/DmSidebar.vue`
+  - `apps/web/components/shell/UserPanel.vue`(fix round 1, hydration)
   - `apps/web/middleware/auth.global.ts`(검증 결과 필요할 때만. 현재 계획은 변경 없음)
 - test
   - `apps/web/tests/fixtures/shell-demo-state.ts`(신규)
@@ -86,6 +97,10 @@
 ## 위험
 - **병합 충돌**: T221이 `shell.ts`의 `author:` 매핑 줄을 바꾼다. 이 task는 그 줄과 바로 붙은 줄을 바꾸지 않는다. `localSequence`는 객체 끝에 둔다. T219가 `pages/app.vue`를 바꾸므로 이 task는 `app.vue`를 바꾸지 않는다.
 - **`app.vue`가 직접 읽는 값**: status bar가 `READY {gateway.lastSequence}`를 그리므로 기본값에서는 `READY 0`이 된다. 문구 정리는 T219/T222 소관이다.
-- **legacy 컴포넌트**: `InviteModal`, `ForumPanel`, `ModerationPanel`, `ExperiencePanel`, `UserPanel`은 기본값이 비면 빈 값을 그린다. T219가 legacy section을 숨기기 전에는 빈 카드가 보일 수 있다. `UserPanel`은 `auth.user`를 SSR 뒤 바로 읽어 hydration 불일치 여지가 남는다(이 task 범위 밖).
+- **legacy 컴포넌트**: `InviteModal`, `ForumPanel`, `ModerationPanel`, `ExperiencePanel`은 기본값이 비면 빈 값을 그린다. T219가 legacy section을 숨기기 전에는 빈 카드가 보일 수 있다.
+- **남은 hydration 후보**: `pages/app.vue`의 `real-api-panel`(`v-if="auth.accessToken"`)은 T219가 지운다. T220 단독 branch에서는 이 노드 때문에 경고가 남을 수 있다.
 - **비교 함수의 일관성**: 서버 sequence와 `createdAt`이 서로 어긋나는 데이터에서는 섞인 비교가 전순서가 아닐 수 있다. 서버는 sequence를 항상 주고(`MessageController.MessageResponse.from(message, sequence)`), sequence가 없는 메시지는 예외 경로라 실제 영향은 작다.
-- **e2e spec**: `tests/e2e/app-shell.spec.ts`의 여러 test는 인증 없이 `/`에 들어가 데모 기본값을 단언한다. 이미 auth middleware 때문에 `/login`으로 이동해 실패하던 test이고, 이번 변경으로 데모 기본값도 사라진다. 없어진 요소 단언은 지우고, 데모 기본값에 기대는 test는 이유를 적어 `test.fixme`로 표시한다. CI는 e2e를 돌리지 않는다.
+- **e2e spec**: 데모 기본값에 기대던 spec 15개(`app-shell.spec.ts` 13개, `visual-smoke`, `t62-screenshot-report`)는 `test.fixme`로 표시하고, 각 test 위에 한 줄 이유를 단다. 없어진 요소 단언은 정리했다.
+  - 대부분은 인증 없이 `/`에 들어가므로 main에서도 auth middleware 때문에 `/login`으로 이동해 실패하던 spec이다.
+  - 예외: "searches messages and resolves a moderation report"는 `/api/auth/refresh`를 mock해 인증 상태로 데모 데이터 위에서 돌던 spec이다. 그래서 "이미 실패하던 spec"이라는 설명은 인증 mock이 없는 spec에만 맞다.
+  - **후속 작업**(별도 task): 이 spec들을 "opens notification inbox" spec처럼 `page.route`로 auth·guild·message API를 mock해 seed한 workspace에서 돌도록 다시 쓴다("seed via page.route auth mock"). 이 작업이 끝나면 `test.fixme`를 푼다. CI는 e2e를 돌리지 않는다.
