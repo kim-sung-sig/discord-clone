@@ -36,7 +36,7 @@ test('runs login, guild/channel/message, voice, and stage through the real backe
 
   await expect(page.getByTestId('guild-name')).toContainText('Web Real Guild')
   await expect(page.getByTestId('chat-viewport')).toContainText('real backend hello')
-  await expect(page.getByTestId('voice-token-provider')).toContainText('LIVEKIT_SKELETON')
+  await expect(page.getByTestId('voice-token-provider')).toHaveCount(0)
   await expect(page.getByTestId('stage-topic')).toContainText('Web Real Stage')
 
   const persistedClientState = await page.evaluate(() => ({

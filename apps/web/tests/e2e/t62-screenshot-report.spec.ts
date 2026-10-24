@@ -2,9 +2,13 @@ import { mkdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 
+// T220: the shell store no longer ships a demo workspace; it lives only in the unit-test seed
+// (tests/fixtures/shell-demo-state.ts). Specs that need demo channels, members, or DMs stay
+// test.fixme until they run against an authenticated, seeded workspace.
+
 const screenshotDir = resolve(process.cwd(), '..', '..', 'output', 'playwright', 't62-subscription-reconciliation')
 
-test('captures T62 Discord clone screenshot report evidence', async ({ page }) => {
+test.fixme('captures T62 Discord clone screenshot report evidence', async ({ page }) => {
   mkdirSync(screenshotDir, { recursive: true })
 
   await page.setViewportSize({ width: 1440, height: 1100 })
