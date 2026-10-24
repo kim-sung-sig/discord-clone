@@ -10,7 +10,9 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -46,6 +48,15 @@ class InMemoryAuthStore implements AuthStore {
     @Override
     public Optional<UserProfile> findById(UUID id) {
         return Optional.ofNullable(accountsById.get(id)).map(AuthAccount::profile);
+    }
+
+    @Override
+    public List<UserProfile> findProfilesByIds(Set<UUID> ids) {
+        return ids.stream()
+            .map(accountsById::get)
+            .filter(Objects::nonNull)
+            .map(AuthAccount::profile)
+            .toList();
     }
 
     @Override

@@ -13,9 +13,11 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.DependsOn;
@@ -93,6 +95,30 @@ class JdbcAuthStore implements AuthStore {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("failed to find user profile", exception);
+        }
+    }
+
+    @Override
+    public List<UserProfile> findProfilesByIds(Set<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("""
+                 SELECT id, username, display_name, created_at
+                 FROM users
+                 WHERE id = ANY(?)
+                 """)) {
+            statement.setArray(1, connection.createArrayOf("uuid", ids.toArray()));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<UserProfile> profiles = new ArrayList<>();
+                while (resultSet.next()) {
+                    profiles.add(mapProfile(resultSet));
+                }
+                return List.copyOf(profiles);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("failed to find user profiles", exception);
         }
     }
 
