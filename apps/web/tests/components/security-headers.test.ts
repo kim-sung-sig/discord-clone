@@ -41,6 +41,7 @@ import {
 describe('Nuxt HTML security headers', () => {
   it('defines deployment security headers with a script nonce for rendered HTML responses', () => {
     const headers = htmlSecurityHeaders({
+      development: false,
       scriptNonce: 'nonce-test-123',
       connectSources: ['https://api.discord-clone.local', 'wss://rtc.discord-clone.local']
     })
@@ -60,6 +61,32 @@ describe('Nuxt HTML security headers', () => {
     expect(headers['Permissions-Policy']).toBe('camera=(), microphone=(self), geolocation=()')
   })
 
+  it('allows inline styles for the Vite/Nuxt dev server only when development is set', () => {
+    const reporting = {
+      enforceEndpoint: '/api/security/csp-report',
+      reportOnlyEndpoint: '/api/security/csp-report-only'
+    }
+    const dev = htmlSecurityHeaders({ development: true, scriptNonce: 'nonce-test-123', cspReporting: reporting })
+    const prod = htmlSecurityHeaders({ development: false, scriptNonce: 'nonce-test-123', cspReporting: reporting })
+
+    expect(dev['Content-Security-Policy']).toContain("style-src 'self' 'unsafe-inline'")
+    expect(dev['Content-Security-Policy-Report-Only']).toContain("style-src 'self' 'unsafe-inline'")
+    expect(dev['Content-Security-Policy']).toContain("script-src 'self' 'nonce-nonce-test-123'")
+    expect(dev['Content-Security-Policy']).not.toContain("script-src 'self' 'unsafe-inline'")
+
+    expect(prod['Content-Security-Policy']).toMatch(/style-src 'self'(;|$)/)
+    expect(prod['Content-Security-Policy']).not.toContain("'unsafe-inline'")
+    expect(prod['Content-Security-Policy-Report-Only']).not.toContain("'unsafe-inline'")
+  })
+
+  it('defaults the style policy to the build-time import.meta.dev flag, not to request state', () => {
+    const headers = htmlSecurityHeaders({ scriptNonce: 'nonce-test-123' })
+
+    expect(headers['Content-Security-Policy']).toContain(
+      import.meta.dev ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'"
+    )
+  })
+
   it('adds the matching nonce to rendered script tags without duplicating existing nonces', () => {
     const html = [
       '<script>window.__NUXT__={}</script>',
@@ -76,6 +103,7 @@ describe('Nuxt HTML security headers', () => {
 
   it('adds CSP report endpoints and a stricter report-only style policy without weakening script nonce policy', () => {
     const headers = htmlSecurityHeaders({
+      development: false,
       scriptNonce: 'nonce-test-123',
       connectSources: ['https://api.discord-clone.local'],
       cspReporting: {
