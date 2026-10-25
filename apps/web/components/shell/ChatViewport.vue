@@ -6,6 +6,7 @@ import TypingIndicator from './TypingIndicator.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore, type ShellMessage } from '../../stores/shell'
+import { messageAuthorInitials } from '../../services/message-author'
 
 const shell = useShellStore()
 const auth = useAuthStore()
@@ -122,7 +123,7 @@ async function loadOlderMessages() {
         class="message"
         :class="{ 'message-deleted': message.deleted }"
       >
-        <div class="avatar">{{ message.author.slice(0, 2).toUpperCase() }}</div>
+        <div class="avatar">{{ messageAuthorInitials(message.author) }}</div>
         <div class="message-card" data-testid="message-card">
           <div class="message-meta">
             <strong>{{ message.author }}</strong>

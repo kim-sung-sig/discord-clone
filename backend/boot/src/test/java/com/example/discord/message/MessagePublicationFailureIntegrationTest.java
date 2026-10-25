@@ -220,6 +220,7 @@ class MessagePublicationFailureIntegrationTest {
     @Autowired private InMemoryGatewayService gateway;
     @Autowired private JdbcMessagePublicationInbox durableInbox;
     @Autowired private MessagePublicationOutboxQueue durableOutbox;
+    @Autowired private MessageAuthorDirectory authorDirectory;
 
     @Test
     void simultaneousDuplicateConsumersShareOneDurableGatewayEventAndInboxEntry() throws Exception {
@@ -246,9 +247,9 @@ class MessagePublicationFailureIntegrationTest {
         };
         try (var executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(() -> new KafkaMessagePublishedConsumer(
-                objectMapper, messages, gateway, barrierInbox, metrics).consume(publication.payload()));
+                objectMapper, messages, gateway, barrierInbox, metrics, authorDirectory).consume(publication.payload()));
             var second = executor.submit(() -> new KafkaMessagePublishedConsumer(
-                objectMapper, messages, gateway, barrierInbox, metrics).consume(publication.payload()));
+                objectMapper, messages, gateway, barrierInbox, metrics, authorDirectory).consume(publication.payload()));
             first.get(20, TimeUnit.SECONDS);
             second.get(20, TimeUnit.SECONDS);
         }

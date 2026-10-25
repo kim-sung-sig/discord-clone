@@ -7,6 +7,8 @@
 import type { MessageEditResponse } from './messageEditResponse';
 
 export interface MessageResponse {
+  /** @nullable */
+  authorDisplayName: string | null;
   authorId: string;
   channelId: string;
   content: string;
