@@ -41,6 +41,30 @@ const themeDefinitions: Record<ThemeId, ThemeDefinition> = {
 
 const isClient = () => typeof document !== 'undefined'
 
+/**
+ * Picks the supported locale for a browser language list (most preferred first).
+ * The first entry that is Korean or English wins; anything else falls back to en-US.
+ */
+export function detectLocale(languages: readonly string[] | null | undefined): LocaleId {
+  for (const language of languages ?? []) {
+    const primary = language.trim().toLowerCase().split(/[-_]/)[0]
+    if (primary === 'ko') {
+      return 'ko-KR'
+    }
+    if (primary === 'en') {
+      return 'en-US'
+    }
+  }
+  return 'en-US'
+}
+
+const browserLanguages = (): readonly string[] => {
+  if (typeof navigator === 'undefined') {
+    return []
+  }
+  return navigator.languages?.length ? navigator.languages : [navigator.language]
+}
+
 export const usePreferencesStore = defineStore('preferences', {
   state: () => ({
     locale: 'en-US' as LocaleId,
@@ -68,7 +92,10 @@ export const usePreferencesStore = defineStore('preferences', {
       const storedTheme = window.localStorage.getItem('discord-theme') as ThemeId | null
       if (storedLocale && storedLocale in localeMessages) {
         this.locale = storedLocale
+      } else {
+        this.locale = detectLocale(browserLanguages())
       }
+      this.applyLocale()
       if (storedTheme && storedTheme in themeDefinitions) {
         this.themeId = storedTheme
       }
@@ -79,6 +106,12 @@ export const usePreferencesStore = defineStore('preferences', {
       }
       window.localStorage.setItem('discord-locale', this.locale)
       window.localStorage.setItem('discord-theme', this.themeId)
+    },
+    applyLocale() {
+      if (!isClient()) {
+        return
+      }
+      document.documentElement.lang = this.locale
     },
     applyTheme() {
       if (!isClient()) {
@@ -106,6 +139,7 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setLocale(locale: LocaleId) {
       this.locale = locale
+      this.applyLocale()
       this.persist()
     },
     setTheme(themeId: ThemeId) {

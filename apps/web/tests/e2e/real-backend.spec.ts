@@ -5,6 +5,9 @@ const runRealBackend = process.env.REAL_BACKEND_E2E === '1'
 
 test.skip(!runRealBackend, 'Set REAL_BACKEND_E2E=1 to run real-backend frontend smoke')
 
+// The login form follows the browser language; pin English so the label selectors below stay stable.
+test.use({ locale: 'en-US' })
+
 test('signs in through the real backend and covers guild, channel, and message in the workspace', async ({ page, request }) => {
   const stamp = Date.now()
   const email = `web-real-${stamp}@example.com`

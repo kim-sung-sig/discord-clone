@@ -35,6 +35,18 @@ describe('auth route middleware', () => {
     expect(restoreSession).not.toHaveBeenCalled()
   })
 
+  it('redirects an already authenticated login visit to the workspace', async () => {
+    const auth = useAuthStore()
+    auth.accessToken = 'access-token'
+    const restoreSession = vi.spyOn(auth, 'restoreSession')
+
+    const result = await authMiddleware({ path: '/login' } as never, {} as never)
+
+    expect(nuxtMocks.navigateTo).toHaveBeenCalledWith('/', { replace: true })
+    expect(result).toEqual({ path: '/', options: { replace: true } })
+    expect(restoreSession).not.toHaveBeenCalled()
+  })
+
   it('redirects unauthenticated app shell visits to login after refresh fails', async () => {
     const auth = useAuthStore()
     vi.spyOn(auth, 'restoreSession').mockResolvedValue(false)

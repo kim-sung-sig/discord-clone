@@ -98,8 +98,8 @@ describe('Discord app shell', () => {
 
     expect(bar.get('[data-testid="activity-explorer"]').attributes('title')).toBe('탐색기')
     expect(bar.get('[data-testid="activity-search"]').attributes('title')).toBe('검색')
-    expect(bar.get('[data-testid="activity-inbox"]').attributes('title')).toBe('받은 알림')
-    expect(bar.get('[data-testid="activity-calls"]').attributes('title')).toBe('통화')
+    expect(bar.get('[data-testid="activity-inbox"]').attributes('title')).toBe('알림함')
+    expect(bar.get('[data-testid="activity-calls"]').attributes('title')).toBe('음성 채널')
     expect(bar.get('[data-testid="activity-settings"]').attributes('title')).toBe('설정')
   })
 
@@ -650,7 +650,7 @@ enableAutoUnmount(afterEach)
     await nextTick()
 
     expect(wrapper.get('[data-testid="workspace-explorer"]').text()).toContain('텍스트 채널')
-    expect(wrapper.get('[data-testid="editor-empty-hint"]').text()).toContain('VS Code 스타일')
+    expect(wrapper.find('[data-testid="editor-empty-hint"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="member-sidebar"]').text()).not.toContain('Members')
     expect(wrapper.get('[data-testid="gateway-status-panel"]').text()).not.toContain('Gateway')
     expect(wrapper.get('[data-testid="voice-token-provider"]').text()).not.toContain('Provider')

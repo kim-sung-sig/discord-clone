@@ -94,7 +94,6 @@ async function loadOlderMessages() {
   <section class="chat-viewport" data-testid="chat-viewport" aria-label="Messages">
     <header class="chat-header">
       <h2 data-testid="active-channel">{{ activeChannelLabel }}</h2>
-      <p>{{ preferences.t('editor.channelDescription') }}</p>
     </header>
     <div ref="messageListRef" class="message-list" data-testid="message-list" aria-live="polite">
       <button
