@@ -153,6 +153,7 @@ describe('real workspace data', () => {
 
       expect(wrapper.get('[data-testid="active-channel"]').text()).not.toContain('# general')
       expect(wrapper.find('[data-testid="channel-general"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="workspace-explorer"]').findAll('.channel-group h2')).toHaveLength(0)
       const before = {
         chat: wrapper.get('[data-testid="chat-viewport"]').html(),
         channels: wrapper.get('[data-testid="channel-sidebar"]').html()
@@ -336,6 +337,7 @@ describe('real workspace data', () => {
       await vi.waitFor(() => expect(resolvePost).toBeDefined())
       expect(activeIds().at(-1)).toMatch(/^local-/)
       expect(shell.activeMessages.at(-1)?.status).toBe('sending')
+      expect(shell.activeMessages.at(-1)?.author).toBe('김성식')
 
       shell.applyGatewayDispatch({
         sequence: 1, type: 'MESSAGE_CREATE', channelId: 'channel-a', createdAt: '2026-10-01T10:03:00.000Z',

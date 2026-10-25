@@ -570,6 +570,12 @@ const localSequenceFlag = (
 ): { localSequence?: true } =>
   serverSequence == null && (!existing || existing.localSequence) ? { localSequence: true } : {}
 
+/** Author label for messages the signed-in user writes; falls back to the shell user when signed out. */
+const ownMessageAuthorLabel = (fallback: string): string => {
+  const viewer = useAuthStore().user
+  return messageAuthorLabel({ authorId: viewer?.id }, viewer, fallback)
+}
+
 const messageTime = (message: ShellMessage): number => {
   const time = Date.parse(message.createdAt)
   return Number.isNaN(time) ? 0 : time
@@ -1206,7 +1212,7 @@ export const useShellStore = defineStore('shell', {
         id: `message-${Date.now()}`,
         channelId: this.activeChannelId,
         sequence: nextShellMessageSequence(this.messages),
-        author: this.currentUser,
+        author: ownMessageAuthorLabel(this.currentUser),
         body,
         createdAt: new Date().toISOString(),
         edited: false,
@@ -1541,7 +1547,7 @@ export const useShellStore = defineStore('shell', {
           id: localMessageId,
           channelId,
           sequence: nextShellMessageSequence(this.messages),
-          author: this.currentUser,
+          author: ownMessageAuthorLabel(this.currentUser),
           body,
           createdAt: new Date().toISOString(),
           edited: false,

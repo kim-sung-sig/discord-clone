@@ -65,6 +65,10 @@
    - read marker watcher의 key는 선택된 `activeReadMarkerMessage`의 id, sequence, status, `localSequence`다. 같은 id·sequence의 메시지가 local에서 서버 확정으로 바뀌어도 다시 실행된다.
    - `DmSidebar`: 버튼을 지워 `h3` 하나만 남은 `.dm-section-heading` wrapper를 없앤다. CSS의 `.dm-section-heading`은 flex 정렬과 버튼 모양만 정의하므로 `h3` 단독에는 필요 없다.
 
+9. **main `64308e6` 반영(T219·T221·T222·T223 merge 뒤)**
+   - 내가 쓴 메시지(optimistic·local 전송)의 작성자는 `this.currentUser` 대신 `messageAuthorLabel({ authorId: viewer.id }, viewer, currentUser)`(T221 helper)로 정한다. 기본 `currentUser`가 `''`가 되면서 로그인 사용자의 메시지가 빈 이름으로 보이던 문제를 막는다. 로그인하지 않은 상태(seed된 unit test)에서는 `currentUser`를 그대로 쓴다.
+   - `createBackendGuild`, `createBackendChannel`, `joinBackendVoice`, `startBackendStage`는 T219가 UI 호출처를 지웠다. 하지만 `app-shell.test.ts`가 아직 참조하므로 지우지 않는다.
+
 ## Expected Changed Files
 - 문서
   - `docs/03-analysis/task_T220-real-workspace-data.blueprint.md`(이 문서)
