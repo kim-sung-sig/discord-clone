@@ -1,16 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { navigateTo } from '#app'
+import { onMounted, ref } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { usePreferencesStore } from '../../stores/preferences'
+
+const workspacePath = '/'
 
 const auth = useAuthStore()
+const preferences = usePreferencesStore()
 const email = ref('')
 const password = ref('')
 const isHydrated = ref(false)
 
-const hasAccessToken = computed(() => Boolean(auth.accessToken))
+const openWorkspace = () => navigateTo(workspacePath, { replace: true })
 
 onMounted(() => {
-  void auth.restoreSession().finally(() => {
+  preferences.hydrate()
+  void auth.restoreSession().then(async (restored) => {
+    if (restored) {
+      await openWorkspace()
+    }
+  }).catch(() => {
+    // A failed restore or navigation leaves the user on the form.
+  }).finally(() => {
     isHydrated.value = true
   })
 })
@@ -20,20 +32,21 @@ async function submitLogin() {
     email: email.value,
     password: password.value
   })
+  if (auth.accessToken) {
+    await openWorkspace()
+  }
 }
 </script>
 
 <template>
   <section class="login-card" aria-labelledby="login-title">
-    <p class="login-kicker">Welcome back</p>
-    <h1 id="login-title">Sign in to Discord Clone</h1>
-    <p class="login-copy">
-      Sign in through the Spring Boot API. Your access token stays in memory while refresh uses an httpOnly cookie.
-    </p>
+    <p class="login-kicker">{{ preferences.t('login.kicker') }}</p>
+    <h1 id="login-title">{{ preferences.t('login.title') }}</h1>
+    <p class="login-copy">{{ preferences.t('login.description') }}</p>
 
     <form class="login-form" data-testid="login-form" @submit.prevent="submitLogin">
       <label class="login-field" for="login-email">
-        Email
+        {{ preferences.t('login.email') }}
         <input
           id="login-email"
           v-model="email"
@@ -46,7 +59,7 @@ async function submitLogin() {
       </label>
 
       <label class="login-field" for="login-password">
-        Password
+        {{ preferences.t('login.password') }}
         <input
           id="login-password"
           v-model="password"
@@ -62,32 +75,15 @@ async function submitLogin() {
         {{ auth.error }}
       </p>
 
-      <p v-if="hasAccessToken" class="login-success" data-testid="login-success" role="status">
-        Signed in with backend session.
-      </p>
-
-      <NuxtLink
-        v-if="hasAccessToken"
-        class="login-submit login-workspace-link"
-        data-testid="open-workspace"
-        to="/"
-      >
-        Open workspace
-      </NuxtLink>
-
       <button
         class="login-submit"
         data-testid="login-submit"
         type="submit"
         :disabled="!isHydrated || auth.isLoading"
       >
-        {{ auth.isLoading ? 'Signing in...' : 'Sign in' }}
+        {{ auth.isLoading ? preferences.t('login.submitting') : preferences.t('login.submit') }}
       </button>
     </form>
-
-    <p class="login-token-policy" data-testid="login-token-policy">
-      Access token stays in memory. Refresh is handled by an httpOnly cookie.
-    </p>
   </section>
 </template>
 
@@ -95,6 +91,8 @@ async function submitLogin() {
 .login-card {
   width: min(100%, 440px);
   padding: 34px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   background: rgba(23, 32, 51, 0.9);
   border: 1px solid var(--line);
   border-radius: 28px;
@@ -116,8 +114,7 @@ async function submitLogin() {
   line-height: 1;
 }
 
-.login-copy,
-.login-token-policy {
+.login-copy {
   color: var(--muted);
   line-height: 1.6;
 }
@@ -150,8 +147,7 @@ async function submitLogin() {
   box-shadow: 0 0 0 4px rgba(57, 217, 138, 0.14);
 }
 
-.login-error,
-.login-success {
+.login-error {
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
@@ -161,12 +157,6 @@ async function submitLogin() {
   color: #ffe3e3;
   background: rgba(255, 107, 107, 0.16);
   border: 1px solid rgba(255, 107, 107, 0.28);
-}
-
-.login-success {
-  color: #d8ffea;
-  background: rgba(57, 217, 138, 0.16);
-  border: 1px solid rgba(57, 217, 138, 0.32);
 }
 
 .login-submit {

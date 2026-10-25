@@ -88,6 +88,7 @@ class MessageConfiguration {
     MessagePublishedDispatcher messagePublishedDispatcher(
         InMemoryGatewayService gatewayService,
         MessageLookupPort messages,
+        MessageAuthorDirectory authors,
         ObjectProvider<MessageMentionProjector> projector
     ) {
         return event -> {
@@ -98,7 +99,7 @@ class MessageConfiguration {
                     "MESSAGE_CREATE",
                     channel.guildId(),
                     channel.channelId(),
-                    gatewayPayload(message)
+                    gatewayPayload(message, authors.displayName(message.authorId()).orElse(null))
                 );
                 MessageMentionProjector available = projector.getIfAvailable();
                 if (available != null) {
@@ -155,12 +156,16 @@ class MessageConfiguration {
         };
     }
 
-    private static Map<String, Object> gatewayPayload(Message message) {
+    private static Map<String, Object> gatewayPayload(Message message, String authorDisplayName) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", message.id().toString());
         payload.put("guildId", message.guildId().toString());
         payload.put("channelId", message.channelId().toString());
         payload.put("authorId", message.authorId().toString());
+        if (authorDisplayName != null) {
+            // GatewayEvent copies the payload with Map.copyOf, which rejects null values; omit unknown authors.
+            payload.put("authorDisplayName", authorDisplayName);
+        }
         payload.put("content", message.content().value());
         payload.put("mentions", message.mentions().stream().map(MessageConfiguration::mentionToken).toList());
         payload.put("pinned", message.pinned());

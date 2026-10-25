@@ -27,19 +27,22 @@ final class KafkaMessagePublishedConsumer {
     private final InMemoryGatewayService gateway;
     private final MessagePublicationInbox inbox;
     private final MeterRegistry metrics;
+    private final MessageAuthorDirectory authors;
 
     KafkaMessagePublishedConsumer(
         ObjectMapper objectMapper,
         MessageLookupPort messages,
         InMemoryGatewayService gateway,
         MessagePublicationInbox inbox,
-        MeterRegistry metrics
+        MeterRegistry metrics,
+        MessageAuthorDirectory authors
     ) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.messages = Objects.requireNonNull(messages, "messages must not be null");
         this.gateway = Objects.requireNonNull(gateway, "gateway must not be null");
         this.inbox = Objects.requireNonNull(inbox, "inbox must not be null");
         this.metrics = Objects.requireNonNull(metrics, "metrics must not be null");
+        this.authors = Objects.requireNonNull(authors, "authors must not be null");
     }
 
     @KafkaListener(
@@ -91,7 +94,7 @@ final class KafkaMessagePublishedConsumer {
                 "MESSAGE_CREATE",
                 record.guildId(),
                 record.channelId(),
-                gatewayPayload(message)
+                gatewayPayload(message, authors.displayName(message.authorId()).orElse(null))
             );
         } catch (GatewayEventConflictException alreadyAppended) {
             // A concurrent delivery appended this event ID first from an older message state.
@@ -118,12 +121,16 @@ final class KafkaMessagePublishedConsumer {
         return record;
     }
 
-    private static Map<String, Object> gatewayPayload(Message message) {
+    private static Map<String, Object> gatewayPayload(Message message, String authorDisplayName) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", message.id().toString());
         payload.put("guildId", message.guildId().toString());
         payload.put("channelId", message.channelId().toString());
         payload.put("authorId", message.authorId().toString());
+        if (authorDisplayName != null) {
+            // GatewayEvent copies the payload with Map.copyOf, which rejects null values; omit unknown authors.
+            payload.put("authorDisplayName", authorDisplayName);
+        }
         payload.put("content", message.content().value());
         payload.put("mentions", message.mentions().stream().map(KafkaMessagePublishedConsumer::mentionToken).toList());
         payload.put("pinned", message.pinned());

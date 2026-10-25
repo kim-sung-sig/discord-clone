@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.UUID;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
@@ -113,12 +114,55 @@ class MessageConfigurationTest {
         new MessageConfiguration().messagePublishedDispatcher(
             gateway,
             (target, id) -> message,
+            userIds -> Map.of(ownerId, "Owner Display"),
+            mock(ObjectProvider.class)
+        ).dispatch(published);
+
+        List<com.example.discord.gateway.GatewayEvent> events = gateway.poll(session.id(), ownerId, 0);
+        assertThat(events.stream().map(com.example.discord.gateway.GatewayEvent::busEventId))
+            .contains(sourceEventId.toString());
+        assertThat(events.stream().filter(event -> sourceEventId.toString().equals(event.busEventId())).findFirst())
+            .get()
+            .satisfies(event -> {
+                assertThat(event.payload()).containsEntry("authorId", ownerId.toString());
+                assertThat(event.payload()).containsEntry("authorDisplayName", "Owner Display");
+            });
+    }
+
+    @Test
+    void localDispatcherOmitsAuthorDisplayNameWhenTheAuthorNoLongerExists() {
+        UUID ownerId = UUID.randomUUID();
+        InMemoryGuildService guilds = new InMemoryGuildService();
+        var guild = guilds.createGuild("dispatcher-unknown-author", ownerId);
+        var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
+        InMemoryGatewayService gateway = new InMemoryGatewayService(
+            guilds,
+            Clock.fixed(Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC),
+            Duration.ofSeconds(30)
+        );
+        var session = gateway.identify(ownerId).session();
+        Message message = new Message(UUID.randomUUID(), new UserMessageAuthor(ownerId),
+            new ChannelMessageTarget(guild.id(), channel.id()), new MessageContent("hello"),
+            List.of(), false, false, List.of(), Instant.EPOCH, Instant.EPOCH);
+        UUID sourceEventId = UUID.randomUUID();
+        MessagePublished published = new MessagePublished(sourceEventId, message.id(), message.author(), message.target(),
+            List.of(), "correlation", Instant.EPOCH);
+
+        new MessageConfiguration().messagePublishedDispatcher(
+            gateway,
+            (target, id) -> message,
+            userIds -> Map.of(),
             mock(ObjectProvider.class)
         ).dispatch(published);
 
         assertThat(gateway.poll(session.id(), ownerId, 0).stream()
-            .map(com.example.discord.gateway.GatewayEvent::busEventId))
-            .contains(sourceEventId.toString());
+            .filter(event -> sourceEventId.toString().equals(event.busEventId()))
+            .findFirst())
+            .get()
+            .satisfies(event -> {
+                assertThat(event.payload()).containsEntry("authorId", ownerId.toString());
+                assertThat(event.payload()).doesNotContainKey("authorDisplayName");
+            });
     }
 
     @Test
@@ -141,7 +185,8 @@ class MessageConfigurationTest {
         ObjectProvider<MessageMentionProjector> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(projector);
 
-        new MessageConfiguration().messagePublishedDispatcher(gateway, (target, id) -> message, provider).dispatch(event);
+        new MessageConfiguration().messagePublishedDispatcher(gateway, (target, id) -> message, userIds -> Map.of(), provider)
+            .dispatch(event);
 
         assertThat(recorded).hasSize(1);
         assertThat(recorded.getFirst().mentionedUserIds()).containsExactly(recipientId);

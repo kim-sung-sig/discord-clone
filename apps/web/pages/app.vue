@@ -3,14 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ServerRail from '../components/shell/ServerRail.vue'
 import ChannelSidebar from '../components/shell/ChannelSidebar.vue'
 import ChatViewport from '../components/shell/ChatViewport.vue'
-import ForumPanel from '../components/shell/ForumPanel.vue'
-import ModerationPanel from '../components/shell/ModerationPanel.vue'
 import VoicePanel from '../components/shell/VoicePanel.vue'
-import ExperiencePanel from '../components/shell/ExperiencePanel.vue'
-import InviteModal from '../components/invite/InviteModal.vue'
-import DmSidebar from '../components/social/DmSidebar.vue'
 import MemberSidebar from '../components/shell/MemberSidebar.vue'
-import RolePermissionPanel from '../components/shell/RolePermissionPanel.vue'
 import GatewayStatusPanel from '../components/shell/GatewayStatusPanel.vue'
 import UserPanel from '../components/shell/UserPanel.vue'
 import { useAuthStore } from '../stores/auth'
@@ -102,19 +96,6 @@ const directMessageInboxItems = computed(() =>
   shell.socialDirectSummaries.filter((dm) => dm.unreadCount > 0 && dm.friend)
 )
 const statusText = computed(() => `${preferences.t('status.ready')} ${shell.gateway.lastSequence}`)
-const shellThemeStyle = computed(() => ({
-  '--workbench-bg': preferences.theme.tokens.workbenchBg,
-  '--activity-bg': preferences.theme.tokens.activityBg,
-  '--sidebar-bg': preferences.theme.tokens.sideBarBg,
-  '--editor-bg': preferences.theme.tokens.editorBg,
-  '--workbench-panel-bg': preferences.theme.tokens.panelBg,
-  '--status-bg': preferences.theme.tokens.statusBg,
-  '--title-bg': preferences.theme.tokens.titleBg,
-  '--workbench-fg': preferences.theme.tokens.foreground,
-  '--workbench-muted': preferences.theme.tokens.muted,
-  '--workbench-accent': preferences.theme.tokens.accent,
-  '--workbench-border': preferences.theme.tokens.border
-}))
 
 function updatePlatformSurface() {
   platformSurface.value = window.matchMedia('(max-width: 720px)').matches ? 'pwa-mobile' : 'web-desktop'
@@ -332,29 +313,6 @@ function openInboxDirectMessage(directMessageId: string) {
   }
 }
 
-async function runRealBackendSmoke() {
-  if (!auth.accessToken) {
-    shell.apiError = 'Sign in before running the real backend smoke.'
-    return
-  }
-  const stamp = Date.now()
-  const guild = await shell.createBackendGuild(`Web Real Guild ${stamp}`, auth.accessToken)
-  if (!guild) {
-    return
-  }
-  const text = await shell.createBackendChannel(guild.id, `real-text-${stamp}`, 'GUILD_TEXT', auth.accessToken)
-  if (!text) {
-    return
-  }
-  const voice = await shell.createBackendChannel(guild.id, `real-voice-${stamp}`, 'GUILD_VOICE', auth.accessToken)
-  if (!voice) {
-    return
-  }
-  await shell.sendBackendMessage(text.id, 'real backend hello', auth.accessToken)
-  await shell.joinBackendVoice(voice.id, auth.accessToken)
-  await shell.startBackendStage(voice.id, 'Web Real Stage', auth.accessToken)
-}
-
 definePageMeta({
   path: '/',
   alias: ['/app']
@@ -423,7 +381,6 @@ onBeforeUnmount(() => {
     :data-platform-surface="platformSurface"
     :data-locale="preferences.locale"
     :data-theme-id="preferences.themeId"
-    :style="shellThemeStyle"
   >
     <a class="skip-link" data-testid="skip-to-workspace" href="#workspace-content">Skip to workspace</a>
     <header class="global-title-bar workbench-titlebar" data-testid="global-title-bar" aria-label="Global navigation">
@@ -450,7 +407,6 @@ onBeforeUnmount(() => {
     </header>
     <aside class="account-banner workbench-banner" data-testid="account-banner" aria-label="Account registration notice">
       <span>{{ preferences.t('banner') }}</span>
-      <button type="button">{{ preferences.t('banner.register') }}</button>
     </aside>
     <aside class="activity-bar" data-testid="activity-bar" aria-label="Activity bar">
       <ServerRail />
@@ -458,20 +414,18 @@ onBeforeUnmount(() => {
         type="button"
         data-testid="activity-explorer"
         :aria-current="activeWorkbenchView === 'explorer' ? 'page' : undefined"
-        title="Explorer"
+        :title="preferences.t('activity.explorer')"
         @click="setWorkbenchView('explorer')"
       >
-        <span>Files</span>
         <strong>{{ preferences.t('activity.explorer') }}</strong>
       </button>
       <button
         type="button"
         data-testid="activity-search"
         :aria-current="activeWorkbenchView === 'search' ? 'page' : undefined"
-        title="Search"
+        :title="preferences.t('activity.search')"
         @click="setWorkbenchView('search')"
       >
-        <span>Find</span>
         <strong>{{ preferences.t('activity.search') }}</strong>
       </button>
       <button
@@ -481,27 +435,24 @@ onBeforeUnmount(() => {
         :title="preferences.t('activity.inbox')"
         @click="setWorkbenchView('inbox')"
       >
-        <span>{{ preferences.t('activity.inbox') }}</span>
         <strong>{{ preferences.t('activity.inbox') }}</strong>
       </button>
       <button
         type="button"
         data-testid="activity-calls"
         :aria-current="activeWorkbenchView === 'calls' ? 'page' : undefined"
-        title="Calls"
+        :title="preferences.t('activity.calls')"
         @click="setWorkbenchView('calls')"
       >
-        <span>Call</span>
         <strong>{{ preferences.t('activity.calls') }}</strong>
       </button>
       <button
         type="button"
         data-testid="activity-settings"
         :aria-current="activeWorkbenchView === 'settings' ? 'page' : undefined"
-        title="Settings"
+        :title="preferences.t('activity.settings')"
         @click="setWorkbenchView('settings')"
       >
-        <span>Gear</span>
         <strong>{{ preferences.t('activity.settings') }}</strong>
       </button>
     </aside>
@@ -532,9 +483,8 @@ onBeforeUnmount(() => {
           <p>{{ preferences.t('activity.explorer') }}</p>
           <h2>{{ shell.guild.name }}</h2>
         </header>
-        <p class="explorer-section-label">{{ preferences.t('channels.text') }}</p>
         <ChannelSidebar @click.capture="activeMobilePane = 'chat'" />
-        <p class="explorer-section-label">{{ preferences.t('channels.voice') }}</p>
+        <UserPanel />
       </aside>
       <section
         v-if="activeWorkbenchView === 'explorer'"
@@ -544,10 +494,8 @@ onBeforeUnmount(() => {
       >
         <header class="editor-titlebar" data-testid="editor-titlebar">
           <span>{{ activeChannelLabel }}</span>
-          <small>{{ preferences.t('editor.hint') }}</small>
         </header>
         <ChatViewport />
-        <p class="editor-empty-hint" data-testid="editor-empty-hint">{{ preferences.t('editor.hint') }}</p>
       </section>
       <aside v-if="activeWorkbenchView === 'explorer'" class="side-panel" data-testid="side-panel">
         <MemberSidebar />
@@ -799,6 +747,7 @@ onBeforeUnmount(() => {
             <dd>{{ activeChannelLabel }}</dd>
           </div>
         </dl>
+        <UserPanel />
       </section>
       <footer class="status-bar" data-testid="status-bar" aria-label="Status bar">
         <button
@@ -816,26 +765,6 @@ onBeforeUnmount(() => {
         <span>{{ preferences.t('status.locale') }}: {{ preferences.locale }}</span>
         <span>{{ preferences.t('status.theme') }}: {{ preferences.theme.label }}</span>
       </footer>
-      <section v-if="auth.accessToken" class="real-api-panel" data-testid="real-api-panel">
-        <p>Real backend flow</p>
-        <button
-          type="button"
-          data-testid="real-backend-smoke"
-          :disabled="shell.apiBusy"
-          @click="runRealBackendSmoke"
-        >
-          {{ shell.apiBusy ? 'Running...' : 'Run backend smoke' }}
-        </button>
-      </section>
-      <section class="legacy-shell-contracts" data-testid="legacy-shell-contracts" aria-hidden="true">
-        <DmSidebar />
-        <ForumPanel />
-        <ModerationPanel />
-        <ExperiencePanel />
-        <RolePermissionPanel />
-        <InviteModal />
-        <UserPanel />
-      </section>
     </section>
     <nav class="mobile-shell-nav" data-testid="mobile-shell-nav" aria-label="Mobile shell navigation">
       <button

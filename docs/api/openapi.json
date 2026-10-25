@@ -1307,6 +1307,12 @@
       },
       "MessageResponse" : {
         "properties" : {
+          "authorDisplayName" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
           "authorId" : {
             "format" : "uuid",
             "type" : "string"
@@ -1361,6 +1367,7 @@
           }
         },
         "required" : [
+          "authorDisplayName",
           "authorId",
           "channelId",
           "content",

@@ -93,6 +93,16 @@ class OpenApiContractTest {
     }
 
     @Test
+    void messageAuthorDisplayNameIsRequiredButNullableForDeletedAuthors() {
+        JsonNode schema = spec.at("/components/schemas/MessageResponse");
+        assertThat(schema.path("required")).contains(mapper.valueToTree("authorId"), mapper.valueToTree("authorDisplayName"));
+        assertThat(schema.at("/properties/authorDisplayName/type").toString())
+            .as("MessageResponse.authorDisplayName is null only when the author no longer exists")
+            .contains("string")
+            .contains("null");
+    }
+
+    @Test
     void outboxVariantIdentifiersAreRequiredButNullable() {
         Map<String, List<String>> identifiers = Map.of(
             "MessageOutboxMessageAuthorResponse", List.of("userId", "botId", "webhookId"),

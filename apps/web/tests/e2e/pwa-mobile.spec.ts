@@ -69,3 +69,32 @@ test('mobile PWA shell exposes install metadata and single-pane navigation', asy
   await expect(page.getByTestId('chat-viewport')).toBeVisible()
   await expect(page.getByTestId('message-input')).toBeVisible()
 })
+
+test('mobile shell uses one column, wraps message text normally, and keeps Send visible', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('chat-viewport')).toBeVisible()
+  await expect(page.getByTestId('message-send')).toBeVisible()
+
+  const metrics = await page.evaluate(() => {
+    const rect = (testId: string) => document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)?.getBoundingClientRect()
+    const send = rect('message-send')
+    const viewport = rect('chat-viewport')
+    const card = rect('message-card')
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      chatLeft: Math.round(viewport?.left ?? -1),
+      chatWidth: Math.round(viewport?.width ?? 0),
+      cardWidth: Math.round(card?.width ?? 0),
+      sendLeft: Math.round(send?.left ?? -1),
+      sendRight: Math.round(send?.right ?? Number.POSITIVE_INFINITY)
+    }
+  })
+
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+  expect(metrics.chatLeft).toBeLessThanOrEqual(1)
+  expect(metrics.chatWidth).toBeGreaterThanOrEqual(metrics.viewportWidth - 2)
+  expect(metrics.cardWidth).toBeGreaterThan(200)
+  expect(metrics.sendLeft).toBeGreaterThanOrEqual(0)
+  expect(metrics.sendRight).toBeLessThanOrEqual(metrics.viewportWidth)
+})

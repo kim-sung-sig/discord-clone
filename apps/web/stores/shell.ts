@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { useRuntimeConfig } from '#app'
 import { DiscordRestError, createDiscordRestClient, discordApiPaths } from '../services/discord-api'
 import { useAuthStore } from './auth'
+import { messageAuthorLabel } from '../services/message-author'
 import {
   normalizeGatewayDispatch,
   toShellGatewayEvent,
@@ -46,6 +47,7 @@ interface BackendMessageResponse {
   channelId: string
   sequence?: number | null
   authorId: string
+  authorDisplayName?: string | null
   content: string
   mentions: string[]
   pinned: boolean
@@ -1593,7 +1595,7 @@ export const useShellStore = defineStore('shell', {
         id: message.id,
         channelId: message.channelId,
         sequence: message.sequence ?? existing?.sequence ?? nextShellMessageSequence(this.messages),
-        author: message.authorId,
+        author: messageAuthorLabel(message, useAuthStore().user),
         body: message.content,
         createdAt: message.createdAt,
         edited: message.edited,
@@ -1651,7 +1653,7 @@ export const useShellStore = defineStore('shell', {
             id: message.id,
             channelId: message.channelId,
             sequence: message.sequence ?? existing?.sequence ?? nextSequence + index,
-            author: message.authorId,
+            author: messageAuthorLabel(message, useAuthStore().user),
             body: message.content,
             createdAt: message.createdAt,
             edited: message.edited,
@@ -1691,7 +1693,7 @@ export const useShellStore = defineStore('shell', {
             id: message.id,
             channelId: message.channelId,
             sequence: message.sequence ?? nextSequence + index,
-            author: message.authorId,
+            author: messageAuthorLabel(message, useAuthStore().user),
             body: message.content,
             createdAt: message.createdAt,
             edited: message.edited,
@@ -1913,7 +1915,11 @@ export const useShellStore = defineStore('shell', {
         id: messageId,
         channelId,
         sequence: payloadNumber(dispatch, 'messageSequence') ?? existing?.sequence ?? nextShellMessageSequence(this.messages),
-        author: payloadString(dispatch, 'authorId') ?? payloadString(dispatch, 'author') ?? existing?.author ?? 'unknown',
+        author: messageAuthorLabel(
+          { authorId: payloadString(dispatch, 'authorId'), authorDisplayName: payloadString(dispatch, 'authorDisplayName') },
+          useAuthStore().user,
+          existing?.id === messageId && existing.status !== 'sending' ? existing.author : undefined
+        ),
         body,
         createdAt: payloadString(dispatch, 'createdAt') ?? existing?.createdAt ?? dispatch.createdAt,
         edited: payloadBoolean(dispatch, 'edited') ?? existing?.edited ?? false,

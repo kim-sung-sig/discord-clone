@@ -7,7 +7,9 @@ import com.example.discord.identity.RefreshSession;
 import com.example.discord.user.UserProfile;
 import com.example.discord.user.Username;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +70,21 @@ class PostgresAuthStoreTest {
 
         assertThat(store.isAccessTokenRevoked(token)).isTrue();
         assertThat(store.isAccessTokenRevoked("other-" + token)).isFalse();
+    }
+
+    @Test
+    void findsOnlyRequestedExistingProfilesInOneBatchForMessageAuthorNames() {
+        UserProfile first = saveProfile("batch-first", "Batch First");
+        UserProfile second = saveProfile("batch-second", "두번째 작성자");
+        UserProfile notRequested = saveProfile("batch-other", "Not Requested");
+        UUID deleted = UUID.randomUUID();
+
+        assertThat(store.findProfilesByIds(Set.of(first.id(), second.id(), deleted)))
+            .containsExactlyInAnyOrder(first, second)
+            .doesNotContain(notRequested);
+        assertThat(store.findProfilesByIds(Set.of())).isEmpty();
+        assertThat(new AuthStoreMessageAuthorDirectory(store).displayNames(Set.of(first.id(), second.id(), deleted)))
+            .containsOnly(Map.entry(first.id(), "Batch First"), Map.entry(second.id(), "두번째 작성자"));
     }
 
     @Test
@@ -177,5 +194,18 @@ class PostgresAuthStoreTest {
 
         assertThat(store.globalRoleAuditLog(userId)).containsExactly(grant, revokeNoop);
         assertThat(store.globalRoleAuditLog(UUID.randomUUID())).isEmpty();
+    }
+
+    private UserProfile saveProfile(String prefix, String displayName) {
+        UUID userId = UUID.randomUUID();
+        UserProfile profile = UserProfile.create(
+            userId,
+            Username.from(prefix.replace("-", "_") + userId.toString().substring(0, 8)),
+            displayName,
+            Instant.parse("2026-01-01T00:00:00Z")
+        );
+        EmailAddress email = EmailAddress.from(prefix + "-" + userId + "@example.com");
+        assertThat(store.saveIfAbsent(new AuthAccount(email, "hashed-password", profile))).isTrue();
+        return profile;
     }
 }

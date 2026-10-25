@@ -4,6 +4,11 @@ export interface HtmlSecurityHeaderOptions {
   scriptNonce?: string
   connectSources?: string[]
   cspReporting?: CspReportingOptions
+  /**
+   * Dev servers (Vite/Nuxt dev) inject inline <style> tags, so style-src needs 'unsafe-inline'.
+   * Defaults to the build-time flag import.meta.dev; production builds keep style-src 'self'.
+   */
+  development?: boolean
 }
 
 export interface CspReportingOptions {
@@ -40,7 +45,8 @@ const scriptSource = (scriptNonce?: string): string => {
   return "script-src 'self'"
 }
 
-const styleSource = (): string => "style-src 'self'"
+const styleSource = (development: boolean): string =>
+  development ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'"
 
 const cspPolicy = (
   options: HtmlSecurityHeaderOptions,
@@ -51,7 +57,7 @@ const cspPolicy = (
     "form-action 'self'",
     "frame-ancestors 'none'",
     "img-src 'self' data: blob:",
-    styleSource(),
+    styleSource(options.development ?? import.meta.dev),
     scriptSource(options.scriptNonce),
     connectSource(options.connectSources),
     ...(reporting ? [`report-to ${reporting.group}`, `report-uri ${reporting.endpoint}`] : [])

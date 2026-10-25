@@ -372,6 +372,17 @@ describe('browser security dashboard', () => {
     expect(wrapper.get('[data-testid="csp-trend-window"]').text()).toContain('6h')
     expect(wrapper.get('[data-testid="csp-trend-bucket-2026-05-19T01:00:00.000Z"]').text()).toContain('1')
     expect(wrapper.get('[data-testid="csp-trend-bucket-2026-05-19T03:00:00.000Z"]').text()).toContain('3')
+    const bars = panel.findAll('.csp-trend-bucket i')
+    expect(bars).toHaveLength(6)
+    expect(bars.map((bar) => bar.classes().find((name) => name.startsWith('csp-trend-h-')))).toEqual([
+      'csp-trend-h-10',
+      'csp-trend-h-35',
+      'csp-trend-h-10',
+      'csp-trend-h-100',
+      'csp-trend-h-10',
+      'csp-trend-h-10'
+    ])
+    expect(bars.every((bar) => bar.attributes('style') === undefined)).toBe(true)
     expect(wrapper.text()).not.toContain('token=secret')
     expect(wrapper.text()).not.toContain('203.0.113')
   })
