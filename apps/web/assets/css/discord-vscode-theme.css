@@ -124,16 +124,6 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.account-banner button {
-  min-height: 24px;
-  padding: 2px 10px;
-  color: #dbfce7;
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid #87efac;
-  border-radius: 4px;
-}
-
 .server-rail {
   grid-column: 1;
   grid-row: 2 / 4;
@@ -317,7 +307,6 @@ a:focus-visible {
 }
 
 .message-composer button,
-.real-api-panel button,
 .invite-accept,
 .voice-card button,
 .experience-card button,
@@ -347,8 +336,7 @@ a:focus-visible {
   background: var(--discord-brand);
 }
 
-.presence-badge-online .presence-dot,
-.storage-health-ready {
+.presence-badge-online .presence-dot {
   background: var(--discord-green);
 }
 
@@ -364,6 +352,12 @@ a:focus-visible {
 .dm-row strong,
 .expression-toggle {
   color: var(--vscode-focus);
+}
+
+.security-summary-card strong,
+.directive-list strong,
+.security-report-card strong {
+  color: #4dabff;
 }
 
 @media (max-width: 720px) {

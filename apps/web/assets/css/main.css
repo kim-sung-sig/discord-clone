@@ -12,6 +12,28 @@
   font-family: "Segoe UI", "Pretendard", sans-serif;
 }
 
+/*
+ * Workbench theme token defaults (vscode-dark, same values as themes/vscode-dark.json).
+ * The app shell no longer carries an inline style (CSP style-src 'self'); the preferences
+ * store overrides these through CSSOM (style.setProperty) once the client is hydrated.
+ */
+:root {
+  --workbench-bg: #1e1e1e;
+  --activity-bg: #333333;
+  --sidebar-bg: #252526;
+  --editor-bg: #1e1e1e;
+  --workbench-panel-bg: #181818;
+  --status-bg: #007acc;
+  --title-bg: #3c3c3c;
+  --workbench-fg: #d4d4d4;
+  --workbench-muted: #9da5b4;
+  --workbench-accent: #0078d4;
+  --workbench-border: #3c3c3c;
+  /* The activity bar is dark in every theme, so its icon colours do not follow --workbench-fg. */
+  --activity-fg: #c5c5c5;
+  --activity-fg-active: #ffffff;
+}
+
 /* Workbench visual polish: keep this at EOF so legacy shell rules cannot override it. */
 .vscode-shell.app-shell {
   height: 100vh;
@@ -37,7 +59,6 @@
 }
 
 .vscode-shell.app-shell .activity-bar .brand,
-.vscode-shell.app-shell .activity-bar button span,
 .vscode-shell.app-shell .activity-bar button strong {
   position: absolute !important;
   width: 1px !important;
@@ -56,29 +77,12 @@
   line-height: 1;
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  content: "▦";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  content: "⌕";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  content: "◉";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  content: "⚙";
-}
-
 .vscode-shell.app-shell .workbench.workspace {
   grid-template-columns: 276px minmax(520px, 1fr) 224px;
   grid-template-rows: minmax(0, 1fr) 148px 24px;
 }
 
-.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
-.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1 {
   display: none !important;
 }
 
@@ -180,15 +184,6 @@
   background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
 }
 
-.vscode-shell.app-shell .workbench-banner button {
-  height: 22px;
-  padding: 0 10px;
-  color: var(--workbench-fg);
-  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
-  border-radius: 3px;
-}
-
 .vscode-shell.app-shell .activity-bar {
   width: 50px;
   padding: 8px 0;
@@ -225,38 +220,6 @@
   height: 18px;
   margin: auto;
   content: "";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  border: 1px solid currentColor;
-  box-shadow:
-    inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
-    inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow: 7px 8px 0 -6px currentColor;
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  width: 17px;
-  height: 17px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  width: 16px;
-  height: 16px;
-  background:
-    radial-gradient(circle, transparent 0 4px, currentColor 4px 6px, transparent 6px),
-    conic-gradient(from 0deg, currentColor 0 12%, transparent 12% 25%, currentColor 25% 37%, transparent 37% 50%, currentColor 50% 62%, transparent 62% 75%, currentColor 75% 87%, transparent 87%);
-  border-radius: 50%;
 }
 
 .vscode-shell.app-shell .workbench.workspace {
@@ -711,11 +674,95 @@ body {
   background: var(--accent);
 }
 
+.csp-trend-h-10 {
+  height: 10%;
+}
+
+.csp-trend-h-15 {
+  height: 15%;
+}
+
+.csp-trend-h-20 {
+  height: 20%;
+}
+
+.csp-trend-h-25 {
+  height: 25%;
+}
+
+.csp-trend-h-30 {
+  height: 30%;
+}
+
+.csp-trend-h-35 {
+  height: 35%;
+}
+
+.csp-trend-h-40 {
+  height: 40%;
+}
+
+.csp-trend-h-45 {
+  height: 45%;
+}
+
+.csp-trend-h-50 {
+  height: 50%;
+}
+
+.csp-trend-h-55 {
+  height: 55%;
+}
+
+.csp-trend-h-60 {
+  height: 60%;
+}
+
+.csp-trend-h-65 {
+  height: 65%;
+}
+
+.csp-trend-h-70 {
+  height: 70%;
+}
+
+.csp-trend-h-75 {
+  height: 75%;
+}
+
+.csp-trend-h-80 {
+  height: 80%;
+}
+
+.csp-trend-h-85 {
+  height: 85%;
+}
+
+.csp-trend-h-90 {
+  height: 90%;
+}
+
+.csp-trend-h-95 {
+  height: 95%;
+}
+
+.csp-trend-h-100 {
+  height: 100%;
+}
+
 .storage-health-ready {
-  color: var(--accent);
+  color: #57f287;
 }
 
 .storage-health-degraded {
+  color: var(--danger);
+}
+
+.security-summary-card strong.storage-health-ready {
+  color: #57f287;
+}
+
+.security-summary-card strong.storage-health-degraded {
   color: var(--danger);
 }
 
@@ -846,7 +893,7 @@ body {
 
 .guard-health-summary strong,
 .guard-method-list strong {
-  color: #06131d;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 900;
 }
@@ -882,23 +929,25 @@ body {
 }
 
 .backend-auth-probe strong {
-  color: var(--accent);
+  color: #4dabff;
 }
 
 .backend-auth-probe small {
   color: var(--muted);
 }
 
-.guard-status-ready {
-  background: var(--accent);
+.guard-health-summary .guard-status-ready {
+  color: #06131d;
+  background: #4ade80;
 }
 
-.guard-status-local-dev-open {
+.guard-health-summary .guard-status-local-dev-open {
+  color: #06131d;
   background: #ffd166;
 }
 
-.guard-status-fail-closed,
-.guard-status-unknown {
+.guard-health-summary .guard-status-fail-closed,
+.guard-health-summary .guard-status-unknown {
   color: #ffe3e3;
   background: rgba(255, 107, 107, 0.18);
 }
@@ -925,12 +974,18 @@ body {
 
 .guard-method-list strong,
 .subject-diagnostics-list strong {
+  color: #06131d;
   background: #54a6ff;
   border-radius: 999px;
 }
 
-.guard-method-disabled {
-  opacity: 0.58;
+.guard-method-list .guard-method-disabled span {
+  color: var(--muted);
+}
+
+.guard-method-list .guard-method-disabled strong {
+  color: var(--ink);
+  background: #4e5058;
 }
 
 .guard-warning-list li {
@@ -985,34 +1040,6 @@ input {
   background: rgba(255, 107, 107, 0.16);
   border: 1px solid rgba(255, 107, 107, 0.32);
   border-radius: 16px;
-}
-
-.real-api-panel {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 12px 16px;
-  color: var(--ink);
-  background: rgba(84, 166, 255, 0.13);
-  border: 1px solid rgba(84, 166, 255, 0.28);
-}
-
-.real-api-panel p {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 800;
-}
-
-.real-api-panel button {
-  padding: 10px 14px;
-  color: #06131d;
-  font-weight: 900;
-  cursor: pointer;
-  background: linear-gradient(145deg, var(--accent), #54a6ff);
-  border: 0;
-  border-radius: 12px;
 }
 
 .server-rail {
@@ -1709,6 +1736,18 @@ input {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.user-panel-identity {
+  min-width: 0;
+}
+
+.user-panel-identity strong,
+.user-panel-identity .voice-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-panel {
@@ -2881,7 +2920,6 @@ input {
 }
 
 .vscode-shell.app-shell .activity-bar .brand,
-.vscode-shell.app-shell .activity-bar button span,
 .vscode-shell.app-shell .activity-bar button strong {
   position: absolute !important;
   width: 1px !important;
@@ -2900,29 +2938,12 @@ input {
   line-height: 1;
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
-  content: "▦";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
-  content: "⌕";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
-  content: "◉";
-}
-
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
-  content: "⚙";
-}
-
 .vscode-shell.app-shell .workbench.workspace {
   grid-template-columns: 276px minmax(520px, 1fr) 224px;
   grid-template-rows: minmax(0, 1fr) 148px 24px;
 }
 
-.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1,
-.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar h1 {
   display: none !important;
 }
 
@@ -3008,15 +3029,6 @@ input {
   background: color-mix(in srgb, var(--workbench-panel-bg) 82%, var(--status-bg) 18%);
 }
 
-.vscode-shell.app-shell .workbench-banner button {
-  height: 22px;
-  padding: 0 10px;
-  color: var(--workbench-fg);
-  background: color-mix(in srgb, var(--workbench-accent) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--workbench-accent) 54%, transparent);
-  border-radius: 3px;
-}
-
 .vscode-shell.app-shell .activity-bar {
   width: 50px;
   padding: 8px 0;
@@ -3059,14 +3071,14 @@ input {
   content: "";
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Explorer"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-explorer"]::before {
   border: 1px solid currentColor;
   box-shadow:
     inset 7px 0 0 color-mix(in srgb, currentColor 20%, transparent),
     inset 0 7px 0 color-mix(in srgb, currentColor 20%, transparent);
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Search"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-search"]::before {
   width: 14px;
   height: 14px;
   border: 2px solid currentColor;
@@ -3074,7 +3086,7 @@ input {
   box-shadow: 7px 8px 0 -6px currentColor;
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Calls"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-calls"]::before {
   width: 17px;
   height: 17px;
   border: 2px solid currentColor;
@@ -3082,7 +3094,7 @@ input {
   box-shadow: inset 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
 }
 
-.vscode-shell.app-shell .activity-bar button[title="Settings"]::before {
+.vscode-shell.app-shell .activity-bar button[data-testid="activity-settings"]::before {
   width: 16px;
   height: 16px;
   background:

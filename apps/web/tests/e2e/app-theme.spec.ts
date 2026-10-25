@@ -39,7 +39,6 @@ test('desktop shell uses the Discord and VSCode dark theme across primary surfac
       workspaceTop: Math.round(workspace?.getBoundingClientRect().top ?? 0),
       serverRailBackground: colorOf('[data-testid="server-rail"]'),
       channelSidebarBackground: colorOf('[data-testid="channel-sidebar"]'),
-      dmSidebarBackground: colorOf('[data-testid="dm-sidebar"]'),
       chatBackground: colorOf('[data-testid="chat-viewport"]'),
       memberSidebarBackground: colorOf('[data-testid="member-sidebar"]')
     }
@@ -52,12 +51,11 @@ test('desktop shell uses the Discord and VSCode dark theme across primary surfac
   expect(theme.vscodeFocus).toBe('#0078d4')
   expect(theme.bodyBackground).toBe('rgb(17, 18, 20)')
   expect(theme.bodyBackgroundImage).toBe('none')
-  expect(theme.topBarHeight).toBe(30)
-  expect(theme.serverRailWidth).toBe(72)
-  expect(theme.workspaceTop).toBe(68)
-  expect(theme.serverRailBackground).toBe('rgb(30, 31, 34)')
-  expect(theme.channelSidebarBackground).toBe('rgb(43, 45, 49)')
-  expect(theme.dmSidebarBackground).toBe('rgb(43, 45, 49)')
+  expect(theme.topBarHeight).toBe(32)
+  expect(theme.serverRailWidth).toBe(50)
+  expect(theme.workspaceTop).toBe(60)
+  expect(theme.serverRailBackground).toBe('rgba(0, 0, 0, 0)')
+  expect(theme.channelSidebarBackground).toBe('rgba(0, 0, 0, 0)')
   expect(theme.chatBackground).toBe('rgb(49, 51, 56)')
-  expect(theme.memberSidebarBackground).toBe('rgb(43, 45, 49)')
+  expect(theme.memberSidebarBackground).toBe('rgba(0, 0, 0, 0)')
 })
