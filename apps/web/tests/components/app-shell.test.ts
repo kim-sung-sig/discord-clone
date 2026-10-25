@@ -98,8 +98,8 @@ describe('Discord app shell', () => {
 
     expect(bar.get('[data-testid="activity-explorer"]').attributes('title')).toBe('탐색기')
     expect(bar.get('[data-testid="activity-search"]').attributes('title')).toBe('검색')
-    expect(bar.get('[data-testid="activity-inbox"]').attributes('title')).toBe('받은 알림')
-    expect(bar.get('[data-testid="activity-calls"]').attributes('title')).toBe('통화')
+    expect(bar.get('[data-testid="activity-inbox"]').attributes('title')).toBe('알림함')
+    expect(bar.get('[data-testid="activity-calls"]').attributes('title')).toBe('음성 채널')
     expect(bar.get('[data-testid="activity-settings"]').attributes('title')).toBe('설정')
   })
 
