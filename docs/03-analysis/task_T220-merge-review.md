@@ -3,8 +3,8 @@
 ## 대상
 
 - 작업 브랜치: `task_T220-real-workspace-data`
-- 기준 `origin/main` SHA: `ecf24e3b880e0c5cbd74a588be52c0f47f10a8ca`
-- 검토한 내용 SHA: `77a1664f5a2ad6abbf6d35995f93c989f89a7813`
+- 기준 `origin/main` SHA: `64308e6e1075185320f33fa1d71005b2f32482db`(T219·T223·T222·T221 병합 후)
+- 검토한 내용 SHA: `ccaf1fed6a674a59be8319817491fe9e991dd5a9`
   - `0143be1`: 설계 문서
   - `937e48c`
     - 실제 로그인 세션이 빈 작업 공간에서 시작한다. 데모 데이터는 test fixture로 옮겼다.
@@ -17,6 +17,9 @@
     - 이전 page를 불러온 뒤 scroll 위치를 보정한다.
     - read marker watcher를 정리했다.
     - fixme에 후속 이유를 적었다.
+  - `871fca7`: 예전 증거 기록(`77a1664` 기준). 이 문서로 교체됐다.
+  - `4fdf0ad`: T219·T223·T222·T221이 병합된 `origin/main`을 합쳤다. 충돌 4곳(`ChatViewport.vue`, `app-shell.test.ts`, e2e `app-shell`·`real-backend` spec)을 세 쪽 의도를 모두 살려 해결했다.
+  - `ccaf1fe`: 전송 중인 내 메시지에도 로그인한 사용자의 표시 이름을 보여 준다(T221 helper 사용).
 - 증거 기록: 이 문서만 바꾸는 commit이다. 검토한 내용 commit 바로 다음 commit이다.
 - 설계 문서: `docs/03-analysis/task_T220-real-workspace-data.blueprint.md`
 
@@ -44,8 +47,10 @@
 | --- | --- | --- | ---: | --- | --- |
 | 1 | 명세 준수 | `788fb5f` | 82/100 | 0/1/2/1 | 불합격 |
 | 1 | 코드 품질·보안 | `788fb5f` | 84/100 | 0/1/1/3 | 불합격 |
-| 2 | 명세 준수(수정분 재검토) | `77a1664f5a2ad6abbf6d35995f93c989f89a7813` | 93/100 | 0/0/0/1 | **승인** |
-| 2 | 코드 품질·보안(수정분 재검토) | `77a1664f5a2ad6abbf6d35995f93c989f89a7813` | 92/100 | 0/0/0/1 | **승인** |
+| 2 | 명세 준수(수정분 재검토) | `77a1664` | 93/100 | 0/0/0/1 | 통과 |
+| 2 | 코드 품질·보안(수정분 재검토) | `77a1664` | 92/100 | 0/0/0/1 | 통과 |
+| 3 | 명세 준수(main 병합·충돌 해결 재검토) | `ccaf1fed6a674a59be8319817491fe9e991dd5a9` | 94/100 | 0/0/0/2 | **승인** |
+| 3 | 코드 품질·보안(main 병합·충돌 해결 재검토) | `ccaf1fed6a674a59be8319817491fe9e991dd5a9` | 93/100 | 0/0/0/2 | **승인** |
 
 1차 지적 5건은 모두 2차에서 해결됐다.
 
@@ -55,14 +60,25 @@
 - P3: watcher key가 부족했다.
 - P3: 빈 wrapper가 남아 있었다.
 
+3차 재검토(remerge-diff 기준)는 다음을 확인했다.
+
+- 네 branch의 의도가 모두 남았다: T221 이름·이니셜, T222 설명 줄 삭제, T220 scroll·read marker·hydration gate, T219의 시험과 영역 삭제.
+- 지운 testid가 다시 생기지 않았다. `real-backend.spec.ts`와 `pages/`는 main과 같다.
+- fixme가 15개에서 11개로 줄었다. 줄어든 4개는 T219가 지운 spec과 일치한다.
+- 새 commit `ccaf1fe`는 send action 안에서만 로그인 정보를 읽으므로 hydration 위험이 없다.
+
 ## 검증 (Windows, 코디네이터 직접 실행)
 
-| 명령 | `788fb5f` | `77a1664` |
-| --- | --- | --- |
-| `npm run lint` | 성공 | 성공 |
-| `npx vitest run` (`apps/web`) | 181 통과, 8 건너뜀 | 185 통과, 8 건너뜀 |
-| `npm run build --workspace @discord-clone/web` | 성공 | 성공 |
-| `git diff --check origin/main HEAD` | 성공 | 성공 |
+| 명령 | `788fb5f` | `77a1664` | `ccaf1fe`(최종) |
+| --- | --- | --- | --- |
+| `npm run lint` | 성공 | 성공 | 성공 |
+| `npx vitest run` (`apps/web`) | 181 통과, 8 건너뜀 | 185 통과, 8 건너뜀 | 239 통과, 8 건너뜀 |
+| `npm run build --workspace @discord-clone/web` | 성공 | 성공 | 성공 |
+| `git diff --check origin/main HEAD` | 성공 | 성공 | 성공 |
+| 모든 `qa/*.contract.ps1` | - | - | 통과(main과 같은 환경 실패 4건만 남음) |
+| 실제 백엔드 Playwright 시험(`REAL_BACKEND_E2E=1`) | - | - | 1 통과 |
+
+최종(`ccaf1fe`) 실제 화면 둘러보기(배포 빌드, 실제 백엔드): 콘솔에는 예상한 401(로그인 전 갱신, 일부러 틀린 비밀번호)만 남았다. **꾸밈 차단 0건, hydration 불일치 0건, 읽음 표시 400 0건**이다. 멤버 목록은 로그인한 사용자만 보이고, 메시지는 오래된 것부터 보이며, 작성자 이름이 나온다.
 
 실제 화면 둘러보기(배포 빌드, 실제 백엔드)
 
@@ -76,6 +92,7 @@ hydration 추적(`nuxt dev`, 실제 로그인)
 - 남은 불일치는 1건이다. 서버는 주석을 그렸고 브라우저는 `section`을 기대했다.
 - 위치는 `/app` 최상단의 `pages/app.vue` `real-api-panel`(`v-if="auth.accessToken"`)이다.
 - 이 노드는 이 작업 범위 밖이고, T219가 지운다. 이 작업이 맡은 컴포넌트에서 나오는 불일치는 없다.
+- T219가 병합된 main을 합친 최종 상태에서는 불일치가 0건이다.
 
 화면 캡처: `C:\tmp\review-extract\ui-polish\shots-task_T220-real-workspace-data\`
 
@@ -92,12 +109,14 @@ hydration 추적(`nuxt dev`, 실제 로그인)
 - 구현 수용: 예
 - 검증 수용: 검토한 내용 기준으로 예
 
-## 병합 순서 권고
+## 병합 상태
 
-- **T219를 먼저 병합한다.** T220만 먼저 들어가면 `real-api-panel`에서 생기는 hydration 경고가 main에 남는다. 이 경고는 원래 있던 문제다. T219 병합 뒤 둘러보기에서 경고가 0인지 다시 확인한다.
-- **T221과 같은 파일을 고쳤다.** `apps/web/stores/shell.ts`와 `ChatViewport.vue`를 함께 건드리므로 충돌을 정리해야 할 수 있다.
+- T219·T223·T222·T221이 먼저 병합됐고, 이 브랜치는 그 main(`64308e6`)을 합친 상태다. 남은 충돌은 없다.
 
 ## 남은 위험·미룬 일
+
+- P3: 로그인 상태에서 local `sendMessage` 경로의 이름 단언이 시험에 없다. `ownMessageAuthorLabel`이 helper를 우회 호출한다(동작은 맞음).
+- 상태 표시줄의 "준비됨 0" 문구는 `pages/app.vue`에서 나온다(후속 작업).
 
 - P3
   - 이전 page를 불러오는 중에 채널을 바꾸면, 늦게 끝난 scroll 보정이 새 채널에 적용될 수 있다.
