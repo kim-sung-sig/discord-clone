@@ -3,8 +3,8 @@
 ## 대상
 
 - 작업 브랜치: `task_T222-login-locale-copy`
-- 기준 `origin/main` SHA: `ecf24e3b880e0c5cbd74a588be52c0f47f10a8ca`
-- 검토한 내용 SHA: `98b7113110eb59d90403ba807e9c26c9c1896a49`
+- 기준 `origin/main` SHA: `a393a727a3d0af6feb2d409e032012de3fe8bdd3`
+- 검토한 내용 SHA: `eb5cbbac8128f2bafb9e7ee80c738940012c4db8`
 
   | commit | 내용 |
   | --- | --- |
@@ -15,6 +15,10 @@
   | `eb4db74` | 1차 검토 후속: 한국어 단어가 줄 중간에서 끊기지 않게 했고, 용어를 통일했다. 세션 복구 실패를 처리하는 코드를 추가했다. |
   | `3337e91` | 예전 증거 기록(`eb4db74` 기준). 이 문서로 교체됐다. |
   | `98b7113` | 2차 후속: CI 계약 검사(`qa/real-backend-browser-smoke-default.contract.ps1`)가 지운 `login-success`를 계속 요구해 PR #19의 qa-runtime이 실패했다. 계약 검사에서 그 항목을 지웠고, e2e 언어를 `en-US`로 고정했다. |
+  | `24bb3e1` | 예전 증거 기록(`98b7113` 기준). 이 문서로 교체됐다. |
+  | `6c8bd30` | T219(PR #22)·T223(PR #18)이 병합된 `origin/main`을 합쳤다. `real-backend.spec.ts`와 계약 검사 충돌은 T219 쪽으로 해결했고, T222의 `en-US` 고정 한 줄만 남겼다. |
+  | `9f1bc32` | T219가 회원가입 버튼을 지워 쓰이지 않게 된 `banner.register` 키를 지웠다. |
+  | `eb5cbba` | 글자 충돌 없이 생긴 의미 충돌을 고쳤다. T219 시험이 예전 한국어 이름(받은 알림, 통화)을 기대해서 T222의 이름(알림함, 음성 채널)으로 맞췄다. |
 
 - 증거 기록: 이 문서만 바꾸는, 검토한 내용 commit의 바로 다음 commit이다.
 - 설계 문서: `docs/03-analysis/task_T222-login-locale-copy.blueprint.md`
@@ -44,8 +48,10 @@
 | 1 | 코드 품질·보안 | `cb9f62a` | 91/100 | 0/0/1/5 | 통과 |
 | 2 | 명세 준수(수정분 재검토) | `eb4db74` | 96/100 | 0/0/0/0 | 통과 |
 | 2 | 코드 품질·보안(수정분 재검토) | `eb4db74` | 95/100 | 0/0/0/0 | 통과 |
-| 3 | 명세 준수(2차 수정분 재검토) | `98b7113110eb59d90403ba807e9c26c9c1896a49` | 96/100 | 0/0/0/2 | **승인** |
-| 3 | 코드 품질·보안(2차 수정분 재검토) | `98b7113110eb59d90403ba807e9c26c9c1896a49` | 95/100 | 0/0/0/2 | **승인** |
+| 3 | 명세 준수(2차 수정분 재검토) | `98b7113` | 96/100 | 0/0/0/2 | 통과 |
+| 3 | 코드 품질·보안(2차 수정분 재검토) | `98b7113` | 95/100 | 0/0/0/2 | 통과 |
+| 4 | 명세 준수(main 병합·충돌 해결 재검토) | `eb5cbbac8128f2bafb9e7ee80c738940012c4db8` | 96/100 | 0/0/0/3 | **승인** |
+| 4 | 코드 품질·보안(main 병합·충돌 해결 재검토) | `eb5cbbac8128f2bafb9e7ee80c738940012c4db8` | 95/100 | 0/0/0/3 | **승인** |
 
 1차에서 나온 P2 2건과 P3 2건은 2차에서 모두 해결된 것으로 확인됐다.
 
@@ -66,12 +72,19 @@
 - `login.spec.ts`가 `en-US`로 고정돼 있어, 한국어 감지는 단위 시험에서만 확인한다.
 - 계약 검사가 로그인 뒤 작업 화면(`workspace`)을 확인하지 않는다.
 
-## 검증 (`98b7113`, Windows, 코디네이터 직접 실행)
+4차 재검토는 다음을 확인했다.
+
+- 충돌 해결이 두 브랜치의 의도를 모두 지킨다(remerge-diff 기준).
+- 계약 검사의 9개 항목이 합친 시험 파일에 모두 있다.
+- 두 언어 파일의 key가 87개로 같다.
+- 지운 testid·key·예전 문구를 기대하는 시험이 더 없다.
+
+## 검증 (`eb5cbba`, Windows, 코디네이터 직접 실행)
 
 | 명령 | 결과 |
 | --- | --- |
 | `npm run lint` | 성공 |
-| `npx vitest run` (`apps/web`) | 190 통과, 8 건너뜀 |
+| `npx vitest run` (`apps/web`) | 207 통과, 8 건너뜀 |
 | `npm run build --workspace @discord-clone/web` | 성공 |
 | `git diff --check origin/main HEAD` | 성공 |
 | 모든 `qa/*.contract.ps1` | `real-backend-browser-smoke-default`와 `real-backend-e2e`를 포함해 통과했다. 실패 4건은 main과 같은 환경 관련 실패다: `central-kafka-ci-artifacts`, `dashboard-guard-health-smoke`, `production-profile-guard-smoke`, `web-docker-tests`. |
@@ -80,6 +93,8 @@
 
 - 화면 캡처: `C:\tmp\review-extract\ui-polish\shots-task_T222-login-locale-copy\`
 - 1차 검증(`cb9f62a`)도 모두 성공했다. 테스트는 188 통과였다.
+- `6c8bd30`(병합 직후) 검증에서 단위 시험 1건이 실패해(T219 시험의 예전 한국어 이름) `eb5cbba`로 고쳤다.
+- 3차 검증(`98b7113`)은 190 통과, 계약 검사·실제 백엔드 시험 통과였다.
 - 2차 검증(`eb4db74`)도 모두 성공했다. 다만 그때는 qa 계약 검사를 돌리지 않아서 CI 실패를 놓쳤다. 이후 코디네이터 검증 목록에 계약 검사 전체를 넣었다.
 
 ## 설계 문서와의 일치
@@ -96,9 +111,10 @@
 ## 남은 위험·미룬 일
 
 - **병합 충돌 가능성**
-  - T219(PR #22)와 `real-backend.spec.ts`의 로그인 줄, 계약 검사 목록이 겹친다. T219 쪽 내용으로 해결하면 된다. 그렇게 합친 상태에서 계약 검사와 실제 백엔드 시험이 통과하는 것을 확인했다.
+  - T219(PR #22)와의 충돌은 `6c8bd30`에서 해결했다.
   - `pages/app.vue`에서 2줄(`editor.hint`), `ChatViewport.vue`에서 1줄(`editor.channelDescription`)을 지웠다. T219·T220과 같은 부분을 고쳤다면 충돌할 수 있다.
-  - T219가 회원가입 버튼을 지우면 `banner.register` 키는 쓰이지 않게 되므로 함께 지운다.
+- **설계 문서 문구(P3)**: 설계 문서가 `banner.register`를 유지한다고 적고 있고(27·49행), 계약 검사 파일을 변경 파일로 적고 있다(71행). 지금은 key를 지웠고 계약 검사는 main과 같다. 후속 정리 대상이다.
+- **쓰이지 않는 CSS(P3, T219 범위)**: `workbench-density.css:292`의 `.editor-empty-hint` 규칙이 남아 있다.
 - **`<html lang>`**: 화면이 뜬 뒤 브라우저에서 바꾼다. 서버가 그린 HTML에는 `lang`이 없다.
 - **로그인 오류 문구**: 문자열로 저장하므로, 오류가 난 뒤 언어를 바꿔도 오류 문구는 다시 번역되지 않는다.
 - **e2e 시험**: 브라우저 언어를 `ko-KR`로 둔 경우를 확인하지 않는다.
