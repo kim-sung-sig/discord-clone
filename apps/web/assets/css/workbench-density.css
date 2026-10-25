@@ -9,7 +9,6 @@
   font-size: 12px;
 }
 
-.vscode-shell.app-shell .workbench-banner button,
 .vscode-shell.app-shell .message-composer button,
 .vscode-shell.app-shell .attachment-stage-button,
 .vscode-shell.app-shell .workbench-field input,
@@ -52,7 +51,7 @@
 }
 
 .vscode-shell.app-shell .editor-workbench .message-composer {
-  grid-template-columns: 104px minmax(0, 1fr) 56px;
+  grid-template-columns: 104px minmax(0, 1fr) minmax(56px, auto);
   gap: 8px;
   padding: 8px 14px;
   background: color-mix(in srgb, var(--editor-bg) 91%, black 9%);
@@ -165,26 +164,275 @@
   padding: 5px 4px;
 }
 
-.vscode-shell.app-shell .workbench.workspace[data-active-workbench-view="explorer"] {
-  position: relative;
-  grid-template-rows: minmax(0, 1fr) 22px;
+/*
+ * T219 shell grid. This file is loaded last and is the authoritative layer for the shell and workspace
+ * grid (columns, rows, and child placement); the older polish blocks in main.css only provide fallbacks.
+ * Every shell child and every workspace child owns an explicit grid cell, so nothing falls into an
+ * implicit row. These selectors are at least as specific as the legacy ones (0,3,0)-(0,4,0).
+ */
+.vscode-shell.app-shell {
+  grid-template-columns: 50px minmax(0, 1fr);
+  grid-template-rows: 32px 28px minmax(0, 1fr);
 }
 
-.vscode-shell.app-shell .workbench.workspace[data-active-workbench-view="explorer"] .workspace-explorer,
-.vscode-shell.app-shell .workbench.workspace[data-active-workbench-view="explorer"] .editor-workbench,
-.vscode-shell.app-shell .workbench.workspace[data-active-workbench-view="explorer"] .side-panel {
+.vscode-shell.app-shell .workbench-titlebar {
+  grid-column: 1 / -1;
   grid-row: 1;
 }
 
-.vscode-shell.app-shell .workbench.workspace[data-active-workbench-view="explorer"] .status-bar {
+.vscode-shell.app-shell .workbench-banner {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  height: 28px;
+}
+
+.vscode-shell.app-shell .activity-bar {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+.vscode-shell.app-shell .workbench.workspace {
+  grid-column: 2;
+  grid-row: 3;
+  position: relative;
+  grid-template-columns: 264px minmax(0, 1fr) 220px;
+  grid-template-rows: minmax(0, 1fr) 22px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vscode-shell.app-shell .workbench.workspace > .workspace-explorer {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  background: var(--discord-sidebar, var(--sidebar-bg));
+}
+
+.vscode-shell.app-shell .workbench.workspace > .editor-workbench {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vscode-shell.app-shell .workbench.workspace > .side-panel {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--discord-sidebar, var(--sidebar-bg));
+}
+
+.vscode-shell.app-shell .workbench.workspace > .workbench-secondary-view {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.vscode-shell.app-shell .workbench.workspace > .shell-api-error {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 60;
+  align-self: start;
+  margin: 8px 12px;
+}
+
+.vscode-shell.app-shell .workbench.workspace > .status-bar {
   grid-column: 1 / -1;
   grid-row: 2;
+  display: flex;
+  gap: 12px;
+  align-items: center;
   height: 22px;
   min-height: 22px;
-  gap: 12px;
   padding: 0 10px;
   overflow: hidden;
   font-size: 11px;
+}
+
+/* The chat viewport keeps a legacy "grid-column: 3" that pushed it into an implicit column. */
+.vscode-shell.app-shell .editor-workbench > .chat-viewport {
+  grid-column: 1;
+  grid-row: 2;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vscode-shell.app-shell .editor-titlebar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.vscode-shell.app-shell .editor-titlebar small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--workbench-muted);
+  text-overflow: ellipsis;
+}
+
+/* The editor hint repeats the editor title bar text; keep it for assistive technology only. */
+.vscode-shell.app-shell .editor-empty-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.vscode-shell.app-shell .workspace-explorer > header {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 6px;
+}
+
+.vscode-shell.app-shell .workspace-explorer > header p,
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+  margin: 0;
+  color: var(--workbench-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vscode-shell.app-shell .workspace-explorer > header h2 {
+  margin: 0;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-group {
+  margin-top: 8px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-group h2 {
+  padding: 0 6px 4px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .channel-sidebar {
+  flex: none;
+  background: transparent;
+  border-right: 0;
+}
+
+.vscode-shell.app-shell .workbench.workspace > .side-panel .member-sidebar {
+  background: transparent;
+  border-left: 0;
+}
+
+.vscode-shell.app-shell .workspace-explorer .user-panel {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  margin-top: auto;
+  padding: 8px 12px;
+  border-radius: 0;
+}
+
+.vscode-shell.app-shell .workbench-settings-view .user-panel {
+  max-width: 520px;
+  margin-top: 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--workbench-border);
+  border-radius: 5px;
+}
+
+.vscode-shell.app-shell .workspace-explorer .session-panel,
+.vscode-shell.app-shell .workbench-settings-view .session-panel {
+  justify-content: flex-start;
+}
+
+.vscode-shell.app-shell .workspace-explorer .session-list,
+.vscode-shell.app-shell .workbench-settings-view .session-list {
+  position: static;
+  width: auto;
+  max-height: 140px;
+  box-shadow: none;
+}
+
+.vscode-shell.app-shell .workbench-calls-view {
+  align-content: start;
+}
+
+.vscode-shell.app-shell .status-bar > * {
+  flex: 0 1 auto;
+}
+
+.vscode-shell.app-shell .status-bar > .status-panel-toggle {
+  flex: none;
+}
+
+/*
+ * Activity bar: dark buttons (no UA white boxes) with visible hover, active, and focus states.
+ * The activity bar is dark in every theme, so its foreground does not follow --workbench-fg
+ * (which is dark in the light theme).
+ */
+.vscode-shell.app-shell .activity-bar button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--activity-fg, #c5c5c5);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.vscode-shell.app-shell .activity-bar button:hover {
+  color: var(--activity-fg-active, #ffffff);
+  background: color-mix(in srgb, var(--activity-fg-active, #ffffff) 10%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button[aria-current="page"] {
+  color: var(--activity-fg-active, #ffffff);
+  background: color-mix(in srgb, var(--activity-fg-active, #ffffff) 16%, transparent);
+}
+
+.vscode-shell.app-shell .activity-bar button:focus-visible {
+  outline: 2px solid var(--activity-fg-active, #ffffff);
+  outline-offset: -2px;
+}
+
+.vscode-shell.app-shell .activity-bar .server-rail {
+  flex: none;
+  gap: 0;
+  width: 100%;
+  padding: 4px 0 6px;
+  background: transparent;
+  border: 0;
+}
+
+.vscode-shell.app-shell .activity-bar .server-pill {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  overflow: visible;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 12px;
 }
 
 .vscode-shell.app-shell .status-bar span {
@@ -244,10 +492,10 @@
   left: 264px;
   z-index: 50;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   grid-template-rows: 28px minmax(0, 1fr);
-  height: min(240px, calc(100% - 42px));
-  max-height: min(280px, calc(100% - 42px));
+  height: min(360px, calc(100% - 42px));
+  max-height: min(360px, calc(100% - 42px));
   overflow: hidden;
   background: color-mix(in srgb, var(--workbench-panel-bg) 94%, black 6%);
   border: 1px solid var(--workbench-border);
@@ -308,20 +556,73 @@
   border-color: var(--workbench-border);
 }
 
+/* The legacy theme rules place these panels in columns 3-6, outside the two-column bottom panel. */
+.vscode-shell.app-shell .bottom-panel .gateway-status-panel {
+  grid-column: 1;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.vscode-shell.app-shell .bottom-panel .voice-panel {
+  grid-column: 2;
+  border-left: 1px solid var(--workbench-border);
+}
+
 .vscode-shell.app-shell .bottom-panel .gateway-status-panel,
 .vscode-shell.app-shell .bottom-panel .voice-panel {
   grid-row: 2;
+  gap: 8px;
+  align-content: start;
+  align-items: start;
+  min-width: 0;
   height: auto;
   min-height: 0;
+  padding: 10px 12px;
   overflow: auto;
+  border-top: 0;
+  border-radius: 0;
 }
 
+.vscode-shell.app-shell .bottom-panel .gateway-status-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.vscode-shell.app-shell .bottom-panel .gateway-status-header strong {
+  margin-top: 0;
+}
+
+.vscode-shell.app-shell .bottom-panel .gateway-status-grid {
+  gap: 6px;
+}
+
+.vscode-shell.app-shell .bottom-panel .gateway-status-grid dd {
+  overflow-wrap: anywhere;
+}
+
+.vscode-shell.app-shell .bottom-panel .voice-panel-header {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+}
+
+.vscode-shell.app-shell .bottom-panel .voice-panel-header h2 {
+  font-size: 14px;
+}
+
+/*
+ * Mobile (<= 720px). Pure media query: nothing here depends on the data-platform-surface attribute,
+ * which only exists after hydration. Workspace selectors stay at (0,5,0) or higher so they beat the
+ * desktop grid and placement rules above.
+ */
 @media (max-width: 720px) {
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] {
+  .vscode-shell.app-shell {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    width: 100vw;
+    width: 100%;
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
@@ -329,13 +630,13 @@
     font-size: 12px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench-titlebar,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench-banner,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .activity-bar {
+  .vscode-shell.app-shell .workbench-titlebar,
+  .vscode-shell.app-shell .workbench-banner,
+  .vscode-shell.app-shell .activity-bar {
     display: none;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar {
+  .vscode-shell.app-shell .mobile-shell-bar {
     display: flex;
     grid-column: 1;
     grid-row: 1;
@@ -345,18 +646,18 @@
     border-bottom: 1px solid var(--workbench-border);
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar span {
+  .vscode-shell.app-shell .mobile-shell-bar span {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-bar strong {
+  .vscode-shell.app-shell .mobile-shell-bar strong {
     font-size: 12px;
     font-weight: 650;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace {
+  .vscode-shell.app-shell .workbench.workspace {
     grid-column: 1;
     grid-row: 2;
     display: grid;
@@ -367,19 +668,23 @@
     background: var(--editor-bg);
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workspace-explorer,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .editor-workbench,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .side-panel,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .bottom-panel,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .status-bar,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench-secondary-view {
+  .vscode-shell.app-shell .workbench.workspace > .shell-api-error {
+    grid-column: 1;
+  }
+
+  .vscode-shell.app-shell .workbench.workspace > .workspace-explorer,
+  .vscode-shell.app-shell .workbench.workspace > .editor-workbench,
+  .vscode-shell.app-shell .workbench.workspace > .side-panel,
+  .vscode-shell.app-shell .workbench.workspace > .bottom-panel,
+  .vscode-shell.app-shell .workbench.workspace > .status-bar,
+  .vscode-shell.app-shell .workbench.workspace > .workbench-secondary-view {
     display: none;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-channels .workspace-explorer,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-chat .editor-workbench,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-members .side-panel,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-voice .bottom-panel {
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-channels .workspace-explorer,
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-chat .editor-workbench,
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-members .side-panel,
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-voice .bottom-panel {
     grid-column: 1;
     grid-row: 1;
     min-width: 0;
@@ -387,84 +692,103 @@
     overflow: auto;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-channels .workspace-explorer,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-members .side-panel {
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-channels .workspace-explorer {
+    display: flex;
+  }
+
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-members .side-panel {
     display: block;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-chat .editor-workbench,
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workbench.workspace.mobile-pane-voice .bottom-panel {
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-chat .editor-workbench,
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-voice .bottom-panel {
     display: grid;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workspace-explorer {
-    padding: 12px;
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-chat .editor-workbench {
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    background: var(--editor-bg);
+  }
+
+  .vscode-shell.app-shell .workbench.workspace .workspace-explorer {
+    padding: 0;
     background: var(--sidebar-bg);
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .workspace-explorer .channel-sidebar {
+  .vscode-shell.app-shell .workbench.workspace .workspace-explorer .channel-sidebar {
     display: block;
     padding: 6px 0 0;
     background: transparent;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .editor-workbench {
-    grid-template-rows: auto minmax(0, 1fr);
-    background: var(--editor-bg);
-  }
-
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .editor-titlebar {
+  .vscode-shell.app-shell .workbench.workspace .editor-titlebar {
     height: 30px;
     padding: 0 10px;
     font-size: 11.5px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .chat-viewport {
+  .vscode-shell.app-shell .workbench.workspace .editor-titlebar small {
+    display: none;
+  }
+
+  .vscode-shell.app-shell .workbench.workspace .chat-viewport {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     min-height: 0;
     padding: 0;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .chat-header {
+  .vscode-shell.app-shell .workbench.workspace .chat-header {
     padding: 14px 12px 10px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .chat-header h2 {
+  .vscode-shell.app-shell .workbench.workspace .chat-header h2 {
     font-size: 18px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .message-list {
+  .vscode-shell.app-shell .workbench.workspace .message-list {
     min-height: 0;
     padding: 10px 12px;
     overflow: auto;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .message {
+  .vscode-shell.app-shell .workbench.workspace .message {
     grid-template-columns: 30px minmax(0, 1fr);
     gap: 8px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .avatar {
+  .vscode-shell.app-shell .workbench.workspace .avatar {
     width: 28px;
     height: 28px;
     font-size: 11px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .message-card {
+  .vscode-shell.app-shell .workbench.workspace .message-card {
     width: 100%;
+    min-width: 0;
     padding: 10px 12px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .message-composer {
-    grid-template-columns: 32px minmax(0, 1fr) 52px;
+  .vscode-shell.app-shell .workbench.workspace .message-card p,
+  .vscode-shell.app-shell .workbench.workspace .message-meta strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .vscode-shell.app-shell .workbench.workspace .message-composer {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
     gap: 6px;
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .attachment-stage-button {
+  .vscode-shell.app-shell .workbench.workspace .message-composer button[type="submit"] {
+    min-width: 56px;
+  }
+
+  .vscode-shell.app-shell .workbench.workspace .attachment-stage-button {
     grid-column: auto;
-    width: 32px;
+    width: 34px;
     padding: 0;
     overflow: hidden;
     color: transparent;
@@ -472,45 +796,60 @@
     white-space: nowrap;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .attachment-stage-button::before {
+  .vscode-shell.app-shell .workbench.workspace .attachment-stage-button::before {
     color: var(--workbench-muted);
     font-size: 18px;
     content: "+";
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .side-panel {
+  .vscode-shell.app-shell .workbench.workspace .side-panel {
     background: var(--sidebar-bg);
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .side-panel .member-sidebar {
+  .vscode-shell.app-shell .workbench.workspace .side-panel .member-sidebar {
     display: block;
     padding: 14px 12px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .bottom-panel {
+  .vscode-shell.app-shell .workbench.workspace.mobile-pane-voice .bottom-panel {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
+    height: auto;
+    max-height: none;
     background: var(--workbench-panel-bg);
+    border: 0;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .bottom-panel-titlebar {
+  .vscode-shell.app-shell .workbench.workspace .bottom-panel-titlebar {
     display: none;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .bottom-panel .gateway-status-panel {
+  .vscode-shell.app-shell .workbench.workspace .bottom-panel .gateway-status-panel {
     display: none;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .bottom-panel .voice-panel {
+  .vscode-shell.app-shell .workbench.workspace .bottom-panel .voice-panel {
+    grid-column: 1;
+    grid-row: 1;
     display: block;
     width: auto;
     height: auto;
     min-height: 0;
     padding: 14px 12px;
     overflow: auto;
+    border-left: 0;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav {
+  .vscode-shell.app-shell .mobile-shell-nav {
     display: grid;
     grid-column: 1;
     grid-row: 3;
@@ -521,7 +860,7 @@
     border-top: 1px solid var(--workbench-border);
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav button {
+  .vscode-shell.app-shell .mobile-shell-nav button {
     min-width: 0;
     min-height: 34px;
     padding: 5px 3px;
@@ -536,7 +875,7 @@
     border-radius: 3px;
   }
 
-  .vscode-shell.app-shell[data-platform-surface="pwa-mobile"] .mobile-shell-nav button[aria-selected="true"] {
+  .vscode-shell.app-shell .mobile-shell-nav button[aria-selected="true"] {
     color: var(--workbench-fg);
     background: color-mix(in srgb, var(--workbench-fg) 7%, transparent);
     border-color: color-mix(in srgb, var(--workbench-accent) 42%, var(--workbench-border));
