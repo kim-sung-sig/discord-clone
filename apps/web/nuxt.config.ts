@@ -10,6 +10,10 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt'],
   css: ['~/assets/css/main.css', '~/assets/css/discord-vscode-theme.css', '~/assets/css/workbench-density.css'],
   devtools: { enabled: false },
+  features: {
+    // The production CSP uses style-src 'self'; keep component CSS in <link> files instead of inlined <style> tags.
+    inlineStyles: false
+  },
   alias: {
     '@discord-clone/ui-contracts/screens': packageSource('ui-contracts/src/screens.ts'),
     '@discord-clone/platform-shell/capabilities': packageSource('platform-shell/src/capabilities.ts')

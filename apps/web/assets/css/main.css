@@ -674,11 +674,95 @@ body {
   background: var(--accent);
 }
 
+.csp-trend-h-10 {
+  height: 10%;
+}
+
+.csp-trend-h-15 {
+  height: 15%;
+}
+
+.csp-trend-h-20 {
+  height: 20%;
+}
+
+.csp-trend-h-25 {
+  height: 25%;
+}
+
+.csp-trend-h-30 {
+  height: 30%;
+}
+
+.csp-trend-h-35 {
+  height: 35%;
+}
+
+.csp-trend-h-40 {
+  height: 40%;
+}
+
+.csp-trend-h-45 {
+  height: 45%;
+}
+
+.csp-trend-h-50 {
+  height: 50%;
+}
+
+.csp-trend-h-55 {
+  height: 55%;
+}
+
+.csp-trend-h-60 {
+  height: 60%;
+}
+
+.csp-trend-h-65 {
+  height: 65%;
+}
+
+.csp-trend-h-70 {
+  height: 70%;
+}
+
+.csp-trend-h-75 {
+  height: 75%;
+}
+
+.csp-trend-h-80 {
+  height: 80%;
+}
+
+.csp-trend-h-85 {
+  height: 85%;
+}
+
+.csp-trend-h-90 {
+  height: 90%;
+}
+
+.csp-trend-h-95 {
+  height: 95%;
+}
+
+.csp-trend-h-100 {
+  height: 100%;
+}
+
 .storage-health-ready {
-  color: var(--accent);
+  color: #57f287;
 }
 
 .storage-health-degraded {
+  color: var(--danger);
+}
+
+.security-summary-card strong.storage-health-ready {
+  color: #57f287;
+}
+
+.security-summary-card strong.storage-health-degraded {
   color: var(--danger);
 }
 
@@ -809,7 +893,7 @@ body {
 
 .guard-health-summary strong,
 .guard-method-list strong {
-  color: #06131d;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 900;
 }
@@ -845,23 +929,25 @@ body {
 }
 
 .backend-auth-probe strong {
-  color: var(--accent);
+  color: #4dabff;
 }
 
 .backend-auth-probe small {
   color: var(--muted);
 }
 
-.guard-status-ready {
-  background: var(--accent);
+.guard-health-summary .guard-status-ready {
+  color: #06131d;
+  background: #4ade80;
 }
 
-.guard-status-local-dev-open {
+.guard-health-summary .guard-status-local-dev-open {
+  color: #06131d;
   background: #ffd166;
 }
 
-.guard-status-fail-closed,
-.guard-status-unknown {
+.guard-health-summary .guard-status-fail-closed,
+.guard-health-summary .guard-status-unknown {
   color: #ffe3e3;
   background: rgba(255, 107, 107, 0.18);
 }
@@ -888,12 +974,18 @@ body {
 
 .guard-method-list strong,
 .subject-diagnostics-list strong {
+  color: #06131d;
   background: #54a6ff;
   border-radius: 999px;
 }
 
-.guard-method-disabled {
-  opacity: 0.58;
+.guard-method-list .guard-method-disabled span {
+  color: var(--muted);
+}
+
+.guard-method-list .guard-method-disabled strong {
+  color: var(--ink);
+  background: #4e5058;
 }
 
 .guard-warning-list li {

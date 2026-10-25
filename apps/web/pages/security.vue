@@ -259,7 +259,11 @@ const responseIsMfaRequired = async (response: Response): Promise<boolean> => {
   }
 }
 
-const trendBarHeight = (total: number): string => `${Math.max(8, Math.round((total / trendMaxTotal.value) * 100))}%`
+// 5% height buckets (csp-trend-h-10 .. csp-trend-h-100) keep the bars free of inline style attributes (CSP style-src 'self').
+const trendBarClass = (total: number): string => {
+  const percent = Math.round((total / trendMaxTotal.value) * 100)
+  return `csp-trend-h-${Math.min(100, Math.max(10, Math.ceil(percent / 5) * 5))}`
+}
 
 const isOperatorTokenAuditPayload = (
   value: unknown
@@ -586,7 +590,7 @@ const isSecurityDashboardGuardHealth = (value: unknown): value is SecurityDashbo
             >
               <span>{{ bucket.total }}</span>
               <div>
-                <i :style="{ height: trendBarHeight(bucket.total) }" />
+                <i :class="trendBarClass(bucket.total)" />
               </div>
               <small>{{ bucket.bucketStart.slice(11, 16) }}</small>
             </div>
