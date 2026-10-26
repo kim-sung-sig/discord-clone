@@ -5,7 +5,7 @@ import ReactionBar from './ReactionBar.vue'
 import TypingIndicator from './TypingIndicator.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
-import { useShellStore, type ShellMessage } from '../../stores/shell'
+import { useShellStore } from '../../stores/shell'
 import { messageAuthorInitials } from '../../services/message-author'
 
 const shell = useShellStore()
@@ -29,22 +29,22 @@ const activeChannelLabel = computed(() => {
 const composerPlaceholder = computed(() => `${preferences.t('composer.placeholder')} ${activeChannelLabel.value}`)
 const activeTypingUserIds = computed(() => shell.activeTypingUserIds)
 const emptyStateText = computed(() => `${preferences.t('editor.emptyBody')} ${activeChannelLabel.value}`)
-const canLoadOlderMessages = computed(() => Boolean(auth.accessToken && shell.activeMessagePageCursor))
+// composerReady doubles as the mounted flag: the server render has no session.
+const canLoadOlderMessages = computed(() => Boolean(composerReady.value && auth.accessToken && shell.activeMessagePageCursor))
 
 onMounted(() => {
   composerReady.value = true
+  scrollToBottom()
 })
 
-watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeMessages.map((message) => `${message.id}:${message.sequence}`).join(',')], async () => {
+watch(() => [auth.accessToken, auth.user?.id, shell.accountGeneration, shell.backendWorkspace, shell.activeChannelId, shell.activeReadMarkerMessage?.id, shell.activeReadMarkerMessage?.sequence, shell.activeReadMarkerMessage?.status, shell.activeReadMarkerMessage?.localSequence], async () => {
   const generation = ++readGeneration
   readObserver?.disconnect()
   readObserver = null
   if (!auth.accessToken || !shell.backendWorkspace || typeof IntersectionObserver === 'undefined') {
     return
   }
-  const latest = shell.activeMessages.reduce<ShellMessage | null>(
-    (current, message) => !current || message.sequence > current.sequence ? message : current, null
-  )
+  const latest = shell.activeReadMarkerMessage
   if (!latest || latest.sequence <= (shell.presence.readMarkers[latest.channelId]?.lastReadSequence ?? 0)) {
     return
   }
@@ -78,8 +78,40 @@ onBeforeUnmount(() => {
   readObserver?.disconnect()
 })
 
+const bottomThresholdPx = 48
+let stickToBottom = true
+
+function scrollToBottom() {
+  const list = messageListRef.value
+  if (list) {
+    list.scrollTop = list.scrollHeight
+  }
+}
+
+function trackScrollPosition() {
+  const list = messageListRef.value
+  if (list) {
+    stickToBottom = list.scrollHeight - list.scrollTop - list.clientHeight <= bottomThresholdPx
+  }
+}
+
+watch(() => shell.activeChannelId, () => {
+  stickToBottom = true
+  scrollToBottom()
+}, { flush: 'post' })
+
+watch(() => shell.activeMessages.at(-1)?.id, () => {
+  if (stickToBottom) {
+    scrollToBottom()
+  }
+}, { flush: 'post' })
+
 async function submitMessage() {
-  await shell.sendMessage(auth.accessToken)
+  stickToBottom = true
+  const sent = shell.sendMessage(auth.accessToken)
+  await nextTick()
+  scrollToBottom()
+  await sent
 }
 
 async function loadOlderMessages() {
@@ -87,7 +119,16 @@ async function loadOlderMessages() {
     return
   }
 
+  // Keep the reader's position: prepended messages push content down by the height delta.
+  // Assign an absolute position so browsers with scroll anchoring are not compensated twice.
+  const list = messageListRef.value
+  const previousHeight = list?.scrollHeight ?? 0
+  const previousTop = list?.scrollTop ?? 0
   await shell.loadOlderActiveChannelMessages(auth.accessToken)
+  await nextTick()
+  if (list) {
+    list.scrollTop = previousTop + list.scrollHeight - previousHeight
+  }
 }
 </script>
 
@@ -96,7 +137,13 @@ async function loadOlderMessages() {
     <header class="chat-header">
       <h2 data-testid="active-channel">{{ activeChannelLabel }}</h2>
     </header>
-    <div ref="messageListRef" class="message-list" data-testid="message-list" aria-live="polite">
+    <div
+      ref="messageListRef"
+      class="message-list"
+      data-testid="message-list"
+      aria-live="polite"
+      @scroll.passive="trackScrollPosition"
+    >
       <button
         v-if="canLoadOlderMessages"
         class="load-older-messages"

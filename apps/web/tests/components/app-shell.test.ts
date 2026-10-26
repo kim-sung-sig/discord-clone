@@ -1,7 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../pages/app.vue'
 import InviteModal from '../../components/invite/InviteModal.vue'
 import DmSidebar from '../../components/social/DmSidebar.vue'
@@ -12,6 +12,7 @@ import RolePermissionPanel from '../../components/shell/RolePermissionPanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePreferencesStore } from '../../stores/preferences'
 import { useShellStore } from '../../stores/shell'
+import { seedShellDemoState } from '../fixtures/shell-demo-state'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -20,6 +21,10 @@ const jsonResponse = (body: unknown, status = 200) =>
   })
 
 describe('Discord app shell', () => {
+  beforeEach(() => {
+    seedShellDemoState()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
     useAuthStore().$reset()
@@ -653,7 +658,7 @@ enableAutoUnmount(afterEach)
     expect(wrapper.find('[data-testid="editor-empty-hint"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="member-sidebar"]').text()).not.toContain('Members')
     expect(wrapper.get('[data-testid="gateway-status-panel"]').text()).not.toContain('Gateway')
-    expect(wrapper.get('[data-testid="voice-token-provider"]').text()).not.toContain('Provider')
+    expect(wrapper.find('[data-testid="voice-token-provider"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="voice-join-channel-war-room"]').text()).not.toContain('Join')
     expect(wrapper.get('[data-testid="voice-leave"]').text()).not.toContain('Leave')
     expect(wrapper.get('[data-testid="attachment-stage-demo"]').text()).not.toContain('Attach image')
@@ -692,7 +697,7 @@ enableAutoUnmount(afterEach)
 
   it('renders deterministic presence badges for members', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     expect(wrapper.get('[data-testid="presence-badge-vibe-coder"]').text()).toContain('Online')
@@ -701,7 +706,7 @@ enableAutoUnmount(afterEach)
 
   it('renders typing users for the active channel only', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     expect(wrapper.get('[data-testid="typing-indicator"]').text()).toContain('cto-bot is typing')
@@ -713,7 +718,7 @@ enableAutoUnmount(afterEach)
 
   it('renders unread badges and clears channel unread state when selected', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     expect(wrapper.get('[data-testid="unread-badge-channel-architecture"]').text()).toContain('1')
@@ -726,7 +731,7 @@ enableAutoUnmount(afterEach)
   it('updates read markers through store-backed mark-read actions', async () => {
     await mountSuspended(App)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     expect((shell as any).unreadCountForChannel?.('channel-architecture')).toBe(1)
 
@@ -738,7 +743,7 @@ enableAutoUnmount(afterEach)
   it('opens mention inbox rows and clears channel unread state', async () => {
     const wrapper = await mountSuspended(App)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     await nextTick()
 
     await wrapper.get('[data-testid="activity-inbox"]').trigger('click')
@@ -754,7 +759,7 @@ enableAutoUnmount(afterEach)
   it('searches messages and drives the local moderation report queue', async () => {
     const wrapper = await mountSuspended(App)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     await wrapper.get('[data-testid="activity-search"]').trigger('click')
     await wrapper.get('[data-testid="workbench-search-input"]').setValue('API contract')
@@ -782,7 +787,7 @@ enableAutoUnmount(afterEach)
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'access-token'
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     const calls: Array<{ input: RequestInfo | URL, init?: RequestInit }> = []
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ input, init })
@@ -906,7 +911,7 @@ enableAutoUnmount(afterEach)
       return jsonResponse({ message: 'unexpected path' }, 404)
     })
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     const guild = await shell.createBackendGuild('Live Guild', 'access-token')
     const text = await shell.createBackendChannel(guild!.id, 'live-text', 'GUILD_TEXT', 'access-token')
@@ -955,7 +960,7 @@ enableAutoUnmount(afterEach)
     })
     const shell = useShellStore()
     const preferences = usePreferencesStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     preferences.setLocale('en-US')
 
     const guilds = await shell.loadCurrentUserGuilds('access-token')
@@ -985,7 +990,7 @@ enableAutoUnmount(afterEach)
     await vi.waitFor(() => expect(auth.isRestoring).toBe(false))
     auth.accessToken = 'access-token'
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const path = String(input)
       if (path.endsWith('/api/users/@me/guilds')) {
@@ -1357,7 +1362,7 @@ enableAutoUnmount(afterEach)
     vi.stubGlobal('fetch', async () => jsonResponse({ type: 'about:blank', title: 'Forbidden', status: 403,
       detail: 'Membership required', instance: '/api/guilds', code: 'FORBIDDEN', requestId: 'server-request' }, 403))
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     const originalGuild = { ...shell.guild }
 
     await expect(shell.createBackendGuild('Rejected Guild', 'bad-token')).resolves.toBeNull()
@@ -1583,7 +1588,7 @@ enableAutoUnmount(afterEach)
   it('renders reaction counts from unique reactors and toggles the current user reaction', async () => {
     const wrapper = await mountSuspended(App)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
 
     ;(shell as any).addReaction?.('message-general-welcome', 'wave', 'vibe-coder')
     ;(shell as any).addReaction?.('message-general-welcome', 'wave', 'vibe-coder')
@@ -1601,7 +1606,7 @@ enableAutoUnmount(afterEach)
 
   it('opens the expression panel and adds a selected expression to the message reactions', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     await wrapper.get('[data-testid="expression-toggle-message-general-welcome"]').trigger('click')
@@ -1622,7 +1627,7 @@ enableAutoUnmount(afterEach)
 
   it('renders forum guidelines, tags, public/private threads, and archive state', async () => {
     const wrapper = await mountSuspended(ForumPanel)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     const forumPanel = wrapper.get('[data-testid="forum-panel"]')
@@ -1637,7 +1642,7 @@ enableAutoUnmount(afterEach)
 
   it('prevents archived thread writes until reopened', async () => {
     const wrapper = await mountSuspended(ForumPanel)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     await wrapper.get('[data-testid="thread-archived-incident"]').trigger('click')
@@ -1655,7 +1660,7 @@ enableAutoUnmount(afterEach)
   it('requires a forum tag before creating a forum post', async () => {
     const wrapper = await mountSuspended(ForumPanel)
     const shell = useShellStore()
-    shell.$reset()
+    seedShellDemoState(shell)
     await nextTick()
 
     await wrapper.get('[data-testid="create-forum-post-without-tag"]').trigger('click')
@@ -1670,7 +1675,7 @@ enableAutoUnmount(afterEach)
 
   it('renders moderation onboarding, automod, and audit state', async () => {
     const wrapper = await mountSuspended(ModerationPanel)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     const moderationPanel = wrapper.get('[data-testid="moderation-panel"]')
@@ -1683,7 +1688,7 @@ enableAutoUnmount(afterEach)
   it('submits onboarding answers, blocks AutoMod content, and appends audit entries', async () => {
     const app = await mountSuspended(App)
     const wrapper = await mountSuspended(ModerationPanel)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     await wrapper.get('[data-testid="submit-onboarding-answer-engineering"]').trigger('click')
@@ -1698,21 +1703,22 @@ enableAutoUnmount(afterEach)
     expect(app.get('[data-testid="chat-viewport"]').text()).not.toContain('leak the release token')
   })
 
-  it('renders voice token provider, participants, controls, and event records', async () => {
+  it('renders voice participants, controls, and event records without the provider enum', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     const voicePanel = wrapper.get('[data-testid="voice-panel"]')
     expect(voicePanel.text()).toContain('Voice')
-    expect(voicePanel.get('[data-testid="voice-token-provider"]').text()).toContain('LIVEKIT_SKELETON')
+    expect(voicePanel.find('[data-testid="voice-token-provider"]').exists()).toBe(false)
+    expect(voicePanel.text()).not.toContain('LIVEKIT_SKELETON')
     expect(voicePanel.get('[data-testid="voice-participants"]').text()).toContain('No participants')
     expect(voicePanel.get('[data-testid="voice-events"]').text()).toContain('VOICE_READY')
   })
 
   it('joins voice, toggles local voice state, screen shares, and leaves cleanly', async () => {
     const wrapper = await mountSuspended(App)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     await wrapper.get('[data-testid="voice-join-channel-war-room"]').trigger('click')
@@ -1740,7 +1746,7 @@ enableAutoUnmount(afterEach)
 
   it('runs stage, soundboard, and premium skeleton flows', async () => {
     const wrapper = await mountSuspended(ExperiencePanel)
-    useShellStore().$reset()
+    seedShellDemoState()
     await nextTick()
 
     const experiencePanel = wrapper.get('[data-testid="experience-panel"]')

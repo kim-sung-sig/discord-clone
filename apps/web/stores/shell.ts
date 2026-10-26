@@ -151,6 +151,8 @@ export interface ShellMessage {
   clientEventId?: string
   requestId?: string
   serverVersion?: number
+  /** The client assigned `sequence` because the server did not send one. */
+  localSequence?: boolean
 }
 
 export interface ShellMentionInboxItem {
@@ -554,6 +556,45 @@ const payloadStringArray = (dispatch: GatewayDispatch, key: string): string[] | 
 const nextShellMessageSequence = (messages: ShellMessage[]): number =>
   messages.reduce((highest, message) => Math.max(highest, message.sequence), 0) + 1
 
+const isPendingShellMessage = (message: ShellMessage): boolean =>
+  message.status === 'sending' || message.status === 'failed'
+
+/** True when `sequence` came from the server for a message the server has stored. */
+const hasServerSequence = (message: ShellMessage): boolean =>
+  !isPendingShellMessage(message) && !message.localSequence
+
+/** Keeps a local sequence flag only when neither the response nor the known message has a server sequence. */
+const localSequenceFlag = (
+  serverSequence: number | null | undefined,
+  existing?: ShellMessage
+): { localSequence?: true } =>
+  serverSequence == null && (!existing || existing.localSequence) ? { localSequence: true } : {}
+
+/** Author label for messages the signed-in user writes; falls back to the shell user when signed out. */
+const ownMessageAuthorLabel = (fallback: string): string => {
+  const viewer = useAuthStore().user
+  return messageAuthorLabel({ authorId: viewer?.id }, viewer, fallback)
+}
+
+const messageTime = (message: ShellMessage): number => {
+  const time = Date.parse(message.createdAt)
+  return Number.isNaN(time) ? 0 : time
+}
+
+/** Oldest first: server sequence when both have one, else creation time; pending local messages last. */
+export const compareShellMessages = (left: ShellMessage, right: ShellMessage): number => {
+  const leftPending = isPendingShellMessage(left)
+  if (leftPending !== isPendingShellMessage(right)) {
+    return leftPending ? 1 : -1
+  }
+  if (hasServerSequence(left) && hasServerSequence(right) && left.sequence !== right.sequence) {
+    return left.sequence - right.sequence
+  }
+  return messageTime(left) - messageTime(right) ||
+    left.sequence - right.sequence ||
+    left.id.localeCompare(right.id)
+}
+
 const createShellClientEventId = (): string => {
   const timePart = Date.now().toString(36)
   const randomPart = Math.random().toString(36).slice(2, 10)
@@ -626,95 +667,12 @@ export const useShellStore = defineStore('shell', {
     backendDmReadMarkers: {} as Record<string, number>,
     backendOpenEvent: null as BackendServerEvent | null,
     guild: {
-      id: 'guild-discord-clone',
-      name: 'Discord Clone'
-    } satisfies ShellGuild,
-    activeChannelId: 'channel-general',
-    channelGroups: [
-      {
-        id: 'text-channels',
-        name: 'Text Channels',
-        channels: [
-          {
-            id: 'channel-general',
-            name: 'general',
-            type: 'GUILD_TEXT'
-          },
-          {
-            id: 'channel-architecture',
-            name: 'architecture',
-            type: 'GUILD_TEXT'
-          },
-          {
-            id: 'channel-qa-lab',
-            name: 'qa-lab',
-            type: 'GUILD_TEXT'
-          },
-          {
-            id: 'channel-forum',
-            name: 'forum',
-            type: 'GUILD_FORUM'
-          }
-        ]
-      },
-      {
-        id: 'voice-channels',
-        name: 'Voice Channels',
-        channels: [
-          {
-            id: 'channel-war-room',
-            name: 'war-room',
-            type: 'GUILD_VOICE'
-          },
-          {
-            id: 'channel-pairing',
-            name: 'pairing',
-            type: 'GUILD_VOICE'
-          }
-        ]
-      }
-    ] satisfies ShellChannelGroup[],
-    messages: [
-      {
-        id: 'message-general-welcome',
-        channelId: 'channel-general',
-        sequence: 1,
-        author: 'vibe-coder',
-        body: 'Welcome to the guild. This shell is wired for the first T00 QA pass. @cto-bot is tracking metadata.',
-        createdAt: '2026-05-13T09:00:00.000Z',
-        edited: true,
-        pinned: true,
-        deleted: false,
-        mentions: ['cto-bot'],
-        attachments: []
-      },
-      {
-        id: 'message-general-deleted',
-        channelId: 'channel-general',
-        sequence: 2,
-        author: 'cto-bot',
-        body: '',
-        createdAt: '2026-05-13T09:05:00.000Z',
-        edited: false,
-        pinned: false,
-        deleted: true,
-        mentions: [],
-        attachments: []
-      },
-      {
-        id: 'message-architecture-notes',
-        channelId: 'channel-architecture',
-        sequence: 3,
-        author: 'cto-bot',
-        body: 'Architecture notes belong in this channel. @vibe-coder should review the next API contract.',
-        createdAt: '2026-05-13T09:10:00.000Z',
-        edited: false,
-        pinned: false,
-        deleted: false,
-        mentions: ['vibe-coder'],
-        attachments: []
-      }
-    ] satisfies ShellMessage[],
+      id: '',
+      name: ''
+    } as ShellGuild,
+    activeChannelId: '',
+    channelGroups: [] as ShellChannelGroup[],
+    messages: [] as ShellMessage[],
     expressions: [
       {
         key: 'wave',
@@ -739,292 +697,88 @@ export const useShellStore = defineStore('shell', {
       }
     ] satisfies ShellExpression[],
     reactions: [] satisfies ShellReaction[],
-    members: [
-      {
-        name: 'vibe-coder',
-        status: 'online',
-        roleIds: ['role-moderator']
-      },
-      {
-        name: 'cto-bot',
-        status: 'online',
-        roleIds: []
-      }
-    ] satisfies ShellMember[],
-    roles: [
-      {
-        id: 'role-everyone',
-        name: '@everyone',
-        permissions: ['VIEW_CHANNEL']
-      },
-      {
-        id: 'role-moderator',
-        name: 'Moderator',
-        permissions: ['VIEW_CHANNEL', 'MANAGE_MESSAGES', 'MANAGE_EXPRESSIONS']
-      },
-      {
-        id: 'role-engineering',
-        name: 'Engineering',
-        permissions: ['VIEW_CHANNEL']
-      }
-    ] satisfies ShellRole[],
-    permissionOverwrites: [
-      {
-        channelId: 'channel-general',
-        roleId: 'role-moderator',
-        allow: ['SEND_MESSAGES'],
-        deny: ['MANAGE_CHANNELS']
-      }
-    ] satisfies ShellPermissionOverwrite[],
+    members: [] as ShellMember[],
+    roles: [] as ShellRole[],
+    permissionOverwrites: [] as ShellPermissionOverwrite[],
     adminConsole: {
-      previewRoleId: 'role-moderator',
-      permissionDraft: {
-        roleId: 'role-moderator',
-        permission: 'MANAGE_CHANNELS',
-        before: false,
-        after: true
-      }
-    } satisfies ShellAdminConsoleState,
+      previewRoleId: '',
+      permissionDraft: null
+    } as ShellAdminConsoleState,
     invitePreview: {
-      code: 'discord-clone-t03',
-      guildId: 'guild-discord-clone',
-      channelId: 'channel-general',
-      expiresIn: '7 days',
-      maxUses: 12,
+      code: '',
+      guildId: '',
+      channelId: '',
+      expiresIn: '',
+      maxUses: 0,
       uses: 0,
-      roleGrantIds: ['role-moderator']
-    } satisfies ShellInvitePreview,
+      roleGrantIds: []
+    } as ShellInvitePreview,
     gateway: {
-      status: 'READY',
-      sessionId: 'gateway-session-t05',
-      lastSequence: 42,
-      lastHeartbeatAckAt: '2026-05-13T09:12:00.000Z',
-      resumed: true,
-      events: [
-        {
-          sequence: 42,
-          type: 'READY',
-          label: 'ready dispatch accepted'
-        }
-      ]
-    } satisfies ShellGatewayState,
-    latestGatewaySequence: 42,
-    processedEventIds: ['READY:gateway:42'] as string[],
+      status: 'DISCONNECTED',
+      sessionId: '',
+      lastSequence: 0,
+      lastHeartbeatAckAt: '',
+      resumed: false,
+      events: []
+    } as ShellGatewayState,
+    latestGatewaySequence: 0,
+    processedEventIds: [] as string[],
     pendingMutations: [] satisfies ShellPendingMutation[],
     failedMutations: [] satisfies ShellFailedMutation[],
     resyncRequired: false,
     messagePageCursors: {} as Record<string, string | null>,
     social: {
       activeSelection: {
-        type: 'GROUP',
-        id: 'group-dm-t07-strike-team'
+        type: 'DIRECT',
+        id: ''
       },
-      friends: [
-        {
-          id: 'user-cto-bot',
-          name: 'cto-bot',
-          status: 'FRIEND',
-          directMessageId: 'dm-cto-bot'
-        },
-        {
-          id: 'user-spam-drone',
-          name: 'spam-drone',
-          status: 'BLOCKED',
-          directMessageId: 'dm-spam-drone'
-        }
-      ],
-      directMessages: [
-        {
-          id: 'dm-cto-bot',
-          userId: 'user-cto-bot',
-          unreadCount: 2
-        },
-        {
-          id: 'dm-spam-drone',
-          userId: 'user-spam-drone',
-          unreadCount: 0
-        }
-      ],
-      groupDms: [
-        {
-          id: 'group-dm-t07-strike-team',
-          name: 'T07 strike team',
-          ownerId: 'vibe-coder',
-          memberIds: ['vibe-coder', 'cto-bot'],
-          call: {
-            active: false,
-            participants: []
-          }
-        }
-      ]
-    } satisfies ShellSocialState,
+      friends: [],
+      directMessages: [],
+      groupDms: []
+    } as ShellSocialState,
     forum: {
-      activeForumChannelId: 'channel-forum',
-      activeThreadId: 'thread-public-release-notes',
+      activeForumChannelId: '',
+      activeThreadId: '',
       postError: 'Ready',
-      forums: [
-        {
-          channelId: 'channel-forum',
-          guidelines: 'Use tags before posting and keep implementation threads scoped.',
-          layout: 'LIST',
-          tags: [
-            {
-              id: 'release',
-              label: 'release',
-              required: true
-            },
-            {
-              id: 'help',
-              label: 'help',
-              required: false
-            }
-          ]
-        }
-      ],
-      threads: [
-        {
-          id: 'thread-public-release-notes',
-          parentChannelId: 'channel-forum',
-          title: 'Release notes',
-          type: 'PUBLIC',
-          tagIds: ['release'],
-          archived: false,
-          autoArchiveAt: '2026-05-14T15:00:00.000Z',
-          writeReceipt: 'Ready'
-        },
-        {
-          id: 'thread-private-mod-review',
-          parentChannelId: 'channel-forum',
-          title: 'Moderator review',
-          type: 'PRIVATE',
-          tagIds: ['help'],
-          archived: false,
-          autoArchiveAt: '2026-05-14T16:00:00.000Z',
-          writeReceipt: 'Ready'
-        },
-        {
-          id: 'thread-archived-incident',
-          parentChannelId: 'channel-forum',
-          title: 'Archived incident follow-up',
-          type: 'PUBLIC',
-          tagIds: ['help'],
-          archived: true,
-          autoArchiveAt: '2026-05-13T15:00:00.000Z',
-          writeReceipt: 'Thread is archived'
-        }
-      ]
-    } satisfies ShellForumState,
+      forums: [],
+      threads: []
+    } as ShellForumState,
     moderation: {
       onboardingQuestion: {
-        id: 'onboarding-squad',
-        prompt: 'Choose your squad',
-        answers: [
-          {
-            id: 'engineering',
-            label: 'Engineering squad',
-            roleId: 'role-engineering',
-            roleName: 'Engineering'
-          }
-        ]
+        id: '',
+        prompt: '',
+        answers: []
       },
       selectedAnswerId: null,
       assignedRoleName: 'Unassigned',
-      automodRules: [
-        {
-          id: 'keyword-leak',
-          keyword: 'leak',
-          enabled: true
-        }
-      ],
+      automodRules: [],
       decision: 'Ready',
       messageReports: [],
-      auditLogs: [
-        {
-          id: 'audit-rule-created',
-          action: 'AUDIT_RULE_CREATED',
-          detail: 'Keyword leak rule created',
-          createdAt: '2026-05-14T12:00:00.000Z'
-        }
-      ]
-    } satisfies ShellModerationState,
+      auditLogs: []
+    } as ShellModerationState,
     voice: {
       activeChannelId: null,
       tokenProvider: 'LIVEKIT_SKELETON',
       token: null,
       participants: [],
-      events: [
-        {
-          id: 'voice-ready',
-          type: 'VOICE_READY',
-          detail: 'Voice signaling skeleton ready'
-        }
-      ]
-    } satisfies ShellVoiceState,
+      events: []
+    } as ShellVoiceState,
     experience: {
       stageSession: null,
       soundboardSounds: [],
       lastSoundboardEvent: null,
       entitlements: [],
       premiumGate: 'Locked',
-      catalog: [
-        {
-          id: 'catalog-hd-stream',
-          featureKey: 'HD_STREAM',
-          label: 'HD Stream Pack',
-          priceLabel: 'Skeleton entitlement'
-        }
-      ],
-      quests: [
-        {
-          id: 'quest-stream-10',
-          title: 'Stream for 10 minutes',
-          rewardFeatureKey: 'HD_STREAM'
-        }
-      ]
-    } satisfies ShellExperienceState,
+      catalog: [],
+      quests: []
+    } as ShellExperienceState,
     presence: {
-      nowMs: Date.parse('2026-05-13T09:12:00.000Z'),
-      users: {
-        'vibe-coder': {
-          userId: 'vibe-coder',
-          status: 'ONLINE',
-          expiresAt: null
-        },
-        'cto-bot': {
-          userId: 'cto-bot',
-          status: 'IDLE',
-          expiresAt: null
-        },
-        'spam-drone': {
-          userId: 'spam-drone',
-          status: 'OFFLINE',
-          expiresAt: null
-        }
-      },
-      typingByChannel: {
-        'channel-general': [
-          {
-            userId: 'cto-bot',
-            expiresAt: Date.parse('2026-05-13T09:17:00.000Z')
-          }
-        ]
-      },
-      readMarkers: {
-        'channel-general': {
-          channelId: 'channel-general',
-          lastReadSequence: 2
-        },
-        'channel-architecture': {
-          channelId: 'channel-architecture',
-          lastReadSequence: 0
-        },
-        'channel-qa-lab': {
-          channelId: 'channel-qa-lab',
-          lastReadSequence: 0
-        }
-      }
-    } satisfies ShellPresenceState,
-    currentUser: 'vibe-coder',
+      nowMs: 0,
+      users: {},
+      typingByChannel: {},
+      readMarkers: {}
+    } as ShellPresenceState,
+    currentUser: '',
     composerBody: '',
     stagedAttachment: null as ShellAttachment | null,
     voiceState: 'voice disconnected'
@@ -1035,7 +789,15 @@ export const useShellStore = defineStore('shell', {
         .flatMap((group) => group.channels)
         .find((channel) => channel.id === state.activeChannelId),
     activeMessages: (state): ShellMessage[] =>
-      state.messages.filter((message) => message.channelId === state.activeChannelId),
+      state.messages
+        .filter((message) => message.channelId === state.activeChannelId)
+        .sort(compareShellMessages),
+    activeReadMarkerMessage: (state): ShellMessage | null =>
+      state.messages
+        .filter((message) => message.channelId === state.activeChannelId && hasServerSequence(message))
+        .reduce<ShellMessage | null>(
+          (latest, message) => !latest || message.sequence > latest.sequence ? message : latest, null
+        ),
     activeMessagePageCursor: (state): string | null =>
       state.activeChannelId ? state.messagePageCursors[state.activeChannelId] ?? null : null,
     messageSearchResults: (state) => (query: string): ShellMessageSearchResult[] => {
@@ -1304,10 +1066,6 @@ export const useShellStore = defineStore('shell', {
       const generation = this.accountGeneration + 1
       this.$reset()
       this.accountGeneration = generation
-      this.messages = []
-      this.channelGroups = []
-      this.activeChannelId = ''
-      this.guild = { id: '', name: '' }
     },
     setPresenceClock(nowMs: number) {
       this.presence.nowMs = nowMs
@@ -1454,14 +1212,15 @@ export const useShellStore = defineStore('shell', {
         id: `message-${Date.now()}`,
         channelId: this.activeChannelId,
         sequence: nextShellMessageSequence(this.messages),
-        author: this.currentUser,
+        author: ownMessageAuthorLabel(this.currentUser),
         body,
         createdAt: new Date().toISOString(),
         edited: false,
         pinned: false,
         deleted: false,
         mentions: extractMentions(body),
-        attachments: attachment ? [{ ...attachment }] : []
+        attachments: attachment ? [{ ...attachment }] : [],
+        localSequence: true
       })
       this.composerBody = ''
       this.stagedAttachment = null
@@ -1788,7 +1547,7 @@ export const useShellStore = defineStore('shell', {
           id: localMessageId,
           channelId,
           sequence: nextShellMessageSequence(this.messages),
-          author: this.currentUser,
+          author: ownMessageAuthorLabel(this.currentUser),
           body,
           createdAt: new Date().toISOString(),
           edited: false,
@@ -1798,7 +1557,8 @@ export const useShellStore = defineStore('shell', {
           attachments: attachments.map((attachment) => ({ ...attachment })),
           status: 'sending',
           clientEventId,
-          requestId
+          requestId,
+          localSequence: true
         }
         this.messages = [
           ...this.messages.filter((candidate) => candidate.id !== optimisticMessage.id),
@@ -1852,7 +1612,8 @@ export const useShellStore = defineStore('shell', {
         status: 'sent',
         clientEventId,
         requestId,
-        serverVersion: existing?.serverVersion
+        serverVersion: existing?.serverVersion,
+        ...localSequenceFlag(message.sequence, existing)
       }
       this.messages = [
         ...this.messages.filter(
@@ -1906,7 +1667,8 @@ export const useShellStore = defineStore('shell', {
             deleted: message.deleted,
             mentions: message.mentions,
             attachments: existing?.attachments ?? [],
-            status: 'sent'
+            status: 'sent',
+            ...localSequenceFlag(message.sequence, existing)
           } satisfies ShellMessage
         })
         this.messages = [
@@ -1945,7 +1707,8 @@ export const useShellStore = defineStore('shell', {
             deleted: message.deleted,
             mentions: message.mentions,
             attachments: [],
-            status: 'sent'
+            status: 'sent',
+            ...localSequenceFlag(message.sequence)
           }) satisfies ShellMessage)
 
         this.messages = [
@@ -2149,8 +1912,10 @@ export const useShellStore = defineStore('shell', {
       const clientEventId = payloadString(dispatch, 'clientEventId')
       const requestId = payloadString(dispatch, 'requestId')
       const serverVersion = payloadNumber(dispatch, 'serverVersion') ?? payloadNumber(dispatch, 'version')
+      const isEcho = (candidate: ShellMessage) =>
+        clientEventId !== undefined && candidate.clientEventId === clientEventId
       const existing = this.messages.find(
-        (candidate) => candidate.id === messageId || candidate.clientEventId === clientEventId
+        (candidate) => candidate.id === messageId || isEcho(candidate)
       )
       const message: ShellMessage = {
         id: messageId,
@@ -2171,12 +1936,13 @@ export const useShellStore = defineStore('shell', {
         status: 'sent',
         ...(clientEventId ? { clientEventId } : {}),
         ...(requestId ? { requestId } : {}),
-        ...(serverVersion !== undefined ? { serverVersion } : existing?.serverVersion !== undefined ? { serverVersion: existing.serverVersion } : {})
+        ...(serverVersion !== undefined ? { serverVersion } : existing?.serverVersion !== undefined ? { serverVersion: existing.serverVersion } : {}),
+        ...localSequenceFlag(payloadNumber(dispatch, 'messageSequence'), existing)
       }
 
       this.messages = [
         ...this.messages.filter(
-          (candidate) => candidate.id !== message.id && candidate.clientEventId !== clientEventId
+          (candidate) => candidate.id !== message.id && !isEcho(candidate)
         ),
         message
       ]

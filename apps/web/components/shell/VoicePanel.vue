@@ -32,7 +32,6 @@ onMounted(() => {
     <header class="voice-panel-header">
       <p>{{ preferences.t('panel.voice') }}</p>
       <h2>{{ preferences.t('voice.sfuSkeleton') }}</h2>
-      <small data-testid="voice-token-provider">{{ preferences.t('voice.provider') }} {{ shell.voice.tokenProvider }}</small>
     </header>
 
     <section class="voice-card">
@@ -102,7 +101,11 @@ onMounted(() => {
       </button>
     </section>
 
-    <section class="voice-card voice-events" data-testid="voice-events">
+    <section
+      v-if="shell.voice.events.length"
+      class="voice-card voice-events"
+      data-testid="voice-events"
+    >
       <p>{{ preferences.t('voice.events') }}</p>
       <article v-for="event in shell.voice.events" :key="event.id">
         <strong>{{ event.type }}</strong>
