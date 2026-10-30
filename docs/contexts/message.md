@@ -1,6 +1,6 @@
 # Message
 
-메시지의 발행, 수정, 삭제, 고정과 그 사실을 다른 context에 알리는 일을 소유하는 context다. 사람은 Identity의 `UserId`로, 수신처는 Community의 `ChannelId`로만 안다. 이 파일은 2026-10-30 이전의 루트 `CONTEXT.md` 내용을 이어받았다.
+메시지의 발행, 수정, 삭제, 고정과 그 사실을 다른 context에 알리는 일을 소유하는 context다. 사람은 Identity의 `UserId`로, 수신처는 Community가 소유한 id(`GuildId`·`ChannelId`, DirectMessageChannel id, GroupDm id)로만 안다. 이 파일은 2026-10-30 이전의 루트 `CONTEXT.md` 내용을 이어받았다.
 
 ## Language
 
@@ -11,18 +11,24 @@
 _Avoid_: post, chat, 유스케이스가 생성자를 직접 불러 상태를 바꾸는 것
 
 **MessageAuthor**:
-메시지를 발행한 주체다. 사용자뿐 아니라 봇, 웹훅, 시스템 같은 발행 주체를 구분할 수 있어야 한다. 사용자 작성자는 `UserId`를 가진다.
+메시지를 발행한 주체이며, 다른 context에서 말하는 **Author**가 이것이다. 사용자뿐 아니라 봇, 웹훅, 시스템 같은 발행 주체를 구분할 수 있어야 한다. 사용자 작성자는 `UserId`를 가진다.
 _Avoid_: sender, writer, user(작성자를 뜻할 때)
 
 **AuthorDisplayName**:
-응답에 함께 실리는 작성자의 표시 이름이다. Identity의 DisplayName을 번역해 온 값이고, 작성자가 없으면 비어 있다.
+응답에 함께 실리는 작성자의 표시 이름이다. Message가 가진 `MessageAuthorDirectory` port로 Identity의 DisplayName을 번역해 온 값이고, 작성자가 없으면 비어 있다. 지금은 boot의 어댑터가 Identity 저장소를 직접 읽는다. 서비스를 나누면 profile 사본으로 바꾼다(ADR §3.1, §6).
 
 **MessageTarget**:
-메시지가 발행되는 수신처다. Guild 채널, DirectMessageChannel, GroupDm, Thread처럼 메시지가 도착할 수 있는 목적지를 표현한다. 수신처가 Guild에 속하면 `GuildId`를, 언제나 `ChannelId`를 줄 수 있어야 한다.
+메시지가 발행되는 수신처다. 종류는 다음과 같다.
+- `ChannelMessageTarget`(Guild 채널: `GuildId`, `ChannelId`)
+- `ThreadMessageTarget`(Guild 채널 아래 Thread)
+- `DirectMessageTarget`(DirectMessageChannel)
+- GroupDm(아직 없음)
+
+Guild에 속하는 수신처는 자기 `GuildId`를 스스로 알려 줘야 한다.
 _Avoid_: destination, room, 바깥에서 instanceof로 종류를 판별하는 것
 
 **MessageStorageShape**:
-도메인 모델은 `MessageAuthor`, `MessageTarget` 같은 타입으로 표현하지만, DB 저장은 조회와 권한 필터링에 필요한 값을 명시 컬럼으로 둔다. 메시지 저장소는 author type/id, target type, guild/channel/thread/conversation 식별자를 컬럼으로 관리한다.
+도메인 모델은 `MessageAuthor`, `MessageTarget` 같은 타입으로 표현하지만, DB 저장은 조회와 권한 필터링에 필요한 값을 명시 컬럼으로 둔다. 메시지 저장소는 author type/id, target type, guild/channel/thread/conversation 식별자를 컬럼으로 관리한다. `conversation` 식별자는 DirectMessageChannel의 id다. 코드의 `DirectMessageTarget.conversationId`도 같다.
 
 **MessageContent**:
 메시지의 정규화된 본문 값이다. 텍스트 제약은 검증하지만, 멘션을 직접 파싱하지는 않는다.
@@ -39,7 +45,7 @@ _Avoid_: mention string, 멘션을 문자열 목록으로 다루는 것
 ### 유스케이스와 정책
 
 **PublishMessageUseCase**:
-발행자, 수신처, 본문, 멘션 대상을 받아 메시지를 생성하고 발행 이벤트를 기록하는 애플리케이션 유스케이스다. Guild 채널, DM 채널, 스레드 메시지 모두 이 유스케이스로 발행한다.
+발행자, 수신처, 본문, 멘션 대상을 받아 메시지를 생성하고 발행 이벤트를 기록하는 애플리케이션 유스케이스다. Guild 채널, DirectMessageChannel, GroupDm, Thread 메시지 모두 이 유스케이스로 발행한다.
 _Avoid_: DM·스레드 메시지를 별도 table과 SQL로 저장하는 것(지금 코드는 그렇다. U4에서 바꾼다)
 
 **EditMessageUseCase**:
@@ -80,7 +86,7 @@ _Avoid_: outbox event(단독), queue item
 
 **ChannelMessageReader**:
 채널 메시지 본문과 상세 정보를 조회하는 읽기 경계다. `MessagePublished` 같은 이벤트 소비자가 본문이 필요할 때 쓰며, 채널 가시성, 권한 필터링, 본문 마스킹 정책을 적용할 수 있어야 한다.
-_Avoid_: 이벤트 소비자가 가시성 규칙 없이 `requireMessage`로 원본을 읽는 것. 지금 코드에는 이 이름의 타입이 없고, 기능이 `ChannelMessageQueryService`, `MessageLookupPort` 등에 흩어져 있다(U2·U4에서 정리한다).
+_Avoid_: 이벤트 소비자가 가시성 규칙 없이 `requireMessage`로 원본을 읽는 것. 지금 코드에는 이 이름의 타입이 없다. 기능은 `ChannelMessageQueryService`, `ChannelMessageReadGuard`, `MessageLookupPort`에 흩어져 있다(U2·U4에서 정리한다).
 
 ### 순서와 읽음 위치
 
@@ -89,7 +95,7 @@ _Avoid_: 이벤트 소비자가 가시성 규칙 없이 `requireMessage`로 원�
 _Avoid_: sequence(단독), version, serverVersion, Gateway의 **UserEventSequence**
 
 **ReadMarker**:
-User 한 명이 채널 하나에서 마지막으로 읽은 **ChannelSequence**다. 줄어들지 않으며, 그 채널에 저장된 최신 번호를 넘을 수 없다.
+User 한 명이 채널 하나에서 마지막으로 읽은 **ChannelSequence**다. 줄어들지 않으며, 그 채널에 저장된 최신 번호를 넘을 수 없다. 지금 코드는 presence 모듈에 있다(U4에서 옮긴다).
 _Avoid_: last seen, 화면이 붙인 임시 번호(localSequence)로 읽음 위치를 보내는 것
 
 ## Relationships
@@ -104,10 +110,11 @@ _Avoid_: last seen, 화면이 붙인 임시 번호(localSequence)로 읽음 위�
 > **Dev:** "Gateway가 MessagePublished를 받으면 본문은 어디서 가져와요?"
 > **Domain expert:** "이벤트에는 본문이 없습니다. **ChannelMessageReader**로 읽어야 해요. 그래야 받는 사람에게 보여도 되는지, 가려야 하는지를 같은 규칙으로 판단합니다."
 > **Dev:** "DM은 따로 table이 있으니 거기 바로 넣으면 되죠?"
-> **Domain expert:** "DM도 **MessageTarget**의 한 종류입니다. **PublishMessageUseCase**로 발행해야 멘션, 자동 모더레이션, **IdempotencyKey**가 똑같이 적용됩니다."
+> **Domain expert:** "DirectMessageChannel도 **MessageTarget**의 한 종류입니다. **PublishMessageUseCase**로 발행해야 멘션, 자동 모더레이션, **IdempotencyKey**가 똑같이 적용됩니다."
 
 ## Flagged ambiguities
 
-- `sequence`가 다섯 가지 뜻으로 쓰였다. Message에서는 **ChannelSequence**와 **ReadMarker**만 쓴다. Gateway의 사용자별 번호는 **UserEventSequence**, DM 채널의 `last_sequence`도 **ChannelSequence**다.
+- `sequence`가 다섯 가지 뜻으로 쓰였다. Message에서는 **ChannelSequence**와 **ReadMarker**만 쓴다. Gateway의 사용자별 번호는 **UserEventSequence**다. DirectMessageChannel의 `last_sequence`도 **ChannelSequence**다.
+- DirectMessageChannel과 Thread 메시지는 지금 `PublishMessageUseCase`를 거치지 않는다. 각자 table과 SQL(`dm_messages`, `thread_messages`)을 쓴다. 대응하는 `DirectMessageTarget`, `ThreadMessageTarget` 타입은 이미 있지만 운영 코드에서 만들지 않는다(U4).
 - 화면은 `idempotencyKey`와 `clientEventId`에 같은 값을 보낸다. 이름은 **IdempotencyKey** 하나로 정리한다.
 - 화면의 `ShellMessage.author`는 작성자 자체가 아니라 표시 문자열이다. 화면 타입은 `authorId`와 **AuthorDisplayName**을 함께 가진다.
