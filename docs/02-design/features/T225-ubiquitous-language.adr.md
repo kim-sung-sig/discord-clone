@@ -12,7 +12,7 @@
 | 서버 | guild, server, workspace, community |
 | 작성자 | author, sender, creator, owner, reporter, actor, requester |
 | 사람 | member, user |
-| session | 4가지 뜻 |
+| session | 코드 네 곳에서 세 가지 뜻 |
 | sequence | 5가지 뜻 |
 
 ## 결정
@@ -35,13 +35,14 @@
    | `Reporter` | 신고한 사람 |
    | `Actor` | 요청이나 감사 대상 작업을 수행한 사람 |
 
-   같은 뜻의 다른 이름(`sender`, `requester`, `memberId`)은 버린다. 예외로 FriendRequest는 신청한 쪽 `Requester`와 받은 쪽 `Addressee`라는 역할 이름을 쓴다.
+   같은 뜻의 다른 이름(`sender`, `requester`, `memberId`)은 버린다. 예외로 FriendRequest는 신청한 쪽 `Requester`와 받은 쪽 `Addressee`라는 역할 이름을 쓴다(코디네이터 판단: 친구 신청에서는 "신청한 사람"이 고유한 역할이라 Actor로 바꾸면 뜻이 흐려진다).
 5. **`Session`과 `Sequence`는 단독으로 쓰지 않는다.**
    - Session: `RefreshSession`(Identity), `GatewaySession`(Gateway), `StageSession`(Community의 experience)
    - Sequence: `ChannelSequence`(Message), `UserEventSequence`(Gateway), `ReadMarker`(Message)
    - 이 항목은 사용자가 따로 고르지 않았다. 앞의 결정 원칙을 따라 코디네이터가 정했다.
 6. **식별자 범위를 나눈다.**
    - `ChannelId`는 Guild 채널만 가리킨다.
+   - 메시지 순서(`ChannelSequence`)와 읽음 위치(`ReadMarker`)는 MessageTarget 단위로 매긴다. Guild 채널, DirectMessageChannel, GroupDm, Thread가 각자 자기 번호를 가진다.
    - DirectMessageChannel과 GroupDm은 Guild의 Channel이 아니며 각자 id를 가진다.
 7. **T171-C0 매핑을 그대로 따른다.**
    - experience 모듈(Stage 등)은 Community에 둔다.

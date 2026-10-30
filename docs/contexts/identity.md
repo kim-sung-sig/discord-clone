@@ -35,7 +35,7 @@ _Avoid_: 2FA(화면 문구로만 쓴다)
 - 다른 context는 **User**를 `UserId`로만 참조한다. 표시 이름이 필요한 context는 자기 쪽 port로 받는다.
   - 예: Message의 `MessageAuthorDirectory`
   - 지금은 boot 안의 어댑터가 Identity 저장소를 직접 읽는다.
-  - 서비스를 나누면 ADR §6에 따라 Identity가 내보내는 profile 변경 이벤트로 사본을 유지하는 방식으로 바꾼다.
+  - 서비스를 나누면 T171-C0 §6에 따라 Identity가 내보내는 profile 변경 이벤트로 사본을 유지하는 방식으로 바꾼다.
 
 ## Example dialogue
 

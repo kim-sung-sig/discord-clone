@@ -10,7 +10,7 @@ _Avoid_: dispatch(단독), message(채팅 메시지와 헷갈림)
 
 **GatewayEventType**:
 GatewayEvent의 종류다. 예: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`, `VOICE_STATE_UPDATE`. enum으로 다룬다.
-_Avoid_: 문자열 상수로 종류를 비교하는 것. 감사 기록의 `MESSAGE_DELETED`(AuditLogAction)와는 다른 어휘다.
+_Avoid_: 문자열 상수로 종류를 비교하는 것. 감사 기록의 `MESSAGE_DELETED`(AuditLogAction)와는 다른 어휘다. 지금 코드에는 이 enum이 없고 `GatewayEvent.type`이 String이다(U2).
 
 **UserEventSequence**:
 User 한 명에게 가는 GatewayEvent마다 매기는 증가 번호다. 재개(resume)와 ACK의 기준이다.
@@ -30,7 +30,7 @@ _Avoid_: 소유 노드 id나 epoch를 고정값으로 두는 것
 
 **Opcode**:
 화면과 Gateway가 주고받는 frame의 종류다: identify, heartbeat, resume, ACK, dispatch.
-_Avoid_: 문자열 switch로 frame을 판별하는 것
+_Avoid_: 문자열 switch로 frame을 판별하는 것. 지금 코드에는 이 타입이 없고 `GatewayWebSocketHandler`가 문자열로 판별한다(U2).
 
 ## Relationships
 

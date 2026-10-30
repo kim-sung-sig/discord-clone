@@ -17,7 +17,7 @@ discord-clone의 도메인 용어집 진입점이다. 서비스(bounded context)
 - **Identity → 모든 context**
   - 다른 context는 사람을 `UserId`로만 참조한다.
   - 이름·프로필이 필요하면 자기 쪽에 port를 두고 번역한다(예: Message의 `MessageAuthorDirectory`). users table을 직접 join하지 않는다.
-  - 지금 그 port는 boot 안의 어댑터가 Identity 저장소를 읽어 구현한다. 서비스를 나누면 Identity의 profile 변경 이벤트로 사본을 유지한다(ADR §6).
+  - 지금 그 port는 boot 안의 어댑터가 Identity 저장소를 읽어 구현한다. 서비스를 나누면 Identity의 profile 변경 이벤트로 사본을 유지한다(T171-C0 §6).
 - **Community → Message, Gateway, Media**: Community가 Guild·Channel·권한의 원본이다. 다른 context는 `GuildId`, `ChannelId`로 참조하고, 권한은 Community가 내보내는 `AuthorizationProjection` 이벤트로 받아 자기 저장소에서 판정한다.
 - **Message → Gateway, Notification**
   - Message는 저장과 같은 트랜잭션으로 `MessagePublished`를 outbox에 남기고, Kafka로 내보낸다.
@@ -51,5 +51,5 @@ discord-clone의 도메인 용어집 진입점이다. 서비스(bounded context)
   - **Creator**: Invite·Webhook·GuildEvent를 만든 사람
   - **Reporter**: 신고한 사람
   - **Actor**: 감사 기록·요청을 수행한 사람
-  - 예외: FriendRequest는 Requester와 Addressee라는 역할 이름을 쓴다.
+  - 예외(코디네이터 판단): FriendRequest는 Requester와 Addressee라는 역할 이름을 쓴다.
 - `Session`과 `Sequence`는 단독으로 쓰지 않는다. 각 context 용어집에 정한 이름(`RefreshSession`, `GatewaySession`, `StageSession`, `ChannelSequence`, `UserEventSequence` 등)을 쓴다.

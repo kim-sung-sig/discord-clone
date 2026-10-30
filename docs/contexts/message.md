@@ -15,7 +15,7 @@ _Avoid_: post, chat, 유스케이스가 생성자를 직접 불러 상태를 바
 _Avoid_: sender, writer, user(작성자를 뜻할 때)
 
 **AuthorDisplayName**:
-응답에 함께 실리는 작성자의 표시 이름이다. Message가 가진 `MessageAuthorDirectory` port로 Identity의 DisplayName을 번역해 온 값이고, 작성자가 없으면 비어 있다. 지금은 boot의 어댑터가 Identity 저장소를 직접 읽는다. 서비스를 나누면 profile 사본으로 바꾼다(ADR §3.1, §6).
+응답에 함께 실리는 작성자의 표시 이름이다. Message가 가진 `MessageAuthorDirectory` port로 Identity의 DisplayName을 번역해 온 값이고, 작성자가 없으면 비어 있다. 지금은 boot의 어댑터가 Identity 저장소를 직접 읽는다. 서비스를 나누면 profile 사본으로 바꾼다(T171-C0 §3.1, §6).
 
 **MessageTarget**:
 메시지가 발행되는 수신처다. 종류는 다음과 같다.
@@ -91,11 +91,11 @@ _Avoid_: 이벤트 소비자가 가시성 규칙 없이 `requireMessage`로 원�
 ### 순서와 읽음 위치
 
 **ChannelSequence**:
-채널 하나 안에서 메시지마다 서버가 매기는 증가 번호다. 메시지 순서와 읽음 위치의 기준이다.
+수신처(MessageTarget) 하나 안에서 메시지마다 서버가 매기는 증가 번호다. Guild 채널, DirectMessageChannel, GroupDm, Thread가 각자 따로 매긴다. 메시지 순서와 읽음 위치의 기준이다.
 _Avoid_: sequence(단독), version, serverVersion, Gateway의 **UserEventSequence**
 
 **ReadMarker**:
-User 한 명이 채널 하나에서 마지막으로 읽은 **ChannelSequence**다. 줄어들지 않으며, 그 채널에 저장된 최신 번호를 넘을 수 없다. 지금 코드는 presence 모듈에 있다(U4에서 옮긴다).
+User 한 명이 수신처(MessageTarget) 하나에서 마지막으로 읽은 **ChannelSequence**다. 줄어들지 않으며, 그 수신처에 저장된 최신 번호를 넘을 수 없다. 지금 코드는 presence 모듈에 있다(U4에서 옮긴다).
 _Avoid_: last seen, 화면이 붙인 임시 번호(localSequence)로 읽음 위치를 보내는 것
 
 ## Relationships
@@ -103,7 +103,7 @@ _Avoid_: last seen, 화면이 붙인 임시 번호(localSequence)로 읽음 위�
 - **Message** 하나는 **MessageAuthor** 하나와 **MessageTarget** 하나를 가진다.
 - **Message**는 **MessageMentionTarget**을 0개 이상 가진다.
 - **Message**가 저장될 때 같은 트랜잭션으로 **MessagePublication**이 하나 생긴다.
-- **ReadMarker**는 (User, Channel)마다 하나다.
+- **ReadMarker**는 (User, MessageTarget)마다 하나다. 지금 코드는 Guild 채널용과 DM용(`dm_read_markers`)을 따로 저장한다.
 
 ## Example dialogue
 
