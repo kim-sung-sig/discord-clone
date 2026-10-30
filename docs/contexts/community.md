@@ -77,7 +77,7 @@ _Avoid_: GroupDmChannel(지금 코드 이름이다. 바꾼다), group conversati
 한 User가 다른 User를 차단한 관계다. DM과 알림이 막힌다.
 
 **GuildEvent**:
-Guild 안에서 일정이 잡힌 행사다. 관심을 표시한 User 목록을 가진다. ADR §3.2의 "event relay"(이벤트 중계, Notification Worker)와는 다른 개념이다. GuildEvent는 Guild 구조의 일부라 Community에 둔다.
+Guild 안에서 일정이 잡힌 행사다. 관심을 표시한 User 목록을 가진다. T171-C0 §3.2의 "event relay"(이벤트 중계, Notification Worker)와는 다른 개념이다. GuildEvent는 Guild 구조의 일부라 Community에 둔다.
 _Avoid_: ServerEvent, server event(지금 코드 이름은 `ServerEvent`이며 U3에서 바꾼다)
 
 ### Experience

@@ -25,7 +25,7 @@ discord-clone의 도메인 용어집 진입점이다. 서비스(bounded context)
   - Notification Worker는 멘션 알림을 만든다.
   - 읽음 위치(ReadMarker)가 바뀌면 그 이벤트로 관련 알림을 읽음 처리한다.
 - **Community·Message → Notification**
-  - 알림을 일으키는 쪽은 자기 outbox로 이벤트를 내보낸다. Notification Worker가 그것을 소비한다(ADR §1.3).
+  - 알림을 일으키는 쪽은 자기 outbox로 이벤트를 내보낸다. Notification Worker가 그것을 소비한다(T171-C0 §1.3).
   - `notification_items` table을 직접 쓰지 않는다.
   - 지금은 4곳이 직접 다루고 있어 U5에서 정리한다.
 - **Presence → Gateway**: Presence 변화는 Gateway 이벤트로 전달된다.
