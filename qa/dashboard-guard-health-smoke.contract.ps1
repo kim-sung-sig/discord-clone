@@ -16,7 +16,7 @@ Assert (Test-Path $workflowPath) '.github/workflows/ci.yml is missing'
 $script = Get-Content -Path $scriptPath -Raw
 $scriptSnippets = @(
   '/api/security/dashboard-guard-health',
-  'Invoke-WebRequest',
+  'System.Net.Http.HttpClient',
   'NODE_ENV',
   'production',
   'NUXT_SECURITY_DASHBOARD_TOKEN',
@@ -28,6 +28,11 @@ $scriptSnippets = @(
 foreach ($snippet in $scriptSnippets) {
   Assert ($script.Contains($snippet)) "dashboard guard health smoke is missing required snippet: $snippet"
 }
+
+Assert (-not $script.Contains('-SkipHttpErrorCheck')) 'dashboard smoke must support Windows PowerShell 5'
+$tokenCheck = $script.IndexOf('Assert (-not $healthResponse.Content.Contains($env:NUXT_SECURITY_DASHBOARD_TOKEN))')
+$artifactWrite = $script.IndexOf('$healthResponse.Content | Set-Content -Path $healthLog')
+Assert ($tokenCheck -ge 0 -and $artifactWrite -gt $tokenCheck) 'dashboard response token check must precede artifact write'
 
 $workflow = Get-Content -Path $workflowPath -Raw
 $workflowSnippets = @(

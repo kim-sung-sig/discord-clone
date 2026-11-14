@@ -34,7 +34,6 @@ Push-Location $repoRoot
 try {
   Write-CapturedCommand 'docker-ps.txt' { docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' }
   Write-CapturedCommand 'docker-compose-ps.txt' { docker compose -f $compose ps }
-  Write-CapturedCommand 'docker-compose-config.txt' { docker compose -f $compose config }
   Write-CapturedCommand 'docker-compose-ms-kafka.log' { docker compose -f $compose logs --no-color ms-kafka }
   Write-CapturedCommand 'docker-ms-kafka.log' { docker logs ms-kafka }
 

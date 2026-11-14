@@ -17,6 +17,7 @@ $scriptText = Get-Content -Path $artifactScript -Raw
 Assert ($scriptText.Contains('CENTRAL_KAFKA_ARTIFACT_DIR')) 'artifact script must support CENTRAL_KAFKA_ARTIFACT_DIR'
 Assert ($scriptText.Contains('docker ps')) 'artifact script must collect Docker container state'
 Assert ($scriptText.Contains('docker compose')) 'artifact script must collect Compose state'
+Assert (-not $scriptText.Contains('docker compose -f $compose config')) 'artifact script must not collect interpolated Compose secrets'
 Assert ($scriptText.Contains('ms-kafka')) 'artifact script must collect ms-kafka logs'
 Assert ($scriptText.Contains('backend/boot/build/reports/tests/test')) 'artifact script must copy Gradle HTML test reports'
 Assert ($scriptText.Contains('backend/boot/build/test-results/test')) 'artifact script must copy Gradle XML test results'

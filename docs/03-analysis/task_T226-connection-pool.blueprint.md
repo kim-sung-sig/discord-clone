@@ -39,3 +39,11 @@ flowchart LR
 - Gradle 전체 test/checkstyle/bootJar, npm lint 및 QA 계약을 계획의 검증 기준으로 실행한다. 실패·미실행은 명시한다.
 - 리뷰 기준: 명세와 품질/보안 각각 90점 이상, P0/P1 없음. 독립 검토 및 증거 검증 후에만 병합한다.
 - 위키 사용: index, Backend Architecture, QA Infra Operations. 승인된 결과만 위키에 게시한다.
+
+## CI 계약 복구 추가 범위
+- Expected Changed Files: `.github/workflows/ci.yml`, `qa/central-kafka-ci-artifacts.contract.ps1`, `qa/central-kafka-ci-artifacts.ps1`, `qa/central-kafka-gateway-smoke.ps1`, `qa/ci-workflow.contract.ps1`, `qa/dashboard-guard-health-smoke.contract.ps1`, `qa/dashboard-guard-health-smoke.ps1`, `qa/production-profile-guard-smoke.ps1`, 이 blueprint.
+- 사용자 승인: 네 계약 실패의 근본 원인 수정 및 실제 실행 검증. 4d4e9d1에서 추적되지 않은 스크립트 때문에 보류된 기존 job이 원인이다.
+- 예상 변경: `.github/workflows/ci.yml`에 Kafka, dashboard health, production profile, web Docker job 복원; `qa/central-kafka-gateway-smoke.ps1`, `qa/production-profile-guard-smoke.ps1`의 PowerShell 자동 변수 충돌 수정; `qa/central-kafka-ci-artifacts.ps1`과 계약에서 보간된 Compose 설정의 비밀값 노출 방지. 이 blueprint에 실행 결과를 기록한다.
+- `qa/dashboard-guard-health-smoke.ps1`과 계약: PowerShell 5/7에서 HTTP 오류 본문을 읽고, 응답의 토큰 노출 여부를 artifact 기록 전에 검사한다. 공통 CI 계약은 복원한 네 job 및 `qa-toolchain`에서의 계약 실행을 검사한다.
+- 검증: 네 계약과 CI 추적 계약, 복원 job의 실행 스크립트 실제 실행, Kafka 및 Redis 실서비스 테스트, artifact 민감 정보 확인, `git diff --check`. 실패와 환경 제약은 분리 기록한다.
+- 로컬 검증: 네 계약 및 CI 추적 계약 통과. 실제 Redis 통합 1건, Kafka Gateway smoke, production profile 거부 smoke, production 빌드 dashboard guard smoke 통과. 직접 참조 스크립트, Compose와 테스트 소스는 Git 추적 중이다. GitHub Actions 자체 실행과 독립 리뷰는 별도로 필요하다.

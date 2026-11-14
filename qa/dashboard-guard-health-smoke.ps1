@@ -83,46 +83,24 @@ function Invoke-LoggedCommand($label, $filePath, [string[]] $argumentList, $work
   }
 }
 
-function Read-ErrorResponseContent($response) {
-  if ($null -eq $response) {
-    return ''
-  }
-  $contentProperty = $response.PSObject.Properties['Content']
-  $content = if ($null -eq $contentProperty) { $null } else { $contentProperty.Value }
-  if ($null -ne $content -and $content.PSObject.Methods['ReadAsStringAsync']) {
-    return $content.ReadAsStringAsync().GetAwaiter().GetResult()
-  }
-  if ($response.PSObject.Methods['GetResponseStream']) {
-    $stream = $response.GetResponseStream()
-    if ($null -eq $stream) {
-      return ''
-    }
-    $reader = [System.IO.StreamReader]::new($stream)
-    try {
-      return $reader.ReadToEnd()
-    } finally {
-      $reader.Dispose()
-    }
-  }
-  return ''
-}
-
 function Invoke-GuardHealthRequest {
+  Add-Type -AssemblyName System.Net.Http
+  $handler = [System.Net.Http.HttpClientHandler]::new()
+  $handler.UseProxy = $false
+  $client = [System.Net.Http.HttpClient]::new($handler)
+  $client.Timeout = [TimeSpan]::FromSeconds(5)
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -Method GET -Uri $healthUrl -TimeoutSec 5
-    return [pscustomobject]@{
-      StatusCode = [int] $response.StatusCode
-      Content = [string] $response.Content
+    $response = $client.GetAsync($healthUrl).GetAwaiter().GetResult()
+    try {
+      return [pscustomobject]@{
+        StatusCode = [int] $response.StatusCode
+        Content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+      }
+    } finally {
+      $response.Dispose()
     }
-  } catch {
-    $response = $_.Exception.Response
-    if ($null -eq $response) {
-      throw
-    }
-    return [pscustomobject]@{
-      StatusCode = [int] $response.StatusCode
-      Content = Read-ErrorResponseContent $response
-    }
+  } finally {
+    $client.Dispose()
   }
 }
 
@@ -189,6 +167,9 @@ try {
 
   $serverProcess = Start-NuxtServer
   $healthResponse = Wait-GuardHealthEndpoint
+  if (-not [string]::IsNullOrWhiteSpace($env:NUXT_SECURITY_DASHBOARD_TOKEN)) {
+    Assert (-not $healthResponse.Content.Contains($env:NUXT_SECURITY_DASHBOARD_TOKEN)) 'Guard health response exposed NUXT_SECURITY_DASHBOARD_TOKEN'
+  }
   $healthResponse.Content | Set-Content -Path $healthLog -Encoding UTF8
 
   $health = $null
@@ -204,10 +185,6 @@ try {
   Assert ($health.status -eq 'ready') "Dashboard guard health smoke expected ready status, got '$($health.status)'. See $healthLog"
   Assert ($health.configured -eq $true) "Dashboard guard health smoke expected configured guard. See $healthLog"
   Assert ($health.requireConfiguredGuard -eq $true) "Dashboard guard health smoke expected production guard enforcement. See $healthLog"
-
-  if (-not [string]::IsNullOrWhiteSpace($env:NUXT_SECURITY_DASHBOARD_TOKEN)) {
-    Assert (-not $healthResponse.Content.Contains($env:NUXT_SECURITY_DASHBOARD_TOKEN)) 'Guard health response exposed NUXT_SECURITY_DASHBOARD_TOKEN'
-  }
 
   Write-Output "Dashboard guard health ready. Artifact: $healthLog"
   Write-Output 'DASHBOARD_GUARD_HEALTH_SMOKE_PASS'
