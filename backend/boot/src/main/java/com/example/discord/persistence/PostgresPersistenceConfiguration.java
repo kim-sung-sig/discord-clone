@@ -2,7 +2,9 @@ package com.example.discord.persistence;
 
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
-import org.postgresql.ds.PGSimpleDataSource;
+import org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,15 +17,15 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Profile("postgres")
 class PostgresPersistenceConfiguration {
     @Bean
-    DataSource postgresDataSource(
-        @Value("${spring.datasource.url}") String url,
-        @Value("${spring.datasource.username}") String username,
-        @Value("${spring.datasource.password}") String password
-    ) {
-        PGSimpleDataSource dataSource = new PGSimpleDataSource();
-        dataSource.setUrl(url);
-        dataSource.setUser(username);
-        dataSource.setPassword(password);
+    HikariDataSource postgresDataSource(Environment environment) {
+        var dataSource = new HikariDataSource();
+        dataSource.setJdbcUrl(environment.getRequiredProperty("spring.datasource.url"));
+        dataSource.setUsername(environment.getRequiredProperty("spring.datasource.username"));
+        dataSource.setPassword(environment.getRequiredProperty("spring.datasource.password"));
+        dataSource.setMaximumPoolSize(environment.getProperty(
+            "spring.datasource.hikari.maximum-pool-size", Integer.class,
+            environment.getProperty("SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE", Integer.class, 10)));
+        dataSource.setPoolName("discord-boot");
         return dataSource;
     }
 
@@ -43,10 +45,11 @@ class PostgresPersistenceConfiguration {
         @Value("${spring.flyway.locations:classpath:db/migration}") String locations,
         @Value("${spring.flyway.baseline-on-migrate:true}") boolean baselineOnMigrate
     ) {
-        return Flyway.configure()
+        var configuration = Flyway.configure()
             .dataSource(postgresDataSource)
             .locations(locations)
-            .baselineOnMigrate(baselineOnMigrate)
-            .load();
+            .baselineOnMigrate(baselineOnMigrate);
+        configuration.getConfigurationExtension(PostgreSQLConfigurationExtension.class).setTransactionalLock(false);
+        return configuration.load();
     }
 }

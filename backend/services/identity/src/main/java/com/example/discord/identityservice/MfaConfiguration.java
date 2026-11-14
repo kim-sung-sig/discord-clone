@@ -6,18 +6,22 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import com.zaxxer.hikari.HikariDataSource;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "discord.auth.mfa.enabled", havingValue = "true")
 class MfaConfiguration {
     @Bean
-    DataSource mfaDataSource(Environment environment) {
+    HikariDataSource mfaDataSource(Environment environment) {
         String prefix = "discord.auth.mfa.";
-        return new DriverManagerDataSource(
-            environment.getRequiredProperty(prefix + "jdbc-url"),
-            environment.getRequiredProperty(prefix + "database-user"),
-            environment.getRequiredProperty(prefix + "database-password"));
+        var dataSource = new HikariDataSource();
+        dataSource.setJdbcUrl(environment.getRequiredProperty(prefix + "jdbc-url"));
+        dataSource.setUsername(environment.getRequiredProperty(prefix + "database-user"));
+        dataSource.setPassword(environment.getRequiredProperty(prefix + "database-password"));
+        dataSource.setMaximumPoolSize(environment.getProperty(prefix + "maximum-pool-size", Integer.class,
+            environment.getProperty("DISCORD_AUTH_MFA_MAXIMUM_POOL_SIZE", Integer.class, 10)));
+        dataSource.setPoolName("discord-identity-mfa");
+        return dataSource;
     }
 
     @Bean

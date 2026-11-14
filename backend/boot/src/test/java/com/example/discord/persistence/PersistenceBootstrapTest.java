@@ -2,6 +2,7 @@ package com.example.discord.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -25,6 +26,7 @@ class PersistenceBootstrapTest {
 
     @Test
     void postgresProfileRunsFlywayAndCreatesCoreTables() throws Exception {
+        assertThat(dataSource).isInstanceOf(HikariDataSource.class);
         assertThat(flyway.info().current()).isNotNull();
         assertThat(flyway.getConfiguration().getLocations())
             .extracting(location -> location.getDescriptor())
