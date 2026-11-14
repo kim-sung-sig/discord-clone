@@ -13,6 +13,7 @@ dependencyManagement {
         dependency("org.apache.tomcat.embed:tomcat-embed-el:11.0.27")
         dependency("org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27")
         dependency("at.yawk.lz4:lz4-java:1.11.4")
+        dependency("org.xerial.snappy:snappy-java:1.1.10.9")
     }
 }
 

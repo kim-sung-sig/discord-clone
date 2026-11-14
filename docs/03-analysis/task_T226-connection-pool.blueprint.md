@@ -40,6 +40,16 @@ flowchart LR
 - 리뷰 기준: 명세와 품질/보안 각각 90점 이상, P0/P1 없음. 독립 검토 및 증거 검증 후에만 병합한다.
 - 위키 사용: index, Backend Architecture, QA Infra Operations. 승인된 결과만 위키에 게시한다.
 
+## 보안 게이트 수정 추가 범위
+- PR #24 실행 43651776119의 backend OSV 검사에서 Kafka가 가져오는 snappy-java 1.1.10.7에 high 취약점 GHSA-gwq9-9ffj-mvrv 및 GHSA-q233-g92q-qxp6이 확인됐다. main의 기존 의존성 경로이며 T226 연결 풀과 무관하다.
+- Expected Changed Files: `backend/boot/build.gradle.kts`, `backend/services/message/build.gradle.kts`, `backend/services/websocket/build.gradle.kts`, 이 blueprint. 세 배포 모듈의 dependencyManagement에 두 취약점의 수정 버전 1.1.10.9를 지정한다. 보안 게이트와 allowlist는 변경하지 않는다.
+- 변경 전 dependencyInsight에서 boot는 수정됐으나 message와 websocket은 1.1.10.7임을 확인했다. 세 runtimeClasspath와 bootJar, Snappy Kafka 왕복을 검증한다.
+- 변경 전후 `:backend:boot:dependencyInsight --dependency snappy-java --configuration runtimeClasspath`로 해결 버전을 확인하고 관련 backend 테스트 및 보안 게이트를 실행한다. 확인하지 못한 CI 및 독립 리뷰는 별도 잔여 항목으로 남긴다.
+- 실행 결과: 변경 전 1.1.10.7, 변경 후 1.1.10.9로 해결된다. main 실행 41131849410의 artifact도 동일 두 high 취약점을 보고했다. Kafka 집중 테스트와 security-gate 계약이 통과했으며, 수정 버전만 대상으로 한 OSV 실조회는 packageCount 1, 취약점 0이다.
+- 기존 Windows 작업 공간의 전체 gate는 node_modules의 happy-dom 20.9.0과 lockfile 21.0.4 불일치로 중단됐다. 격리 Linux 컨테이너의 추적 파일 복사본에서 Node 22와 Java 21로 `npm ci` 및 `pwsh qa/security-gate.ps1`을 실행해 각각 종료 0, SECURITY_GATE_PASS를 확인했다. boot SBOM은 snappy 1.1.10.9이고 두 GHSA가 없으며, moderate 이하 finding은 남는다.
+- 세 서비스의 수정 후 runtimeClasspath는 모두 1.1.10.9, bootJar는 `BOOT-INF/lib/snappy-java-1.1.10.9.jar`를 포함한다. 격리 Kafka 브로커에서 해당 bootJar 라이브러리로 Snappy 압축 메시지 생산·소비 왕복과 두 서비스 테스트가 통과했다. 증거: `C:/Users/KIMSUN~1/AppData/Local/Temp/discord-security-isolated-Tr4enR/`의 `linux-security-artifacts-final`, `fixed-insight-*.log`, `bootjar-snappy.log`, `snappy-kafka-roundtrip.log`, `service-tests.log`.
+- GitHub Actions와 독립 리뷰는 미완료다. 요약의 npm audit 행은 backend OSV 차단 건수까지 합산하므로 두 건의 실제 출처로 해석하면 안 된다.
+
 ## CI 계약 복구 추가 범위
 - Expected Changed Files: `.github/workflows/ci.yml`, `qa/central-kafka-ci-artifacts.contract.ps1`, `qa/central-kafka-ci-artifacts.ps1`, `qa/central-kafka-gateway-smoke.ps1`, `qa/ci-workflow.contract.ps1`, `qa/dashboard-guard-health-smoke.contract.ps1`, `qa/dashboard-guard-health-smoke.ps1`, `qa/production-profile-guard-smoke.ps1`, 이 blueprint.
 - 사용자 승인: 네 계약 실패의 근본 원인 수정 및 실제 실행 검증. 4d4e9d1에서 추적되지 않은 스크립트 때문에 보류된 기존 job이 원인이다.
