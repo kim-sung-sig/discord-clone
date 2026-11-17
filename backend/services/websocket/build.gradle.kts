@@ -3,6 +3,12 @@ plugins {
     id("io.spring.dependency-management")
 }
 
+dependencyManagement {
+    dependencies {
+        dependency("org.xerial.snappy:snappy-java:1.1.10.9")
+    }
+}
+
 group = "com.example.discord.runtime"
 
 tasks.jar {

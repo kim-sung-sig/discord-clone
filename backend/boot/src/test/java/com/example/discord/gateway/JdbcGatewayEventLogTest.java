@@ -2,14 +2,25 @@ package com.example.discord.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.ActiveProfiles;
@@ -76,6 +87,87 @@ class JdbcGatewayEventLogTest {
         assertThat(duplicate.sequence()).isEqualTo(first.sequence());
         assertThat(eventLog.after(first.sequence() - 1L, 10)).extracting(GatewayEvent::busEventId)
             .contains(event.eventId());
+    }
+
+    @Test
+    void concurrentDuplicateInsertReturnsWinnerAfterRollback() throws Exception {
+        var event = new GatewayBusEvent(UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
+            Map.of("content", "same"), Instant.now());
+        var results = concurrentInsert(event, event);
+        assertThat(results[0]).isInstanceOf(GatewayEvent.class);
+        assertThat(results[1]).isInstanceOf(GatewayEvent.class);
+        assertThat(((GatewayEvent) results[0]).sequence()).isEqualTo(((GatewayEvent) results[1]).sequence());
+    }
+
+    @Test
+    void concurrentDuplicateInsertRejectsDifferentPayloadAfterRollback() throws Exception {
+        var event = new GatewayBusEvent(UUID.randomUUID().toString(), "MESSAGE_CREATE", guildId, null,
+            Map.of("content", "first"), Instant.now());
+        var different = new GatewayBusEvent(event.eventId(), event.type(), guildId, null,
+            Map.of("content", "second"), event.createdAt());
+        var results = concurrentInsert(event, different);
+        assertThat(results).filteredOn(GatewayEvent.class::isInstance).hasSize(1);
+        assertThat(results).filteredOn(GatewayEventConflictException.class::isInstance).hasSize(1);
+    }
+
+    private Object[] concurrentInsert(GatewayBusEvent first, GatewayBusEvent second) throws Exception {
+        var barrier = new CyclicBarrier(2);
+        var uniqueViolations = new AtomicInteger();
+        var rollbacks = new AtomicInteger();
+        var initialRead = ThreadLocal.withInitial(() -> true);
+        DataSource synchronizedSource = new DelegatingDataSource(dataSource) {
+            @Override
+            public Connection getConnection() throws SQLException {
+                Connection connection = super.getConnection();
+                return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
+                    new Class<?>[] {Connection.class}, (proxy, method, args) -> {
+                        try {
+                            Object result = method.invoke(connection, args);
+                            if (method.getName().equals("rollback")) rollbacks.incrementAndGet();
+                            if (method.getName().equals("prepareStatement") && args[0] instanceof String sql
+                                && (sql.contains("WHERE event_id = ?") || sql.contains("INSERT INTO gateway_event_log"))) {
+                                PreparedStatement statement = (PreparedStatement) result;
+                                return Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),
+                                    new Class<?>[] {PreparedStatement.class}, (p, m, a) -> {
+                                        try {
+                                            Object value = m.invoke(statement, a);
+                                            if (m.getName().equals("executeQuery") && initialRead.get()
+                                                && sql.contains("SELECT event_sequence")) {
+                                                initialRead.set(false);
+                                                barrier.await(10, TimeUnit.SECONDS);
+                                            }
+                                            return value;
+                                        } catch (InvocationTargetException exception) {
+                                            if (exception.getCause() instanceof SQLException cause
+                                                && "23505".equals(cause.getSQLState())) uniqueViolations.incrementAndGet();
+                                            throw exception.getCause();
+                                        }
+                                    });
+                            }
+                            return result;
+                        } catch (InvocationTargetException exception) {
+                            throw exception.getCause();
+                        }
+                    });
+            }
+        };
+        var log = new JdbcGatewayEventLog(synchronizedSource, new ObjectMapper());
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var left = executor.submit(() -> appendOrConflict(log, first));
+            var right = executor.submit(() -> appendOrConflict(log, second));
+            Object[] results = {left.get(20, TimeUnit.SECONDS), right.get(20, TimeUnit.SECONDS)};
+            assertThat(uniqueViolations.get()).isEqualTo(1);
+            assertThat(rollbacks.get()).isEqualTo(1);
+            return results;
+        }
+    }
+
+    private Object appendOrConflict(JdbcGatewayEventLog log, GatewayBusEvent event) {
+        try {
+            return log.append(event);
+        } catch (GatewayEventConflictException conflict) {
+            return conflict;
+        }
     }
 
     @Test

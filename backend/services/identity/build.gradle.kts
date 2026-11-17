@@ -27,6 +27,7 @@ dependencies {
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.springframework.security:spring-security-webauthn")
     implementation("org.springframework:spring-jdbc")
+    implementation("com.zaxxer:HikariCP")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("com.h2database:h2")

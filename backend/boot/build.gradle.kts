@@ -13,6 +13,7 @@ dependencyManagement {
         dependency("org.apache.tomcat.embed:tomcat-embed-el:11.0.27")
         dependency("org.apache.tomcat.embed:tomcat-embed-websocket:11.0.27")
         dependency("at.yawk.lz4:lz4-java:1.11.4")
+        dependency("org.xerial.snappy:snappy-java:1.1.10.9")
     }
 }
 
@@ -40,6 +41,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-jackson2")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework:spring-jdbc")
+    implementation("com.zaxxer:HikariCP")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")

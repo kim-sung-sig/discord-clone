@@ -62,6 +62,13 @@ foreach ($snippet in $requiredSnippets) {
   Assert ($content.Contains($snippet)) "CI workflow is missing required snippet: $snippet"
 }
 
+foreach ($job in @('qa-production-profile-guard', 'qa-web-docker', 'qa-dashboard-guard-health', 'qa-central-kafka')) {
+  Assert ([regex]::IsMatch($content, "(?m)^  $($job):\s*`r?$")) "CI workflow is missing required job: $job"
+}
+
+$toolchainBlock = [regex]::Match($content, '(?ms)^  qa-toolchain:\r?\n(?<body>.*?)(?=^  [\w-]+:\s*\r?$|\z)').Groups['body'].Value
+Assert ($toolchainBlock -match '(?m)^\s+run:\s+pwsh qa/ci-workflow\.contract\.ps1\s*$') 'qa-toolchain must run the CI workflow contract'
+
 $runtimeBlock = [regex]::Match($content, '(?ms)^  qa-runtime:\r?\n(?<body>.*?)^  qa-security:').Groups['body'].Value
 Assert (-not [string]::IsNullOrWhiteSpace($runtimeBlock)) 'CI workflow is missing the qa-runtime job block'
 Assert ($runtimeBlock.Contains('id: start-backend')) 'qa-runtime backend startup step must expose its selected port'

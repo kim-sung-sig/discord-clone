@@ -13,8 +13,8 @@ $expectedMessage = 'production-like runtime profiles require postgres to avoid i
 $logPath = Join-Path $artifactDir 'bootrun.log'
 
 function Get-GradleCommand {
-  $isWindows = $PSVersionTable.Platform -eq 'Win32NT' -or $env:OS -eq 'Windows_NT'
-  if ($isWindows) {
+  $runningOnWindows = $PSVersionTable.Platform -eq 'Win32NT' -or $env:OS -eq 'Windows_NT'
+  if ($runningOnWindows) {
     return Join-Path $repoRoot 'gradlew.bat'
   }
   return Join-Path $repoRoot 'gradlew'

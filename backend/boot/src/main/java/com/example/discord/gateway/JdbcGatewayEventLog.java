@@ -97,12 +97,11 @@ class JdbcGatewayEventLog implements GatewayEventLog {
             } catch (SQLException exception) {
                 connection.rollback();
                 if ("23505".equals(exception.getSQLState())) {
-                    try (Connection retryConnection = dataSource.getConnection()) {
-                        GatewayEvent existing = findByEventId(retryConnection, event.eventId());
-                        if (existing != null) {
-                            verifyHash(retryConnection, event.eventId(), hash);
-                            return existing;
-                        }
+                    GatewayEvent existing = findByEventId(connection, event.eventId());
+                    if (existing != null) {
+                        verifyHash(connection, event.eventId(), hash);
+                        connection.commit();
+                        return existing;
                     }
                 }
                 throw exception;
