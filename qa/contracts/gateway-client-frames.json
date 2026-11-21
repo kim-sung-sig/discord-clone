@@ -1,0 +1,17 @@
+{
+  "_comment": "Client-to-server Gateway frames. Shared by apps/web (createGatewaySocketLifecycle test) and backend/boot (GatewayWebSocketIntegrationTest). Change both sides together.",
+  "identify": {
+    "type": "IDENTIFY",
+    "accessToken": "access-token"
+  },
+  "heartbeat": {
+    "type": "HEARTBEAT",
+    "lastSequence": 42
+  },
+  "resume": {
+    "type": "RESUME",
+    "accessToken": "access-token",
+    "sessionId": "session-1",
+    "lastSequence": 99
+  }
+}

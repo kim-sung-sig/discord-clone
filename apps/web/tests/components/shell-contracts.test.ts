@@ -13,8 +13,11 @@ import {
 import { useShellStore } from '../../stores/shell'
 import { seedShellDemoState } from '../fixtures/shell-demo-state'
 import { useAuthStore } from '../../stores/auth'
+import clientFrameFixture from '../../../../qa/contracts/gateway-client-frames.json'
 
 enableAutoUnmount(afterEach)
+
+const clientFrames = clientFrameFixture as unknown as Record<'identify' | 'heartbeat' | 'resume', Record<string, unknown>>
 
 describe('Discord shell API and Gateway contracts', () => {
   beforeEach(() => {
@@ -305,15 +308,22 @@ describe('Discord shell API and Gateway contracts', () => {
     sockets[0]?.message(JSON.stringify({ sequence: 0, type: '', payload: {} }))
 
     expect(sockets[0]?.sentFrames()).toContainEqual({
-      op: 'IDENTIFY',
-      token: 'access-token'
+      type: 'IDENTIFY',
+      accessToken: 'access-token'
     })
     expect(sockets[0]?.sentFrames()).toContainEqual({
-      op: 'HEARTBEAT',
+      type: 'HEARTBEAT',
       lastSequence: 42
     })
     expect(dispatches).toHaveLength(1)
     expect(dispatches[0]).toMatchObject({ sequence: 43, type: 'MESSAGE_CREATE' })
+  })
+
+  it('keeps the top-level sessionId of server READY and RESUMED frames in the dispatch payload', () => {
+    expect(normalizeGatewayDispatch({ type: 'READY', sessionId: 'session-7', userId: 'user-1', sequence: 1 }))
+      .toMatchObject({ type: 'READY', payload: { sessionId: 'session-7' } })
+    expect(normalizeGatewayDispatch({ type: 'RESUMED', sessionId: 'session-7', replayedCount: 2, sequence: 5 }))
+      .toMatchObject({ type: 'RESUMED', payload: { sessionId: 'session-7' } })
   })
 
   it('resumes gateway socket when session id and last sequence exist', () => {
@@ -336,11 +346,39 @@ describe('Discord shell API and Gateway contracts', () => {
     sockets[0]?.open()
 
     expect(sockets[0]?.sentFrames()[0]).toEqual({
-      op: 'RESUME',
-      token: 'access-token',
+      type: 'RESUME',
+      accessToken: 'access-token',
       sessionId: 'session-1',
       lastSequence: 99
     })
+  })
+
+  it('sends exactly the client frames defined in the shared backend contract fixture', () => {
+    const sockets: FakeGatewaySocket[] = []
+    const build = (sessionId: string | null, lastSequence: number) => createGatewaySocketLifecycle({
+      url: 'ws://localhost/ws/gateway',
+      accessToken: 'access-token',
+      sessionId: () => sessionId,
+      lastSequence: () => lastSequence,
+      heartbeatIntervalMs: 0,
+      webSocketFactory: (url) => {
+        const socket = new FakeGatewaySocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      onDispatch: () => undefined
+    })
+
+    const fresh = build(null, 42)
+    fresh.connect()
+    sockets[0]?.open()
+    fresh.sendHeartbeat()
+    const resumed = build('session-1', 99)
+    resumed.connect()
+    sockets[1]?.open()
+
+    expect(sockets[0]?.sentFrames()).toEqual([clientFrames.identify, clientFrames.heartbeat])
+    expect(sockets[1]?.sentFrames()).toEqual([clientFrames.resume])
   })
 
   it('applies validated gateway dispatches to the shell store while rejecting stale sequences', async () => {

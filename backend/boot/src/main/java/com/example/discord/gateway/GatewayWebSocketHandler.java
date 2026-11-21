@@ -46,7 +46,7 @@ final class GatewayWebSocketHandler extends TextWebSocketHandler {
                 case "IDENTIFY" -> identify(socket, body);
                 case "HEARTBEAT" -> heartbeat(socket, body);
                 case "RESUME" -> resume(socket, body);
-                default -> send(socket, Map.of("type", "ERROR", "code", "UNKNOWN_OPCODE", "message", "unknown gateway message type"));
+                default -> send(socket, Map.of("type", "ERROR", "code", "UNKNOWN_OPCODE", "message", "unknown gateway message type; frames must carry a \"type\" field of IDENTIFY, HEARTBEAT or RESUME"));
             }
         } catch (ResponseStatusException exception) {
             send(socket, Map.of("type", "ERROR", "code", "UNAUTHORIZED", "message", "authentication failed"));
