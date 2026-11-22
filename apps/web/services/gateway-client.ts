@@ -52,7 +52,8 @@ export const normalizeGatewayDispatch = (value: unknown): GatewayDispatch | null
   const sequence = value.sequence
   const rawType = value.type
   const eventType = optionalString(value.eventType)
-  const payload = value.payload ?? {}
+  const rawPayload = value.payload ?? {}
+  const topLevelSessionId = optionalString(value.sessionId)
   const createdAt = value.createdAt
   const guildId = optionalString(value.guildId)
   const channelId = optionalString(value.channelId)
@@ -63,9 +64,12 @@ export const normalizeGatewayDispatch = (value: unknown): GatewayDispatch | null
   if (typeof rawType !== 'string' || rawType.trim().length === 0) {
     return null
   }
-  if (!isRecord(payload)) {
+  if (!isRecord(rawPayload)) {
     return null
   }
+  const payload = topLevelSessionId && rawPayload.sessionId === undefined
+    ? { ...rawPayload, sessionId: topLevelSessionId }
+    : rawPayload
   if (createdAt !== undefined && (typeof createdAt !== 'string' || createdAt.trim().length === 0)) {
     return null
   }
@@ -109,7 +113,7 @@ export const createGatewaySocketLifecycle = (options: GatewaySocketLifecycleOpti
 
   const sendHeartbeat = () => {
     sendFrame({
-      op: 'HEARTBEAT',
+      type: 'HEARTBEAT',
       lastSequence: options.lastSequence()
     })
   }
@@ -122,15 +126,15 @@ export const createGatewaySocketLifecycle = (options: GatewaySocketLifecycleOpti
       const lastSequence = options.lastSequence()
       if (sessionId && lastSequence > 0) {
         sendFrame({
-          op: 'RESUME',
-          token: options.accessToken,
+          type: 'RESUME',
+          accessToken: options.accessToken,
           sessionId,
           lastSequence
         })
       } else {
         sendFrame({
-          op: 'IDENTIFY',
-          token: options.accessToken
+          type: 'IDENTIFY',
+          accessToken: options.accessToken
         })
       }
 
