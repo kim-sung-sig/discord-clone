@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.lang.reflect.Method;
@@ -234,19 +235,26 @@ class MessageConfigurationTest {
             .findFirst()
             .orElseThrow()
             .payload();
-        List<String> expectedKeys = new ArrayList<>(List.of(
-            "id", "guildId", "channelId", "authorId", "content", "mentions",
-            "pinned", "deleted", "edited", "createdAt", "updatedAt"
-        ));
-        if (hasAuthorDisplayName) {
-            expectedKeys.add("authorDisplayName");
-        }
         List<String> expectedTokens = List.of(
             mentionedUserId.toString(), mentionedRoleId.toString(), channel.id().toString(), "here"
         );
+        Map<String, Object> expectedPayload = new HashMap<>();
+        expectedPayload.put("id", message.id().toString());
+        expectedPayload.put("guildId", guild.id().toString());
+        expectedPayload.put("channelId", channel.id().toString());
+        expectedPayload.put("authorId", ownerId.toString());
+        expectedPayload.put("content", message.content().value());
+        expectedPayload.put("mentions", expectedTokens);
+        expectedPayload.put("pinned", false);
+        expectedPayload.put("deleted", false);
+        expectedPayload.put("edited", false);
+        expectedPayload.put("createdAt", message.createdAt().toString());
+        expectedPayload.put("updatedAt", message.updatedAt().toString());
+        if (hasAuthorDisplayName) {
+            expectedPayload.put("authorDisplayName", "Owner Display");
+        }
 
-        assertThat(gatewayPayload).containsOnlyKeys(expectedKeys.toArray(String[]::new));
-        assertThat(gatewayPayload).containsEntry("mentions", expectedTokens);
+        assertThat(gatewayPayload).isEqualTo(expectedPayload);
     }
 
     private record DecisionStore(AuthorizationDecision decision) implements AuthorizationProjectionStore {
