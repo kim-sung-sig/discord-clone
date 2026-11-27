@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -75,6 +76,7 @@ final class RedisGatewayEventBus implements GatewayEventBus {
         this(redis, objectMapper, clock, nodeId, consumerGroupPrefix, maxStreamLength, "gateway:dead-letter", 1);
     }
 
+    @Autowired
     RedisGatewayEventBus(
         StringRedisTemplate redis,
         ObjectMapper objectMapper,
