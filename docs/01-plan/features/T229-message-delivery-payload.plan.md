@@ -2,7 +2,7 @@
 
 ## 승인 및 진행 상태
 
-- 상태는 **구현 완료, 독립 리뷰 수정 반영 중**이다.
+- 상태는 **구현 완료, 독립 리뷰 지적 반영 완료, PR 대기**이다. 재확인 리뷰어가 제시한 문서 정정 조건(최종 실행 시간, 기준 코드 재실행 범위, 프런트 지적 해소)은 아래 검증 결과에 기록했고, 그 뒤 재리뷰는 하지 않았다.
 - 기준은 `main`의 `d493e72`와 작업 브랜치 `message-delivery-payload`다.
 
 ## 백엔드 작업 범위
@@ -64,8 +64,9 @@
 
 ## 검증 결과 (코디네이터 실행)
 
-- 전체 `gradlew test checkstyleMain checkstyleTest` 결과는 BUILD SUCCESSFUL(2분 31초)이다.
-- 특성화 테스트 세 클래스는 변경 전 코드에서 통과했다. `MessageConfigurationTest` 9/9, `KafkaMessagePublishedConsumerTest` 10/10, `MessageReadModelMentionTokenTest` 1/1이다. 새 단위 테스트는 `MessageMentionTokensTest` 3개와 `MessageDeliveryPayloadTest` 1개가 통과했다.
+- 전체 `gradlew test checkstyleMain checkstyleTest`는 리뷰 수정 라운드 반영 후 최종 실행에서 BUILD SUCCESSFUL(1분 23초)이다. 직전 실행(수정 라운드 전)도 BUILD SUCCESSFUL(2분 31초)이었다.
+- 1단계 특성화 테스트 세 클래스(강화 전)는 변경 전 코드에서 통과했다. `MessageConfigurationTest` 9/9, `KafkaMessagePublishedConsumerTest` 10/10, `MessageReadModelMentionTokenTest` 1/1이다. 새 단위 테스트는 `MessageMentionTokensTest` 3개와 `MessageDeliveryPayloadTest` 1개가 통과했다.
+- 수정 라운드에서 페이로드 전체 비교로 강화한 두 Boot 테스트(`MessageConfigurationTest`, `KafkaMessagePublishedConsumerTest`)도 변경 전 코드에서 통과했다. 코디네이터가 운영 코드(`backend/boot/src/main`, `backend/modules/message/src/main`)를 `d493e72` 상태로 일시적으로 되돌려 두 클래스만 실행했고(9/9, 10/10) 이후 브랜치 HEAD로 복원했다. 따라서 강화된 단언은 리팩터 전후 동작이 같다는 증거다.
 - `apps/web` 전체 Vitest는 241개 통과, 8개 skip, 실패 0개다. 이 테스트는 백엔드 payload를 사용하지 않으므로 프런트 회귀 확인에 한정된다.
 - `JdbcMessageStoreTest` 11개는 모두 skipped다. PostgreSQL과 `DISCORD_RUN_POSTGRES_TESTS=true`가 필요하며, 로컬에 Docker가 없고 CI도 이 변수를 설정하지 않는다. 따라서 `mention_tokens`의 저장·조회 왕복은 자동 테스트로 검증되지 않았다. 독립 리뷰어는 `JdbcMessageStore.java`의 저장 경로(`mentionTokens(Message)`에서 text 배열 바인딩)와 조회 경로(`mentionTokensFrom`)를 읽고 기존과 동일한 text 배열 바인딩과 읽기를 확인했다. 이 평가는 코드 읽기에 근거하며, 리뷰어는 저장 형식 회귀 위험을 낮게 평가했다.
-- 독립 리뷰 점수는 명세 97, 품질 95이며 P0/P1은 없었다. P2 1건(특성화 테스트의 전체 payload 비교)과 nit 1건(용어집에서 형식 정의 소유권 명시)은 이 라운드에서 반영했다.
+- 독립 리뷰 점수는 명세 97, 품질 95이며 P0/P1은 없었다. 지적은 세 가지였고 모두 반영했다. (1) P2: 특성화 테스트가 페이로드 전체를 비교하지 않음 → 수정 라운드에서 전체 비교로 강화. (2) nit: 용어집에서 형식 정의 소유권 명시 → 수정 라운드에서 반영. (3) 병합 조건: 계획서가 요구한 프런트 검증의 실행 기록 → `apps/web` 전체 Vitest 실행 결과(위 241 통과, 8 skip)로 해소했다.
