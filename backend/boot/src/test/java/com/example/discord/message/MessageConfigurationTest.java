@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.annotation.Profile;
 import org.springframework.beans.factory.ObjectProvider;
 import static org.mockito.Mockito.mock;
@@ -190,6 +192,61 @@ class MessageConfigurationTest {
 
         assertThat(recorded).hasSize(1);
         assertThat(recorded.getFirst().mentionedUserIds()).containsExactly(recipientId);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void localDispatcherPreservesMessageCreatePayloadShape(boolean hasAuthorDisplayName) {
+        UUID ownerId = UUID.randomUUID();
+        InMemoryGuildService guilds = new InMemoryGuildService();
+        var guild = guilds.createGuild("dispatcher", ownerId);
+        var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
+        InMemoryGatewayService gateway = new InMemoryGatewayService(
+            guilds, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), Duration.ofSeconds(30)
+        );
+        var session = gateway.identify(ownerId).session();
+        UUID mentionedUserId = UUID.randomUUID();
+        UUID mentionedRoleId = UUID.randomUUID();
+        List<MessageMentionTarget> mentions = List.of(
+            new UserMentionTarget(mentionedUserId),
+            new RoleMentionTarget(mentionedRoleId),
+            new ChannelMentionTarget(channel.id()),
+            new SpecialMentionTarget(SpecialMentionKind.HERE)
+        );
+        Message message = new Message(
+            UUID.randomUUID(), new UserMessageAuthor(ownerId), new ChannelMessageTarget(guild.id(), channel.id()),
+            new MessageContent("hello"), mentions, false, false, List.of(), Instant.EPOCH, Instant.EPOCH
+        );
+        UUID eventId = UUID.randomUUID();
+        MessagePublished published = new MessagePublished(
+            eventId, message.id(), message.author(), message.target(), message.mentions(), "correlation", message.createdAt()
+        );
+
+        new MessageConfiguration().messagePublishedDispatcher(
+            gateway,
+            (target, id) -> message,
+            userIds -> hasAuthorDisplayName ? Map.of(ownerId, "Owner Display") : Map.of(),
+            mock(ObjectProvider.class)
+        ).dispatch(published);
+
+        Map<String, Object> gatewayPayload = gateway.poll(session.id(), ownerId, 0).stream()
+            .filter(event -> eventId.toString().equals(event.busEventId()))
+            .findFirst()
+            .orElseThrow()
+            .payload();
+        List<String> expectedKeys = new ArrayList<>(List.of(
+            "id", "guildId", "channelId", "authorId", "content", "mentions",
+            "pinned", "deleted", "edited", "createdAt", "updatedAt"
+        ));
+        if (hasAuthorDisplayName) {
+            expectedKeys.add("authorDisplayName");
+        }
+        List<String> expectedTokens = List.of(
+            mentionedUserId.toString(), mentionedRoleId.toString(), channel.id().toString(), "here"
+        );
+
+        assertThat(gatewayPayload).containsOnlyKeys(expectedKeys.toArray(String[]::new));
+        assertThat(gatewayPayload).containsEntry("mentions", expectedTokens);
     }
 
     private record DecisionStore(AuthorizationDecision decision) implements AuthorizationProjectionStore {
