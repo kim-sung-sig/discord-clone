@@ -6,8 +6,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.JsonPath;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -42,6 +50,9 @@ class GatewayWebSocketIntegrationTest {
 
     @Autowired
     private GatewaySessionMaintenance sessionMaintenance;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void websocketIdentifyReceivesReadyAndPublishedEvents() throws Exception {
@@ -178,6 +189,73 @@ class GatewayWebSocketIntegrationTest {
         sessionMaintenance.closeTimedOutSessions();
 
         assertThat(probe.awaitClose()).isTrue();
+    }
+
+    @Test
+    void clientFrameContractFixtureIsAcceptedByTheServer() throws Exception {
+        JsonNode frames = objectMapper.readTree(Files.readString(clientFrameFixture()));
+        AuthSession owner = signup("gateway_ws_contract_owner");
+        createGuild(owner);
+        SocketProbe first = connect();
+
+        first.session().sendMessage(new TextMessage(frame(frames.get("identify"), Map.of("accessToken", owner.accessToken()))));
+        String ready = first.nextMessage();
+        assertThat(JsonPath.<String>read(ready, "$.type")).isEqualTo("READY");
+        String gatewaySessionId = JsonPath.read(ready, "$.sessionId");
+        long readySequence = JsonPath.<Number>read(ready, "$.sequence").longValue();
+
+        first.session().sendMessage(new TextMessage(frame(frames.get("heartbeat"), Map.of("lastSequence", readySequence))));
+        assertThat(JsonPath.<String>read(first.nextMessage(), "$.type")).isEqualTo("HEARTBEAT_ACK");
+        first.session().close();
+
+        SocketProbe second = connect();
+        second.session().sendMessage(new TextMessage(frame(frames.get("resume"), Map.of(
+            "accessToken", owner.accessToken(),
+            "sessionId", gatewaySessionId,
+            "lastSequence", readySequence
+        ))));
+        assertThat(JsonPath.<String>read(second.nextMessage(), "$.type")).isEqualTo("RESUMED");
+    }
+
+    @Test
+    void legacyOpTokenFrameIsRejectedWithUnknownOpcodeHint() throws Exception {
+        SocketProbe probe = connect();
+
+        probe.session().sendMessage(new TextMessage("""
+            {
+              "op": "IDENTIFY",
+              "token": "ignored"
+            }
+            """));
+
+        String error = probe.nextMessage();
+        assertThat(JsonPath.<String>read(error, "$.type")).isEqualTo("ERROR");
+        assertThat(JsonPath.<String>read(error, "$.code")).isEqualTo("UNKNOWN_OPCODE");
+        assertThat(JsonPath.<String>read(error, "$.message")).contains("\"type\"");
+    }
+
+    private String frame(JsonNode fixtureFrame, Map<String, Object> values) {
+        Set<String> fixtureFields = new HashSet<>();
+        fixtureFrame.fieldNames().forEachRemaining(fixtureFields::add);
+        fixtureFields.remove("type");
+        assertThat(values.keySet())
+            .as("every fixture field besides type must be filled by the test, and no field may be missing from the fixture")
+            .isEqualTo(fixtureFields);
+        ObjectNode copy = fixtureFrame.deepCopy();
+        values.forEach((name, value) -> copy.set(name, objectMapper.valueToTree(value)));
+        return copy.toString();
+    }
+
+    private static Path clientFrameFixture() {
+        Path directory = Path.of("").toAbsolutePath();
+        while (directory != null) {
+            Path candidate = directory.resolve("qa/contracts/gateway-client-frames.json");
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            directory = directory.getParent();
+        }
+        throw new IllegalStateException("qa/contracts/gateway-client-frames.json not found above " + Path.of("").toAbsolutePath());
     }
 
     private SocketProbe connect() throws Exception {
