@@ -1,0 +1,1 @@
+25:Caused by: java.lang.NoSuchMethodException: com.example.discord.gateway.RedisGatewayEventBus.&lt;init&gt;()

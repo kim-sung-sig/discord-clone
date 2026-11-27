@@ -1,0 +1,321 @@
+> Task :compileJava NO-SOURCE
+> Task :processResources NO-SOURCE
+> Task :classes UP-TO-DATE
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :backend:compileJava NO-SOURCE
+> Task :backend:processResources NO-SOURCE
+> Task :backend:classes UP-TO-DATE
+> Task :backend:compileTestJava NO-SOURCE
+> Task :backend:processTestResources NO-SOURCE
+> Task :backend:testClasses UP-TO-DATE
+> Task :backend:test NO-SOURCE
+> Task :backend:modules:channel:compileJava UP-TO-DATE
+> Task :backend:modules:event:compileJava UP-TO-DATE
+> Task :backend:modules:experience:compileJava UP-TO-DATE
+> Task :backend:modules:expression:compileJava UP-TO-DATE
+> Task :backend:modules:permission:compileJava UP-TO-DATE
+> Task :backend:modules:guild:compileJava UP-TO-DATE
+> Task :backend:modules:gateway:compileJava UP-TO-DATE
+> Task :backend:modules:identity:compileJava UP-TO-DATE
+> Task :backend:modules:invite:compileJava UP-TO-DATE
+> Task :backend:modules:message:compileJava UP-TO-DATE
+> Task :backend:modules:moderation:compileJava UP-TO-DATE
+> Task :backend:modules:notification:compileJava UP-TO-DATE
+> Task :backend:modules:presence:compileJava UP-TO-DATE
+> Task :backend:modules:social:compileJava UP-TO-DATE
+> Task :backend:modules:storage:compileJava UP-TO-DATE
+> Task :backend:modules:thread:compileJava UP-TO-DATE
+> Task :backend:modules:user:compileJava UP-TO-DATE
+> Task :backend:modules:voice:compileJava UP-TO-DATE
+> Task :backend:shared:common:compileJava UP-TO-DATE
+> Task :backend:boot:compileJava UP-TO-DATE
+> Task :backend:boot:processResources UP-TO-DATE
+> Task :backend:boot:classes UP-TO-DATE
+> Task :backend:boot:compileTestJava UP-TO-DATE
+> Task :backend:boot:processTestResources UP-TO-DATE
+> Task :backend:boot:testClasses UP-TO-DATE
+> Task :backend:modules:channel:processResources NO-SOURCE
+> Task :backend:modules:channel:classes UP-TO-DATE
+> Task :backend:modules:channel:jar UP-TO-DATE
+> Task :backend:modules:event:processResources NO-SOURCE
+> Task :backend:modules:event:classes UP-TO-DATE
+> Task :backend:modules:event:jar UP-TO-DATE
+> Task :backend:modules:experience:processResources NO-SOURCE
+> Task :backend:modules:experience:classes UP-TO-DATE
+> Task :backend:modules:experience:jar UP-TO-DATE
+> Task :backend:modules:expression:processResources NO-SOURCE
+> Task :backend:modules:expression:classes UP-TO-DATE
+> Task :backend:modules:expression:jar UP-TO-DATE
+> Task :backend:modules:gateway:processResources NO-SOURCE
+> Task :backend:modules:gateway:classes UP-TO-DATE
+> Task :backend:modules:gateway:jar UP-TO-DATE
+> Task :backend:modules:guild:processResources NO-SOURCE
+> Task :backend:modules:guild:classes UP-TO-DATE
+> Task :backend:modules:guild:jar UP-TO-DATE
+> Task :backend:modules:identity:processResources NO-SOURCE
+> Task :backend:modules:identity:classes UP-TO-DATE
+> Task :backend:modules:identity:jar UP-TO-DATE
+> Task :backend:modules:invite:processResources NO-SOURCE
+> Task :backend:modules:invite:classes UP-TO-DATE
+> Task :backend:modules:invite:jar UP-TO-DATE
+> Task :backend:modules:message:processResources NO-SOURCE
+> Task :backend:modules:message:classes UP-TO-DATE
+> Task :backend:modules:message:jar UP-TO-DATE
+> Task :backend:modules:moderation:processResources NO-SOURCE
+> Task :backend:modules:moderation:classes UP-TO-DATE
+> Task :backend:modules:moderation:jar UP-TO-DATE
+> Task :backend:modules:notification:processResources NO-SOURCE
+> Task :backend:modules:notification:classes UP-TO-DATE
+> Task :backend:modules:notification:jar UP-TO-DATE
+> Task :backend:modules:permission:processResources NO-SOURCE
+> Task :backend:modules:permission:classes UP-TO-DATE
+> Task :backend:modules:permission:jar UP-TO-DATE
+> Task :backend:modules:presence:processResources NO-SOURCE
+> Task :backend:modules:presence:classes UP-TO-DATE
+> Task :backend:modules:presence:jar UP-TO-DATE
+> Task :backend:modules:social:processResources NO-SOURCE
+> Task :backend:modules:social:classes UP-TO-DATE
+> Task :backend:modules:social:jar UP-TO-DATE
+> Task :backend:modules:storage:processResources NO-SOURCE
+> Task :backend:modules:storage:classes UP-TO-DATE
+> Task :backend:modules:storage:jar UP-TO-DATE
+> Task :backend:modules:thread:processResources NO-SOURCE
+> Task :backend:modules:thread:classes UP-TO-DATE
+> Task :backend:modules:thread:jar UP-TO-DATE
+> Task :backend:modules:user:processResources NO-SOURCE
+> Task :backend:modules:user:classes UP-TO-DATE
+> Task :backend:modules:user:jar UP-TO-DATE
+> Task :backend:modules:voice:processResources NO-SOURCE
+> Task :backend:modules:voice:classes UP-TO-DATE
+> Task :backend:modules:voice:jar UP-TO-DATE
+> Task :backend:shared:common:processResources NO-SOURCE
+> Task :backend:shared:common:classes UP-TO-DATE
+> Task :backend:shared:common:jar UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :backend:boot:test
+
+{"timestamp":"2026-11-21T20:06:27.160+09:00","level":"INFO","service":"discord-api","thread":"SpringApplicationShutdownHook","logger":"o.s.boot.tomcat.GracefulShutdown","trace_id":"","span_id":"","request_id":"","http_method":"","http_path":"","http_status":"","message":"Commencing graceful shutdown. Waiting for active requests to complete"}
+{"timestamp":"2026-11-21T20:06:27.169+09:00","level":"INFO","service":"discord-api","thread":"tomcat-shutdown","logger":"o.s.boot.tomcat.GracefulShutdown","trace_id":"","span_id":"","request_id":"","http_method":"","http_path":"","http_status":"","message":"Graceful shutdown complete"}
+
+> Task :backend:modules:compileJava NO-SOURCE
+> Task :backend:modules:processResources NO-SOURCE
+> Task :backend:modules:classes UP-TO-DATE
+> Task :backend:modules:compileTestJava NO-SOURCE
+> Task :backend:modules:processTestResources NO-SOURCE
+> Task :backend:modules:testClasses UP-TO-DATE
+> Task :backend:modules:test NO-SOURCE
+> Task :backend:services:compileJava NO-SOURCE
+> Task :backend:services:processResources NO-SOURCE
+> Task :backend:services:classes UP-TO-DATE
+> Task :backend:services:compileTestJava NO-SOURCE
+> Task :backend:services:processTestResources NO-SOURCE
+> Task :backend:services:testClasses UP-TO-DATE
+> Task :backend:services:test NO-SOURCE
+> Task :backend:shared:compileJava NO-SOURCE
+> Task :backend:shared:processResources NO-SOURCE
+> Task :backend:shared:classes UP-TO-DATE
+> Task :backend:shared:compileTestJava NO-SOURCE
+> Task :backend:shared:processTestResources NO-SOURCE
+> Task :backend:shared:testClasses UP-TO-DATE
+> Task :backend:shared:test NO-SOURCE
+> Task :backend:modules:bot:compileJava
+> Task :backend:modules:bot:processResources NO-SOURCE
+> Task :backend:modules:bot:classes
+> Task :backend:modules:bot:compileTestJava
+> Task :backend:modules:bot:processTestResources NO-SOURCE
+> Task :backend:modules:bot:testClasses
+> Task :backend:modules:bot:test
+> Task :backend:modules:channel:compileTestJava NO-SOURCE
+> Task :backend:modules:channel:processTestResources NO-SOURCE
+> Task :backend:modules:channel:testClasses UP-TO-DATE
+> Task :backend:modules:channel:test NO-SOURCE
+> Task :backend:modules:event:compileTestJava NO-SOURCE
+> Task :backend:modules:event:processTestResources NO-SOURCE
+> Task :backend:modules:event:testClasses UP-TO-DATE
+> Task :backend:modules:event:test NO-SOURCE
+> Task :backend:modules:experience:compileTestJava
+> Task :backend:modules:experience:processTestResources NO-SOURCE
+> Task :backend:modules:experience:testClasses
+> Task :backend:modules:experience:test
+> Task :backend:modules:expression:compileTestJava NO-SOURCE
+> Task :backend:modules:expression:processTestResources NO-SOURCE
+> Task :backend:modules:expression:testClasses UP-TO-DATE
+> Task :backend:modules:expression:test NO-SOURCE
+> Task :backend:modules:gateway:compileTestJava
+> Task :backend:modules:gateway:processTestResources NO-SOURCE
+> Task :backend:modules:gateway:testClasses
+> Task :backend:modules:gateway:test
+> Task :backend:modules:guild:compileTestJava
+> Task :backend:modules:guild:processTestResources NO-SOURCE
+> Task :backend:modules:guild:testClasses
+> Task :backend:modules:guild:test
+> Task :backend:modules:identity:compileTestJava
+> Task :backend:modules:identity:processTestResources
+> Task :backend:modules:identity:testClasses
+> Task :backend:modules:identity:test
+> Task :backend:modules:invite:compileTestJava NO-SOURCE
+> Task :backend:modules:invite:processTestResources NO-SOURCE
+> Task :backend:modules:invite:testClasses UP-TO-DATE
+> Task :backend:modules:invite:test NO-SOURCE
+> Task :backend:modules:message:compileTestJava
+> Task :backend:modules:message:processTestResources NO-SOURCE
+> Task :backend:modules:message:testClasses
+> Task :backend:modules:message:test
+> Task :backend:modules:moderation:compileTestJava
+> Task :backend:modules:moderation:processTestResources NO-SOURCE
+> Task :backend:modules:moderation:testClasses
+> Task :backend:modules:moderation:test
+> Task :backend:modules:notification:compileTestJava NO-SOURCE
+> Task :backend:modules:notification:processTestResources NO-SOURCE
+> Task :backend:modules:notification:testClasses UP-TO-DATE
+> Task :backend:modules:notification:test NO-SOURCE
+> Task :backend:modules:permission:compileTestJava
+> Task :backend:modules:permission:processTestResources NO-SOURCE
+> Task :backend:modules:permission:testClasses
+> Task :backend:modules:permission:test
+> Task :backend:modules:presence:compileTestJava
+> Task :backend:modules:presence:processTestResources NO-SOURCE
+> Task :backend:modules:presence:testClasses
+> Task :backend:modules:presence:test
+> Task :backend:modules:social:compileTestJava
+> Task :backend:modules:social:processTestResources NO-SOURCE
+> Task :backend:modules:social:testClasses
+> Task :backend:modules:social:test
+> Task :backend:modules:storage:compileTestJava
+> Task :backend:modules:storage:processTestResources NO-SOURCE
+> Task :backend:modules:storage:testClasses
+> Task :backend:modules:storage:test
+> Task :backend:modules:thread:compileTestJava NO-SOURCE
+> Task :backend:modules:thread:processTestResources NO-SOURCE
+> Task :backend:modules:thread:testClasses UP-TO-DATE
+> Task :backend:modules:thread:test NO-SOURCE
+> Task :backend:modules:user:compileTestJava
+> Task :backend:modules:user:processTestResources NO-SOURCE
+> Task :backend:modules:user:testClasses
+> Task :backend:modules:user:test
+> Task :backend:modules:voice:compileTestJava
+> Task :backend:modules:voice:processTestResources NO-SOURCE
+> Task :backend:modules:voice:testClasses
+> Task :backend:modules:voice:test
+> Task :backend:services:community:compileJava
+> Task :backend:services:community:processResources
+> Task :backend:services:community:classes
+> Task :backend:services:community:compileTestJava
+> Task :backend:services:community:processTestResources
+> Task :backend:services:community:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :backend:services:community:test
+
+> Task :backend:services:identity:compileJava
+Note: <WORKTREE>\backend\services\identity\src\main\java\com\example\discord\identityservice\WebAuthnController.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :backend:services:identity:processResources
+> Task :backend:services:identity:classes
+
+> Task :backend:services:identity:compileTestJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :backend:services:identity:processTestResources NO-SOURCE
+> Task :backend:services:identity:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-21T20:07:00.249+09:00  INFO 32896 --- [identity-service] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : discord-identity-mfa - Shutdown initiated...
+2026-11-21T20:07:00.250+09:00  INFO 32896 --- [identity-service] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : discord-identity-mfa - Shutdown completed.
+2026-11-21T20:07:00.252+09:00  INFO 32896 --- [identity-service] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : discord-identity-mfa - Shutdown initiated...
+2026-11-21T20:07:00.253+09:00  INFO 32896 --- [identity-service] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : discord-identity-mfa - Shutdown completed.
+> Task :backend:services:identity:test
+> Task :backend:services:message:compileJava UP-TO-DATE
+> Task :backend:services:message:processResources UP-TO-DATE
+> Task :backend:services:message:classes UP-TO-DATE
+> Task :backend:services:message:compileTestJava UP-TO-DATE
+> Task :backend:services:message:processTestResources UP-TO-DATE
+> Task :backend:services:message:testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :backend:services:message:test
+> Task :backend:services:websocket:compileJava UP-TO-DATE
+> Task :backend:services:websocket:processResources UP-TO-DATE
+> Task :backend:services:websocket:classes UP-TO-DATE
+> Task :backend:services:websocket:compileTestJava UP-TO-DATE
+> Task :backend:services:websocket:processTestResources UP-TO-DATE
+> Task :backend:services:websocket:testClasses UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :backend:services:websocket:test
+> Task :backend:shared:common:compileTestJava
+> Task :backend:shared:common:processTestResources NO-SOURCE
+> Task :backend:shared:common:testClasses
+> Task :backend:shared:common:test
+> Task :checkstyleMain NO-SOURCE
+> Task :backend:checkstyleMain NO-SOURCE
+> Task :backend:modules:checkstyleMain NO-SOURCE
+> Task :backend:services:checkstyleMain NO-SOURCE
+> Task :backend:shared:checkstyleMain NO-SOURCE
+> Task :backend:modules:event:checkstyleMain
+> Task :backend:modules:presence:checkstyleMain
+> Task :backend:modules:bot:checkstyleMain
+> Task :backend:modules:storage:checkstyleMain
+> Task :backend:modules:thread:checkstyleMain
+> Task :backend:modules:moderation:checkstyleMain
+> Task :backend:modules:permission:checkstyleMain
+> Task :backend:modules:user:checkstyleMain
+> Task :backend:modules:voice:checkstyleMain
+> Task :backend:shared:common:checkstyleMain
+> Task :checkstyleTest NO-SOURCE
+> Task :backend:checkstyleTest NO-SOURCE
+> Task :backend:services:community:checkstyleMain
+> Task :backend:modules:checkstyleTest NO-SOURCE
+> Task :backend:services:checkstyleTest NO-SOURCE
+> Task :backend:shared:checkstyleTest NO-SOURCE
+> Task :backend:services:websocket:checkstyleMain
+> Task :backend:modules:channel:checkstyleTest NO-SOURCE
+> Task :backend:modules:event:checkstyleTest NO-SOURCE
+> Task :backend:services:message:checkstyleMain
+> Task :backend:modules:expression:checkstyleTest NO-SOURCE
+> Task :backend:modules:bot:checkstyleTest
+> Task :backend:services:identity:checkstyleMain
+> Task :backend:modules:guild:checkstyleTest
+> Task :backend:modules:invite:checkstyleTest NO-SOURCE
+> Task :backend:modules:experience:checkstyleTest
+> Task :backend:modules:gateway:checkstyleTest
+> Task :backend:modules:notification:checkstyleTest NO-SOURCE
+> Task :backend:modules:moderation:checkstyleTest
+> Task :backend:modules:identity:checkstyleTest
+> Task :backend:modules:channel:checkstyleMain
+> Task :backend:modules:message:checkstyleTest
+> Task :backend:modules:social:checkstyleTest
+> Task :backend:modules:permission:checkstyleTest
+> Task :backend:modules:thread:checkstyleTest NO-SOURCE
+> Task :backend:modules:presence:checkstyleTest
+> Task :backend:modules:voice:checkstyleTest
+> Task :backend:modules:user:checkstyleTest
+> Task :backend:services:community:checkstyleTest
+> Task :backend:modules:experience:checkstyleMain
+> Task :backend:shared:common:checkstyleTest
+> Task :backend:services:websocket:checkstyleTest
+> Task :backend:modules:expression:checkstyleMain
+> Task :backend:services:message:checkstyleTest
+> Task :backend:modules:notification:checkstyleMain
+> Task :backend:modules:invite:checkstyleMain
+> Task :backend:services:identity:checkstyleTest
+> Task :backend:modules:social:checkstyleMain
+> Task :backend:modules:storage:checkstyleTest
+> Task :backend:modules:identity:checkstyleMain
+> Task :backend:modules:guild:checkstyleMain
+> Task :backend:modules:gateway:checkstyleMain
+> Task :backend:boot:checkstyleTest
+> Task :backend:modules:message:checkstyleMain
+> Task :backend:boot:checkstyleMain
+
+[Incubating] Problems report is available at: file:///<WORKTREE>/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 20s
+136 actionable tasks: 86 executed, 50 up-to-date

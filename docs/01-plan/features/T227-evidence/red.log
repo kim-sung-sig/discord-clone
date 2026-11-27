@@ -1,0 +1,212 @@
+Starting a Gradle Daemon, 1 busy Daemon could not be reused, use --status for details
+> Task :backend:modules:channel:compileJava
+> Task :backend:modules:event:compileJava
+> Task :backend:modules:experience:compileJava
+> Task :backend:modules:expression:compileJava
+> Task :backend:modules:permission:compileJava
+> Task :backend:modules:guild:compileJava
+> Task :backend:modules:gateway:compileJava
+> Task :backend:modules:identity:compileJava
+> Task :backend:modules:invite:compileJava
+> Task :backend:modules:message:compileJava
+> Task :backend:modules:moderation:compileJava
+> Task :backend:modules:notification:compileJava
+> Task :backend:modules:presence:compileJava
+> Task :backend:modules:social:compileJava
+> Task :backend:modules:storage:compileJava
+> Task :backend:modules:thread:compileJava
+> Task :backend:modules:user:compileJava
+> Task :backend:modules:voice:compileJava
+> Task :backend:shared:common:compileJava
+
+> Task :backend:boot:compileJava
+<WORKTREE>\backend\boot\src\main\java\com\example\discord\ops\RuntimeResourceProfileEnvironmentPostProcessor.java:7: warning: [removal] EnvironmentPostProcessor in org.springframework.boot.env has been deprecated and marked for removal
+public final class RuntimeResourceProfileEnvironmentPostProcessor implements EnvironmentPostProcessor {
+                                                                             ^
+Note: <WORKTREE>\backend\boot\src\main\java\com\example\discord\gateway\RedisGatewayEventBus.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+1 warning
+
+> Task :backend:boot:processResources
+> Task :backend:boot:classes
+
+> Task :backend:boot:compileTestJava
+<WORKTREE>\backend\boot\src\test\java\com\example\discord\gateway\RedisGatewayEventBusContextTest.java:20: error: reference to registerBean is ambiguous
+            context.registerBean(ObjectMapper.class, ObjectMapper::new);
+                   ^
+  both method <T#1>registerBean(Class<T#1>,BeanDefinitionCustomizer...) in GenericApplicationContext and method <T#2>registerBean(Class<T#2>,Supplier<T#2>,BeanDefinitionCustomizer...) in GenericApplicationContext match
+  where T#1,T#2 are type-variables:
+    T#1 extends Object declared in method <T#1>registerBean(Class<T#1>,BeanDefinitionCustomizer...)
+    T#2 extends Object declared in method <T#2>registerBean(Class<T#2>,Supplier<T#2>,BeanDefinitionCustomizer...)
+<WORKTREE>\backend\boot\src\test\java\com\example\discord\gateway\RedisGatewayEventBusContextTest.java:20: error: incompatible types: cannot infer type-variable(s) T
+            context.registerBean(ObjectMapper.class, ObjectMapper::new);
+                                ^
+    (varargs mismatch; invalid constructor reference
+      no suitable constructor found for ObjectMapper(BeanDefinition)
+          constructor ObjectMapper.ObjectMapper(JsonFactory) is not applicable
+            (argument mismatch; BeanDefinition cannot be converted to JsonFactory)
+          constructor ObjectMapper.ObjectMapper(ObjectMapper) is not applicable
+            (argument mismatch; BeanDefinition cannot be converted to ObjectMapper))
+  where T is a type-variable:
+    T extends Object declared in method <T>registerBean(Class<T>,BeanDefinitionCustomizer...)
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+2 errors
+
+> Task :backend:boot:compileTestJava FAILED
+> Task :backend:boot:processTestResources
+> Task :backend:modules:channel:processResources NO-SOURCE
+> Task :backend:modules:channel:classes
+> Task :backend:modules:channel:jar
+> Task :backend:modules:event:processResources NO-SOURCE
+> Task :backend:modules:event:classes
+> Task :backend:modules:event:jar
+> Task :backend:modules:experience:processResources NO-SOURCE
+> Task :backend:modules:experience:classes
+> Task :backend:modules:experience:jar
+> Task :backend:modules:expression:processResources NO-SOURCE
+> Task :backend:modules:expression:classes
+> Task :backend:modules:expression:jar
+> Task :backend:modules:gateway:processResources NO-SOURCE
+> Task :backend:modules:gateway:classes
+> Task :backend:modules:gateway:jar
+> Task :backend:modules:guild:processResources NO-SOURCE
+> Task :backend:modules:guild:classes
+> Task :backend:modules:guild:jar
+> Task :backend:modules:identity:processResources NO-SOURCE
+> Task :backend:modules:identity:classes
+> Task :backend:modules:identity:jar
+> Task :backend:modules:invite:processResources NO-SOURCE
+> Task :backend:modules:invite:classes
+> Task :backend:modules:invite:jar
+> Task :backend:modules:message:processResources NO-SOURCE
+> Task :backend:modules:message:classes
+> Task :backend:modules:message:jar
+> Task :backend:modules:moderation:processResources NO-SOURCE
+> Task :backend:modules:moderation:classes
+> Task :backend:modules:moderation:jar
+> Task :backend:modules:notification:processResources NO-SOURCE
+> Task :backend:modules:notification:classes
+> Task :backend:modules:notification:jar
+> Task :backend:modules:permission:processResources NO-SOURCE
+> Task :backend:modules:permission:classes
+> Task :backend:modules:permission:jar
+> Task :backend:modules:presence:processResources NO-SOURCE
+> Task :backend:modules:presence:classes
+> Task :backend:modules:presence:jar
+> Task :backend:modules:social:processResources NO-SOURCE
+> Task :backend:modules:social:classes
+> Task :backend:modules:social:jar
+> Task :backend:modules:storage:processResources NO-SOURCE
+> Task :backend:modules:storage:classes
+> Task :backend:modules:storage:jar
+> Task :backend:modules:thread:processResources NO-SOURCE
+> Task :backend:modules:thread:classes
+> Task :backend:modules:thread:jar
+> Task :backend:modules:user:processResources NO-SOURCE
+> Task :backend:modules:user:classes
+> Task :backend:modules:user:jar
+> Task :backend:modules:voice:processResources NO-SOURCE
+> Task :backend:modules:voice:classes
+> Task :backend:modules:voice:jar
+> Task :backend:shared:common:processResources NO-SOURCE
+> Task :backend:shared:common:classes
+> Task :backend:shared:common:jar
+> Task :backend:services:message:compileJava
+> Task :backend:services:message:processResources
+> Task :backend:services:message:classes
+> Task :backend:services:message:compileTestJava
+> Task :backend:services:message:processTestResources
+> Task :backend:services:message:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :backend:services:message:test
+
+ProductionProfileContextTest > wiresProductionKafkaWithoutExternalServices() FAILED
+    java.lang.IllegalStateException at DefaultCacheAwareContextLoaderDelegate.java:195
+        Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException at ConstructorResolver.java:804
+            Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException at DefaultListableBeanFactory.java:2304
+
+1 test completed, 1 failed
+
+> Task :backend:services:message:test FAILED
+> Task :backend:services:websocket:compileJava
+> Task :backend:services:websocket:processResources
+> Task :backend:services:websocket:classes
+> Task :backend:services:websocket:compileTestJava
+> Task :backend:services:websocket:processTestResources
+> Task :backend:services:websocket:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :backend:services:websocket:test
+
+ProductionProfileContextTest > bindsPostgresPasswordAtDatasourcePath() FAILED
+    java.lang.IllegalStateException at DefaultCacheAwareContextLoaderDelegate.java:195
+        Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException at ConstructorResolver.java:804
+            Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException at DefaultListableBeanFactory.java:2304
+
+ProductionProfileContextTest > wiresProductionKafkaWithoutExternalServices() FAILED
+    java.lang.IllegalStateException at DefaultCacheAwareContextLoaderDelegate.java:157
+
+2 tests completed, 2 failed
+
+> Task :backend:services:websocket:test FAILED
+
+[Incubating] Problems report is available at: file:///<WORKTREE>/build/reports/problems/problems-report.html
+
+FAILURE: Build completed with 3 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':backend:boot:compileTestJava'.
+> Compilation failed; see the compiler output below.
+  <WORKTREE>\backend\boot\src\test\java\com\example\discord\gateway\RedisGatewayEventBusContextTest.java:20: error: reference to registerBean is ambiguous
+              context.registerBean(ObjectMapper.class, ObjectMapper::new);
+                     ^
+    both method <T#1>registerBean(Class<T#1>,BeanDefinitionCustomizer...) in GenericApplicationContext and method <T#2>registerBean(Class<T#2>,Supplier<T#2>,BeanDefinitionCustomizer...) in GenericApplicationContext match
+    where T#1,T#2 are type-variables:
+      T#1 extends Object declared in method <T#1>registerBean(Class<T#1>,BeanDefinitionCustomizer...)
+      T#2 extends Object declared in method <T#2>registerBean(Class<T#2>,Supplier<T#2>,BeanDefinitionCustomizer...)
+  <WORKTREE>\backend\boot\src\test\java\com\example\discord\gateway\RedisGatewayEventBusContextTest.java:20: error: incompatible types: cannot infer type-variable(s) T
+              context.registerBean(ObjectMapper.class, ObjectMapper::new);
+                                  ^
+      (varargs mismatch; invalid constructor reference
+        no suitable constructor found for ObjectMapper(BeanDefinition)
+            constructor ObjectMapper.ObjectMapper(JsonFactory) is not applicable
+              (argument mismatch; BeanDefinition cannot be converted to JsonFactory)
+            constructor ObjectMapper.ObjectMapper(ObjectMapper) is not applicable
+              (argument mismatch; BeanDefinition cannot be converted to ObjectMapper))
+    where T is a type-variable:
+      T extends Object declared in method <T>registerBean(Class<T>,BeanDefinitionCustomizer...)
+  Note: Recompile with -Xlint:unchecked for details.
+  Note: Some input files use unchecked or unsafe operations.
+  2 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':backend:services:message:test'.
+> There were failing tests. See the report at: file:///<WORKTREE>/backend/services/message/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+==============================================================================
+
+3: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':backend:services:websocket:test'.
+> There were failing tests. See the report at: file:///<WORKTREE>/backend/services/websocket/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+==============================================================================
+
+BUILD FAILED in 40s
+52 actionable tasks: 52 executed
