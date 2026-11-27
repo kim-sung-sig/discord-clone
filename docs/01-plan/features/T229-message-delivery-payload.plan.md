@@ -2,7 +2,7 @@
 
 ## 승인 및 진행 상태
 
-- 상태는 **2·3단계 구현 완료, 코디네이터 검증 대기**다.
+- 상태는 **구현 완료, 독립 리뷰 수정 반영 중**이다.
 - 기준은 `main`의 `d493e72`와 작업 브랜치 `message-delivery-payload`다.
 
 ## 백엔드 작업 범위
@@ -53,11 +53,19 @@
 1. 현재 코드에서 사용할 특성화 테스트를 추가하고 계획서와 용어집을 작성한다. 읽기 모델은 모든 Special 값을 포함해 토큰 형식과 순서를 검증한다. 두 Boot 테스트는 표시 이름 유무에 따른 12개·11개 키 집합과 네 종류의 멘션 토큰 목록을 검증한다.
 2. `MessageMentionTokens`를 추가하고 기존 변환 여섯 곳을 교체한다.
 3. `MessageDeliveryPayload`를 추가하고 로컬 relay와 Kafka 소비 경로의 조립 코드를 교체한다.
-4. 코디네이터가 Gradle로 특성화 테스트와 백엔드 회귀를 검증한다. 기존 프런트 계약에 영향이 없는지는 `apps/web/tests/components/shell-contracts.test.ts`로 확인한다.
+4. 코디네이터가 Gradle로 특성화 테스트와 백엔드 회귀를 검증한다. 백엔드 payload 호환성의 근거는 키 집합과 값을 고정하는 특성화 테스트다. `apps/web/tests/components/shell-contracts.test.ts`는 백엔드가 실제로 만든 payload를 사용하지 않으므로 프런트 회귀 확인에 사용한다.
 5. 독립 리뷰가 구현과 검증 근거를 수용하면 PR을 진행하고, 수용된 경계와 계약을 Wiki에 게시한다.
 
 ## 위험과 검증 한계
 
 - 토큰은 종류 접두사 없이 저장된다. 기존 UUID와 소문자 이름을 그대로 유지한다.
-- `JdbcMessageStoreTest`는 `DISCORD_RUN_POSTGRES_TESTS=true`를 요구한다. 코디네이터의 기본 회귀 환경에서 PostgreSQL 의존 테스트까지 실행할 수 있는지는 미확인이다.
-- 프런트 변경은 예정돼 있지 않으며, `shell-contracts` 실행 결과는 4단계에서 확인한다.
+- `JdbcMessageStoreTest`는 `DISCORD_RUN_POSTGRES_TESTS=true`와 PostgreSQL을 요구한다. 기본 회귀에서의 실행 여부는 아래 검증 결과에 기록한다.
+- 프런트 변경은 예정돼 있지 않으며, 프런트 테스트 결과는 회귀 확인 범위로 해석한다.
+
+## 검증 결과 (코디네이터 실행)
+
+- 전체 `gradlew test checkstyleMain checkstyleTest` 결과는 BUILD SUCCESSFUL(2분 31초)이다.
+- 특성화 테스트 세 클래스는 변경 전 코드에서 통과했다. `MessageConfigurationTest` 9/9, `KafkaMessagePublishedConsumerTest` 10/10, `MessageReadModelMentionTokenTest` 1/1이다. 새 단위 테스트는 `MessageMentionTokensTest` 3개와 `MessageDeliveryPayloadTest` 1개가 통과했다.
+- `apps/web` 전체 Vitest는 241개 통과, 8개 skip, 실패 0개다. 이 테스트는 백엔드 payload를 사용하지 않으므로 프런트 회귀 확인에 한정된다.
+- `JdbcMessageStoreTest` 11개는 모두 skipped다. PostgreSQL과 `DISCORD_RUN_POSTGRES_TESTS=true`가 필요하며, 로컬에 Docker가 없고 CI도 이 변수를 설정하지 않는다. 따라서 `mention_tokens`의 저장·조회 왕복은 자동 테스트로 검증되지 않았다. 독립 리뷰어는 `JdbcMessageStore.java`의 저장 경로(`mentionTokens(Message)`에서 text 배열 바인딩)와 조회 경로(`mentionTokensFrom`)를 읽고 기존과 동일한 text 배열 바인딩과 읽기를 확인했다. 이 평가는 코드 읽기에 근거하며, 리뷰어는 저장 형식 회귀 위험을 낮게 평가했다.
+- 독립 리뷰 점수는 명세 97, 품질 95이며 P0/P1은 없었다. P2 1건(특성화 테스트의 전체 payload 비교)과 nit 1건(용어집에서 형식 정의 소유권 명시)은 이 라운드에서 반영했다.
