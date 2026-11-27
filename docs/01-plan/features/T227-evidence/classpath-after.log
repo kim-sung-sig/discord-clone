@@ -1,0 +1,40 @@
+Starting a Gradle Daemon, 1 busy and 1 stopped Daemons could not be reused, use --status for details
+
+> Task :backend:services:message:dependencyInsight
+org.springframework.boot:spring-boot-kafka:4.1.1 (selected by rule)
+  Variant runtimeElements:
+    | Attribute Name                 | Provided     | Requested    |
+    |--------------------------------|--------------|--------------|
+    | org.gradle.status              | release      |              |
+    | org.gradle.category            | library      | library      |
+    | org.gradle.dependency.bundling | external     | external     |
+    | org.gradle.jvm.version         | 17           | 21           |
+    | org.gradle.libraryelements     | jar          | jar          |
+    | org.gradle.usage               | java-runtime | java-runtime |
+    | org.gradle.jvm.environment     |              | standard-jvm |
+
+org.springframework.boot:spring-boot-kafka -> 4.1.1
+\--- runtimeClasspath
+
+A web-based, searchable dependency report is available by adding the --scan option.
+
+> Task :backend:services:websocket:dependencyInsight
+org.springframework.boot:spring-boot-kafka:4.1.1 (selected by rule)
+  Variant runtimeElements:
+    | Attribute Name                 | Provided     | Requested    |
+    |--------------------------------|--------------|--------------|
+    | org.gradle.status              | release      |              |
+    | org.gradle.category            | library      | library      |
+    | org.gradle.dependency.bundling | external     | external     |
+    | org.gradle.jvm.version         | 17           | 21           |
+    | org.gradle.libraryelements     | jar          | jar          |
+    | org.gradle.usage               | java-runtime | java-runtime |
+    | org.gradle.jvm.environment     |              | standard-jvm |
+
+org.springframework.boot:spring-boot-kafka -> 4.1.1
+\--- runtimeClasspath
+
+A web-based, searchable dependency report is available by adding the --scan option.
+
+BUILD SUCCESSFUL in 8s
+2 actionable tasks: 2 executed
