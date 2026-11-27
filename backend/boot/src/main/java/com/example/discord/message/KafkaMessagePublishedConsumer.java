@@ -8,7 +8,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -132,21 +131,12 @@ final class KafkaMessagePublishedConsumer {
             payload.put("authorDisplayName", authorDisplayName);
         }
         payload.put("content", message.content().value());
-        payload.put("mentions", message.mentions().stream().map(KafkaMessagePublishedConsumer::mentionToken).toList());
+        payload.put("mentions", MessageMentionTokens.tokens(message.mentions()));
         payload.put("pinned", message.pinned());
         payload.put("deleted", message.deleted());
         payload.put("edited", message.edited());
         payload.put("createdAt", message.createdAt().toString());
         payload.put("updatedAt", message.updatedAt().toString());
         return payload;
-    }
-
-    private static String mentionToken(MessageMentionTarget mention) {
-        return switch (mention) {
-            case UserMentionTarget user -> user.userId().toString();
-            case RoleMentionTarget role -> role.roleId().toString();
-            case ChannelMentionTarget channel -> channel.channelId().toString();
-            case SpecialMentionTarget special -> special.kind().name().toLowerCase(Locale.ROOT);
-        };
     }
 }
