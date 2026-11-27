@@ -7,8 +7,6 @@ import com.example.discord.notification.MessageMentionProjector;
 import com.example.discord.permission.AuthorizationProjectionStore;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.beans.factory.annotation.Value;
@@ -98,7 +96,7 @@ class MessageConfiguration {
                     "MESSAGE_CREATE",
                     channel.guildId(),
                     channel.channelId(),
-                    gatewayPayload(message, authors.displayName(message.authorId()).orElse(null))
+                    MessageDeliveryPayload.messageCreate(message, authors.displayName(message.authorId()).orElse(null))
                 );
                 MessageMentionProjector available = projector.getIfAvailable();
                 if (available != null) {
@@ -153,25 +151,5 @@ class MessageConfiguration {
     MessagePublicationOutbox messagePublicationOutbox() {
         return event -> {
         };
-    }
-
-    private static Map<String, Object> gatewayPayload(Message message, String authorDisplayName) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("id", message.id().toString());
-        payload.put("guildId", message.guildId().toString());
-        payload.put("channelId", message.channelId().toString());
-        payload.put("authorId", message.authorId().toString());
-        if (authorDisplayName != null) {
-            // GatewayEvent copies the payload with Map.copyOf, which rejects null values; omit unknown authors.
-            payload.put("authorDisplayName", authorDisplayName);
-        }
-        payload.put("content", message.content().value());
-        payload.put("mentions", MessageMentionTokens.tokens(message.mentions()));
-        payload.put("pinned", message.pinned());
-        payload.put("deleted", message.deleted());
-        payload.put("edited", message.edited());
-        payload.put("createdAt", message.createdAt().toString());
-        payload.put("updatedAt", message.updatedAt().toString());
-        return payload;
     }
 }
