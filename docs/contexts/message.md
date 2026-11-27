@@ -39,6 +39,12 @@ _Avoid_: destination, room, 바깥에서 instanceof로 종류를 판별하는 �
 메시지에서 언급된 구조화 대상이다. 서버가 본문 문자열에서 추출하는 값이 아니라 편집기가 메타데이터로 제출하는 값이며, 사용자, 역할, 채널, `@everyone`, `@here`를 포함한다. 알림, 권한 검증, 발행 이벤트에서 멘션으로 취급되는 기준은 본문 문자열이 아니라 이 구조화 값이다.
 _Avoid_: mention string, 멘션을 문자열 목록으로 다루는 것
 
+**MentionToken**:
+`MessageMentionTarget`의 저장·응답·이벤트용 문자열 표현이다. User·Role·Channel은 대상 UUID 문자열이고 Special은 소문자 종류 이름이다. 형식에 종류 접두사가 없으므로 토큰만으로 대상 종류를 알 수 없다. 도메인 코드는 구조화된 `MessageMentionTarget`으로 멘션을 다룬다.
+
+**MessageDeliveryPayload**:
+발행된 메시지를 Gateway의 `MESSAGE_CREATE` 이벤트로 전달할 때 쓰는 payload 형태다. 이 이벤트의 키 집합과 `MentionToken` 표현을 정의하는 유일한 원본이다.
+
 **MessageMentionAnchor**:
 멘션 대상이 본문 어느 위치에 표시되는지 나타내는 위치 정보다. 첫 메시지 발행 구현에는 포함하지 않고, 숨은 멘션 방지나 rich editor 재현이 필요해지는 후속 단계에서 추가한다.
 
