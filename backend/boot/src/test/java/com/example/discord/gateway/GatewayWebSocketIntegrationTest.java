@@ -154,7 +154,10 @@ class GatewayWebSocketIntegrationTest extends GatewayWebSocketTestSupport {
     void clientFrameContractFixtureIsAcceptedByTheServer() throws Exception {
         JsonNode frames = objectMapper.readTree(Files.readString(clientFrameFixture()));
         AuthSession owner = signup("gateway_ws_contract_owner");
-        createGuild(owner);
+        String guildId = createGuild(owner);
+        String channelId = createChannel(guildId, "general", owner);
+        // Seed the event log so resuming past control frames does not trigger the server's empty-log RESYNC_REQUIRED.
+        publish(owner, "MESSAGE_CREATE", guildId, channelId, "before identify");
         SocketProbe first = connect();
 
         first.session().sendMessage(new TextMessage(frame(frames.get("identify"), Map.of("accessToken", owner.accessToken()))));
