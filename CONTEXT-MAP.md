@@ -12,6 +12,8 @@ discord-clone의 도메인 용어집 진입점이다. 서비스(bounded context)
 - [Notification](./docs/contexts/notification.md): 사용자별 알림함
 - [Media](./docs/contexts/media.md): 첨부 파일, 음성 상태, LiveKit 토큰
 
+Community 내부의 Thread와 ForumPost는 부모 Channel에 속한다. 용어는 [Community 용어집](docs/contexts/community.md), 생성과 트랜잭션 계약은 [Thread 파일럿 명세](docs/01-plan/features/T230/spec.md)에서 확인한다.
+
 ## Relationships
 
 - **Identity → 모든 context**

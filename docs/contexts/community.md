@@ -59,6 +59,8 @@ _Avoid_: owner, inviter, sender
 **Thread**:
 채널 아래에서 갈라진 대화다. **Owner**가 있고, 일정 시간 활동이 없으면 보관된다. 포럼 채널의 글은 **ForumPost**라는 Thread다.
 
+**ForumPost**는 포럼 채널의 Thread다. 이 포럼에 허용된 태그를 하나 이상 지정하며, Thread와 태그 연결을 함께 저장한다. **ForumTag**는 포럼 채널에서 쓸 수 있는 분류다. 생성 계약과 롤백 조건은 [Thread 파일럿 명세](../01-plan/features/T230/spec.md)를 참조한다.
+
 **Webhook**:
 채널 하나에 메시지를 보낼 수 있는 연동 신원이다. 사람이 아니며, 그 메시지의 작성자는 Message의 webhook 작성자다.
 
