@@ -36,7 +36,7 @@
 
 #### 순서 독립성 검증 (0단계)
 
-같은 DB를 공유하는 게이트 테스트가 실행 순서에 의존하는지 확인하려고 JUnit의 클래스·메서드 순서를 무작위로 바꿔 `boot` 테스트를 반복 실행했다. 방법: 환경 변수 `JAVA_TOOL_OPTIONS`로 `junit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer$Random`, `junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random`, `junit.jupiter.execution.order.random.seed=<시드>`를 주고 `gradlew :backend:boot:test --rerun --continue`를 실행한다. 실행마다 새 DB(`discord_runtime_guild_*`)를 쓴다.
+같은 DB를 공유하는 게이트 테스트가 실행 순서에 의존하는지 확인하려고 JUnit의 클래스·메서드 순서를 무작위로 바꿔 `boot` 테스트를 반복 실행했다. 방법: 환경 변수 `JAVA_TOOL_OPTIONS`로 `junit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer$Random`, `junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random`, `junit.jupiter.execution.order.random.seed=<시드>`를 주고 `gradlew :backend:boot:test --rerun --continue`를 실행한다. 실행마다 새 DB(`discord_runtime_guild_*`)를 쓴다. 사전 조건: PostgreSQL 17이 떠 있어야 하고 `DISCORD_RUN_POSTGRES_TESTS=true`, `POSTGRES_JDBC_URL=jdbc:postgresql://127.0.0.1:<포트>/discord_runtime_guild_<이름>`, `POSTGRES_USER=dev_user`, `POSTGRES_PASSWORD=dev_password`를 설정해야 한다(DB 이름은 `discord_runtime_guild_`로 시작해야 한다). 게이트를 끄면 DB 테스트가 건너뛰어져 이 검증이 의미가 없다. Gradle은 PowerShell에서 실행한다.
 
 기본 순서에서는 통과하지만 무작위 순서에서는 다음이 실패했다. 첫 서베이는 시드 1~6, 11, 2026의 8회였고, 수정을 진행하면서 같은 시드를 다시 돌렸다.
 
@@ -52,7 +52,7 @@
 
 **최종 커밋(`0f32654`) 검증**: 기본 순서 1회와 시드 11, 2026, 2, 4, 7, 8, 9 총 8회 모두 `BUILD SUCCESSFUL`이었다. 시드 1, 3, 5, 6은 최종 커밋에서 다시 돌리지 않았다(중간 커밋에서는 통과). 이 결과는 순서 의존이 없다는 증명이 아니라 **알려진 반례를 제거했다는 증거**다. 실제로 시드를 넓혀서 앞선 시드로는 보이지 않던 `PostgresAuthStoreTest`가 드러났고, 같은 시드에서도 실패가 재현되지 않는 경우가 있어 간헐성이 남아 있다.
 
-**알려진 서버 동작(수정하지 않음).** `READY`·`HEARTBEAT_ACK` 같은 제어 이벤트는 `InMemoryGatewayEventLog.allocateSequence()`로 번호만 소모하고 로그에는 저장되지 않는다. 로그가 비어 있으면 `oldestSequence()`가 `nextSequence`를 돌려주므로, 데이터 이벤트가 하나도 없는 상태에서 `identify → heartbeat → 재연결 resume`을 하면 `InMemoryGatewayService.resumeInRound`의 보존 범위 검사(`replayFrom < oldestSequence - 1`)가 `RESYNC_REQUIRED`를 낸다. 잃은 데이터가 없는데도 전체 재동기화를 요구하는 동작이다. 데이터 이벤트가 쌓인 운영에서는 드물 수 있으나 조용한 환경에서는 날 수 있고, 프런트가 `RESYNC_REQUIRED`를 어떻게 처리하는지는 확인하지 않았다. 테스트는 이를 우회하도록 데이터 이벤트를 먼저 발행한다. 서버 수정은 인가·이벤트 로그에 가까워 별도 결정이 필요하므로 이 단계 범위 밖이다.
+**알려진 서버 동작(수정하지 않음).** `READY`·`HEARTBEAT_ACK` 같은 제어 이벤트는 `InMemoryGatewayEventLog.allocateSequence()`로 번호만 소모하고 로그에는 저장되지 않는다. 로그가 비어 있으면 `oldestSequence()`가 `nextSequence`를 돌려주므로, 데이터 이벤트가 하나도 없는 상태에서 `identify → heartbeat → 재연결 resume`을 하면 `InMemoryGatewayService.resumeInRound`의 보존 범위 검사(`replayFrom > 0 && replayFrom < oldestSequence - 1`)가 `RESYNC_REQUIRED`를 낸다. 여기서 `replayFrom`은 클라이언트가 보낸 `lastSequence`가 아니라 세션의 서버 측 ACK 커서(`acknowledgedUserSequence`)이므로, 클라이언트가 `HEARTBEAT`로 양수 시퀀스를 확인응답한 뒤에만 이 조건에 걸린다. 잃은 데이터가 없는데도 전체 재동기화를 요구하는 동작이다. 데이터 이벤트가 쌓인 운영에서는 드물 수 있으나 조용한 환경에서는 날 수 있고, 프런트가 `RESYNC_REQUIRED`를 어떻게 처리하는지는 확인하지 않았다. 테스트는 이를 우회하도록 데이터 이벤트를 먼저 발행한다. 서버 수정은 인가·이벤트 로그에 가까워 별도 결정이 필요하므로 이 단계 범위 밖이다.
 
 **미해결.** (1) `OperationalHardeningFilterTrustedProxyTest.authLoginRateLimitUsesForwardedClientIpFromAllowlistedProxy`가 첫 서베이의 시드 4에서 한 번 실패했다. 이후 실행에서는 재현되지 않았다. 코드를 읽어 빈별 카운터와 서로 다른 IP를 확인했으나 실패한 요청의 증거를 찾지 못했고, rate limit이 분 단위 고정 창이면 요청 도중 분이 바뀌는 시간 기반 불안정성이 원인일 수 있다는 가설만 남았다. 고치지 않았다. (2) `PostgresAuthStoreTest`의 간헐 실패는 위 정리 결함으로 설명되지만, 같은 시드에서 재현이 달랐던 이유(캐시된 Spring 컨텍스트의 백그라운드 작업이 공유 DB에서 다른 테스트의 정리와 겹칠 가능성)는 확인하지 못했다.
 
