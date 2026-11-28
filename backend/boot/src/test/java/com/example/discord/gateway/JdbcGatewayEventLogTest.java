@@ -59,10 +59,12 @@ class JdbcGatewayEventLogTest {
         UUID ownerId = UUID.randomUUID();
         guildId = UUID.randomUUID();
         try (var connection = dataSource.getConnection();
+             var cleanup = connection.createStatement();
              var user = connection.prepareStatement(
                  "INSERT INTO users(id, username, display_name) VALUES (?, ?, ?)" );
              var guild = connection.prepareStatement(
                  "INSERT INTO guilds(id, name, owner_id) VALUES (?, ?, ?)")) {
+            cleanup.executeUpdate("DELETE FROM gateway_event_log");
             user.setObject(1, ownerId);
             user.setString(2, "gateway_event_" + ownerId.toString().replace("-", "").substring(0, 12));
             user.setString(3, "Gateway Event");
