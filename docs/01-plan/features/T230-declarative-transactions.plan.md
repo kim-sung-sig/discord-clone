@@ -2,7 +2,7 @@
 
 ## 승인과 상태
 
-- 상태: 0단계 진행 중
+- 상태: 0단계: 리뷰 지적 반영 중, GitHub CI `backend` 첫 성공 대기
 - 승인 근거: 2026-11-28 사용자 결정과 [T230 아키텍처 방향 ADR](../../02-design/features/T230-architecture-direction.adr.md).
 - 목표: 수동 트랜잭션을 걷어내고 기존 원자성, 잠금, 실패 처리 의미를 유지한다.
 
@@ -28,7 +28,9 @@
 
 0단계 변경은 `Backend tests` 단계의 `DISCORD_RUN_POSTGRES_TESTS: "true"` 추가와 `backend` job의 DB 이름을 `discord_runtime_guild_ci`로 바꾸는 작업이다. 서비스 DB 이름, 헬스 체크와 JDBC URL에 같은 이름을 사용한다.
 
-완료 기준은 **게이트가 켜지고 모든 실패가 원인별로 분류된 상태**다.
+0단계 완료 기준은 **게이트가 켜지고 모든 실패가 원인별로 분류된 상태**다.
+
+1단계 진입 조건은 **게이트를 켠 GitHub CI `backend` job의 첫 성공**이다. 실패 분류는 0단계 완료 기준에 해당한다. 현재 `qa-runtime`의 Ubuntu 26.04와 Playwright 1.60.0 비호환은 코드와 무관하며 이 진입 조건에서 제외한다.
 
 ### 1단계. 트랜잭션 기반
 
@@ -39,6 +41,8 @@
 ### 2단계. 스레드 저장소 파일럿
 
 `JdbcThreadService`의 수동 트랜잭션 1곳을 전환한다. 명시적 행 잠금이 없는 경로에서 연결 참여, 롤백, 기존 PostgreSQL 계약을 확인한 뒤 이후 전환 방식을 확정한다.
+
+기존 `PostgresThreadServiceTest.java`의 48행과 73행은 `new JdbcThreadService(...)`로 Spring 프록시를 우회한다. 파일럿 완료 조건은 Spring 컨텍스트가 주입한 `ThreadService` 빈을 호출해 첫 번째 쓰기 이후 실패를 유도하고, PostgreSQL에서 두 쓰기의 변경분이 모두 롤백됐는지 확인하는 것이다.
 
 ### 3단계. 묶음 전환
 
@@ -62,6 +66,7 @@
 3. `final` 클래스인 `JdbcExpressionService`, `JdbcModerationService`, `JdbcTotpStore`는 Spring 기본 클래스 기반 프록시(CGLIB)로 감쌀 수 없다. 실제 호출이 프록시를 통과하는지 확인한다.
 4. T212의 moderation·guild `FOR UPDATE` 잠금 대상과 획득 순서를 유지한다. 트랜잭션 범위를 넓히지 않고 기존 경합 테스트로 확인한다.
 5. `JdbcInviteService.create`의 중복 키(SQLState `23505`) 재시도는 시도마다 새 트랜잭션이 필요하다. 재시도 루프를 트랜잭션 밖에 두고 각 시도를 트랜잭션 경계로 진입시킨다. 같은 클래스 안의 호출(self-invocation)에는 프록시 AOP가 적용되지 않는다.
-6. `REPEATABLE READ READ ONLY`처럼 직접 지정하던 격리 수준과 읽기 전용 속성은 `@Transactional(isolation = Isolation.REPEATABLE_READ, readOnly = true)`로 옮기고 동일한 설정이 적용되는지 확인한다.
+6. `JdbcGuildStore.readSnapshot`은 SQL `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`로 두 속성을 강제한다. `@Transactional(isolation = Isolation.REPEATABLE_READ, readOnly = true)`로 옮기는 전환의 완료 조건은 해당 트랜잭션에서 `SHOW transaction_read_only`는 `on`, `SHOW transaction_isolation`은 `repeatable read`를 반환한다고 직접 단언하는 테스트다.
+7. Guild·Auth 계열 등 게이트 테스트 일부는 공유 DB에서 조건 없는 `DELETE`로 정리한다. `rg -n --hidden 'maxParallelForks|junit[.]jupiter[.]execution[.]parallel' -g '*.gradle.kts' -g '*.gradle' -g 'gradle.properties' -g 'junit-platform.*'`로 검색한 결과 일치 항목은 없었다. 코디네이터의 로컬 실행에서는 같은 DB로 422개가 통과했다. 정리가 모든 클래스 실행 순서에서 안전한지는 확인하지 못했다. 첫 GitHub CI 결과와 CI 재실행 한 번에서 순서 의존 실패가 나타나는지 확인한다.
 
 0단계의 GitHub CI 실행 결과는 PR에서 확인하고 이 계획서에 반영한다(로컬 검증은 위와 같다).

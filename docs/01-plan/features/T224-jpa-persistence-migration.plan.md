@@ -79,7 +79,7 @@
 - [ ] QueryDSL을 확인한다. 원조 5.x는 유지보수가 멈춰 있어 OpenFeign fork(`io.github.openfeign.querydsl`)의 Hibernate 7 지원과 annotation processor 설정을 봐야 한다. 미확인이다.
 - [ ] Blaze-Persistence가 Hibernate 7을 지원하는지 확인한다. 미확인이다. 지원하지 않으면 QueryDSL만 쓴다.
 - [ ] 저장 계층 조사 결과(중복 SQL, N+1, 동적 조회 위치)로 조회 경로 목록을 확정한다.
-- [ ] 이 결정을 ADR로 남긴다(`docs/02-design/features/T224-persistence-strategy.adr.md`).
+- [ ] 이 결정을 ADR로 남긴다(`docs/02-design/features/T224-persistence-strategy.adr.md`). 이 경로의 ADR은 작성되지 않았다(역사 기록). 방향 결정은 [T230 ADR](../../02-design/features/T230-architecture-direction.adr.md)로 이어진다.
 
 ### 1단계: 기반 (작업 하나)
 - [ ] `spring-boot-starter-data-jpa`와 QueryDSL 의존성을 추가한다. 버전은 Spring Boot BOM을 따른다.

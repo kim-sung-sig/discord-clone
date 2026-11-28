@@ -16,7 +16,10 @@
 | boot·services의 `Jdbc*` 구현 | 21개, 5,345줄 |
 | 수동 트랜잭션 (`setAutoCommit(false)`) | 13개 클래스, 22곳 |
 | 기존 `@Transactional` 적용 | `JdbcAuthorizationProjectionStore` 3벌과 `AuthorizationProjectionOutboxRelay`. 모두 `JdbcTemplate` 사용 |
-| 테스트 의존성 | 테스트 153개 중 26개가 `InMemory`에 의존하고, PostgreSQL 테스트 파일 26개는 `DISCORD_RUN_POSTGRES_TESTS=true`에서만 실행 |
+| 테스트 파일 | `*Test.java` 155개. `InMemory`를 언급하는 테스트 파일 26개(문자열 기준). PostgreSQL 테스트 파일 26개는 `DISCORD_RUN_POSTGRES_TESTS=true`에서만 실행 |
+
+- 테스트 파일은 `find backend -path '*/src/test/*' -name '*Test.java' | wc -l`로 센다. `backend` 아래 각 `src/test`의 `*Test.java`를 포함하고, `src/main` 및 `backend` 밖은 제외한다.
+- `InMemory` 언급 파일은 `find backend -type d -path '*/src/test' -exec grep -rl InMemory {} + | wc -l`로 센다. `backend` 아래 각 `src/test`의 모든 파일 유형을 포함하고, `src/main` 및 `backend` 밖은 제외한다. 문자열 언급만으로 구현 의존성을 판단할 수 없다.
 
 PR CI의 `backend` job은 이미 `postgres:17`과 접속 환경 변수를 제공한다. 테스트 실행 조건인 `DISCORD_RUN_POSTGRES_TESTS`가 빠져 있어 PostgreSQL 테스트는 건너뛴다.
 
@@ -35,7 +38,11 @@ PR CI의 `backend` job은 이미 `postgres:17`과 접속 환경 변수를 제공
 
 ## 기존 결정의 변경 범위
 
-ARCH01의 보존 결정은 “메모리/JDBC adapter가 둘 다 있는 seam은 단일 구현이라는 이유로 제거하지 않는다”였다. 이 보존 결정에서 바뀌는 범위는 결정 2의 저장소 port와 `InMemory*` 쌍뿐이다. 전환하는 저장소의 PostgreSQL 테스트가 해당 동작을 덮는 경우에만 제거한다.
+“실제 메모리/JDBC Adapter가 있는 Seam은 단일 구현이라는 이유로 제거하지 않는다.”
+
+출처는 ARCH01 백엔드 단순화 의사결정 논의 문서(‘논의 시 보존할 근거’ 절). 저장소에 커밋되지 않은 논의 초안이며 상태는 ‘논의 중’이었다.
+
+이 보존 결정에서 바뀌는 범위는 결정 2의 저장소 port와 `InMemory*` 쌍뿐이다. 전환하는 저장소의 PostgreSQL 테스트가 해당 동작을 덮는 경우에만 제거한다.
 
 ## 후속 작업
 
