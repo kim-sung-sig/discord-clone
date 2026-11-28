@@ -24,7 +24,7 @@
 
 이 게이트를 켜면 조건부 PostgreSQL 테스트 파일 26개가 PR CI에서 처음 실행되므로 선행 실패가 드러날 수 있다.
 
-코디네이터가 로컬 PostgreSQL 17에서 게이트를 켜고 전체 백엔드 스위트를 실행했다. DB 이름이 `discord`일 때 404개 중 9개가 실패했으며, 원인은 데이터 삭제가 포함된 테스트가 공용 DB를 보호하기 위해 `discord_runtime_guild_`로 시작하는 DB 이름만 허용하는 안전장치였다. 이름을 `discord_runtime_guild_t230`으로 바꾸고 다시 실행한 `PostgresGuildStoreContractTest`, `PostgresModerationServiceContractTest`, `PostgresGatewayEventLogContractTest`, `PostgresGuildServiceTest`는 모두 통과했다. 현재 알려진 다른 실패는 없으며 전체 스위트 재확인 결과는 코디네이터가 보고한다. 로컬 검증에는 별도 포트로 띄운 일회용 PostgreSQL 컨테이너를 사용했다. 개발 PC의 다른 프로젝트 DB는 사용하지 않았다.
+코디네이터가 로컬 PostgreSQL 17에서 게이트를 켜고 전체 백엔드 스위트를 실행했다. DB 이름이 `discord`일 때 404개 중 9개가 실패했으며, 원인은 데이터 삭제가 포함된 테스트가 공용 DB를 보호하기 위해 `discord_runtime_guild_`로 시작하는 DB 이름만 허용하는 안전장치였다. 이름을 `discord_runtime_guild_t230`으로 바꾸고 다시 실행한 `PostgresGuildStoreContractTest`, `PostgresModerationServiceContractTest`, `PostgresGatewayEventLogContractTest`, `PostgresGuildServiceTest`는 모두 통과했다. 같은 DB(`discord_runtime_guild_t230`) 하나로 전체 백엔드 스위트(`gradlew test --continue`)를 다시 실행한 결과는 BUILD SUCCESSFUL(3분 20초), 테스트 422개, 실패 0개였다. 건너뛴 22개는 Postgres 게이트가 아니라 별도 환경 변수와 외부 서비스(Redis, Kafka)가 필요한 테스트다(`CentralKafkaGatewayEventBusSmokeTest`, `CentralRedisGatewayFanoutSmokeTest`, `CentralRedisGatewaySessionRegistrySmokeTest`, `CentralRedisConnectivitySmokeTest`, `MessageOutboxLeaseFailureIntegrationTest`, `MessagePublicationFailureIntegrationTest`)이며 이 단계의 범위 밖이다. 따라서 Postgres 게이트로 드러난 실패는 위 DB 이름 안전장치 하나뿐이었다. 로컬 검증에는 별도 포트로 띄운 일회용 PostgreSQL 컨테이너를 사용했다. 개발 PC의 다른 프로젝트 DB는 사용하지 않았다.
 
 0단계 변경은 `Backend tests` 단계의 `DISCORD_RUN_POSTGRES_TESTS: "true"` 추가와 `backend` job의 DB 이름을 `discord_runtime_guild_ci`로 바꾸는 작업이다. 서비스 DB 이름, 헬스 체크와 JDBC URL에 같은 이름을 사용한다.
 
@@ -64,4 +64,4 @@
 5. `JdbcInviteService.create`의 중복 키(SQLState `23505`) 재시도는 시도마다 새 트랜잭션이 필요하다. 재시도 루프를 트랜잭션 밖에 두고 각 시도를 트랜잭션 경계로 진입시킨다. 같은 클래스 안의 호출(self-invocation)에는 프록시 AOP가 적용되지 않는다.
 6. `REPEATABLE READ READ ONLY`처럼 직접 지정하던 격리 수준과 읽기 전용 속성은 `@Transactional(isolation = Isolation.REPEATABLE_READ, readOnly = true)`로 옮기고 동일한 설정이 적용되는지 확인한다.
 
-0단계의 CI 실행과 추가 실패 분류는 코디네이터가 맡는다.
+0단계의 GitHub CI 실행 결과는 PR에서 확인하고 이 계획서에 반영한다(로컬 검증은 위와 같다).
