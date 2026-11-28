@@ -14,7 +14,7 @@
 
 ## 관찰과 변경 파일
 
-`backend` job에는 `postgres:17`과 `POSTGRES_JDBC_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`가 이미 있다. `Backend tests` 단계에 DB 테스트 실행 변수가 없어 조건부 테스트 파일 26개가 PR CI에서 건너뛰어진다.
+게이트 추가 전 `backend` job은 `postgres:17`과 접속 환경 변수를 제공했지만, `Backend tests` 단계에 DB 테스트 실행 변수가 없어 조건부 테스트 파일 26개가 PR CI에서 건너뛰어졌다.
 
 0단계 변경 범위는 이 계획서, T230 ADR, [T224 복원 계획서](T224-jpa-persistence-migration.plan.md), `.github/workflows/ci.yml`이다. 새 환경 변수로 기존 문자열 단언이 깨지는 경우에만 관련 CI 계약을 조정한다.
 
@@ -22,9 +22,13 @@
 
 ### 0단계. CI PostgreSQL 테스트 실행
 
-`backend` job의 `Backend tests` 단계에 `DISCORD_RUN_POSTGRES_TESTS: "true"`를 추가한다. 이미 준비된 PostgreSQL로 조건부 테스트 파일 26개를 실행한다. 이 게이트로 PR CI에서 처음 실행되므로 선행 실패가 드러날 수 있다. 게이트는 기존에 건너뛰던 문제를 드러내며, 발견한 실패는 원인별로 분류한 뒤 별도 작업에서 고친다.
+이 게이트를 켜면 조건부 PostgreSQL 테스트 파일 26개가 PR CI에서 처음 실행되므로 선행 실패가 드러날 수 있다.
 
-완료 기준은 **게이트가 켜지고 모든 실패가 원인별로 분류된 상태**다. 로컬에 Docker가 없는 작업 환경에서는 CI가 유일한 DB 검증 수단이다.
+코디네이터가 로컬 PostgreSQL 17에서 게이트를 켜고 전체 백엔드 스위트를 실행했다. DB 이름이 `discord`일 때 404개 중 9개가 실패했으며, 원인은 데이터 삭제가 포함된 테스트가 공용 DB를 보호하기 위해 `discord_runtime_guild_`로 시작하는 DB 이름만 허용하는 안전장치였다. 이름을 `discord_runtime_guild_t230`으로 바꾸고 다시 실행한 `PostgresGuildStoreContractTest`, `PostgresModerationServiceContractTest`, `PostgresGatewayEventLogContractTest`, `PostgresGuildServiceTest`는 모두 통과했다. 현재 알려진 다른 실패는 없으며 전체 스위트 재확인 결과는 코디네이터가 보고한다. 로컬 검증에는 별도 포트로 띄운 일회용 PostgreSQL 컨테이너를 사용했다. 개발 PC의 다른 프로젝트 DB는 사용하지 않았다.
+
+0단계 변경은 `Backend tests` 단계의 `DISCORD_RUN_POSTGRES_TESTS: "true"` 추가와 `backend` job의 DB 이름을 `discord_runtime_guild_ci`로 바꾸는 작업이다. 서비스 DB 이름, 헬스 체크와 JDBC URL에 같은 이름을 사용한다.
+
+완료 기준은 **게이트가 켜지고 모든 실패가 원인별로 분류된 상태**다.
 
 ### 1단계. 트랜잭션 기반
 
@@ -60,4 +64,4 @@
 5. `JdbcInviteService.create`의 중복 키(SQLState `23505`) 재시도는 시도마다 새 트랜잭션이 필요하다. 재시도 루프를 트랜잭션 밖에 두고 각 시도를 트랜잭션 경계로 진입시킨다. 같은 클래스 안의 호출(self-invocation)에는 프록시 AOP가 적용되지 않는다.
 6. `REPEATABLE READ READ ONLY`처럼 직접 지정하던 격리 수준과 읽기 전용 속성은 `@Transactional(isolation = Isolation.REPEATABLE_READ, readOnly = true)`로 옮기고 동일한 설정이 적용되는지 확인한다.
 
-0단계의 CI 실행과 실패 분류는 코디네이터가 맡는다. 첫 CI 실행에서 드러나는 실패 수와 원인은 실행 결과가 나올 때까지 미확인이다.
+0단계의 CI 실행과 추가 실패 분류는 코디네이터가 맡는다.
