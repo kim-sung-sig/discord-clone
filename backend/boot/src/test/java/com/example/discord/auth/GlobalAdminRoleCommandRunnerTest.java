@@ -46,6 +46,7 @@ class GlobalAdminRoleCommandRunnerTest {
             statement.executeUpdate("DELETE FROM channels");
             statement.executeUpdate("DELETE FROM guild_roles");
             statement.executeUpdate("DELETE FROM guild_members");
+            statement.executeUpdate("DELETE FROM premium_entitlements");
             statement.executeUpdate("DELETE FROM guilds");
             statement.executeUpdate("DELETE FROM auth_refresh_sessions");
             statement.executeUpdate("DELETE FROM auth_revoked_access_tokens");
