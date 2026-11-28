@@ -19,12 +19,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class KafkaMessagePublishedConsumerTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-08-22T00:00:00Z"), ZoneOffset.UTC);
@@ -93,6 +96,67 @@ class KafkaMessagePublishedConsumerTest {
         assertThat(metrics.find("discord.message.publication.consumer.events").tag("outcome", "duplicate").counter().count())
             .isEqualTo(1);
         assertThat(metrics.find("discord.message.publication.end_to_end").timer()).isNotNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void kafkaConsumerPreservesMessageCreatePayloadShape(boolean hasAuthorDisplayName) throws Exception {
+        UUID userId = UUID.randomUUID();
+        InMemoryGuildService guilds = new InMemoryGuildService();
+        var guild = guilds.createGuild("messages", userId);
+        var channel = guilds.createChannel(guild.id(), "general", com.example.discord.channel.ChannelType.GUILD_TEXT, null);
+        List<GatewayEvent> sent = new ArrayList<>();
+        InMemoryGatewayService gateway = new InMemoryGatewayService(
+            guilds, CLOCK, Duration.ofSeconds(30), new InMemoryGatewayEventBus(CLOCK)
+        );
+        gateway.addEventListener(sent::add);
+        UUID mentionedUserId = UUID.randomUUID();
+        UUID mentionedRoleId = UUID.randomUUID();
+        List<MessageMentionTarget> mentions = List.of(
+            new UserMentionTarget(mentionedUserId),
+            new RoleMentionTarget(mentionedRoleId),
+            new ChannelMentionTarget(channel.id()),
+            new SpecialMentionTarget(SpecialMentionKind.HERE)
+        );
+        Message message = new Message(
+            UUID.randomUUID(), new UserMessageAuthor(userId), new ChannelMessageTarget(guild.id(), channel.id()),
+            new MessageContent("hello"), mentions, false, false, List.of(), CLOCK.instant(), CLOCK.instant()
+        );
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        KafkaMessagePublishedConsumer consumer = new KafkaMessagePublishedConsumer(
+            mapper, (target, ignored) -> message, gateway,
+            new InMemoryMessagePublicationInbox(), new SimpleMeterRegistry(),
+            userIds -> hasAuthorDisplayName ? Map.of(userId, "Author Display") : Map.of()
+        );
+        MessagePublished published = new MessagePublished(
+            UUID.randomUUID(), message.id(), message.author(), message.target(),
+            message.mentions(), "correlation", message.createdAt()
+        );
+
+        consumer.consume(mapper.writeValueAsString(MessagePublishedRecord.from(published, "payload-hash")));
+
+        assertThat(sent).hasSize(1);
+        Map<String, Object> gatewayPayload = sent.getFirst().payload();
+        List<String> expectedTokens = List.of(
+            mentionedUserId.toString(), mentionedRoleId.toString(), channel.id().toString(), "here"
+        );
+        Map<String, Object> expectedPayload = new HashMap<>();
+        expectedPayload.put("id", message.id().toString());
+        expectedPayload.put("guildId", guild.id().toString());
+        expectedPayload.put("channelId", channel.id().toString());
+        expectedPayload.put("authorId", userId.toString());
+        expectedPayload.put("content", message.content().value());
+        expectedPayload.put("mentions", expectedTokens);
+        expectedPayload.put("pinned", false);
+        expectedPayload.put("deleted", false);
+        expectedPayload.put("edited", false);
+        expectedPayload.put("createdAt", message.createdAt().toString());
+        expectedPayload.put("updatedAt", message.updatedAt().toString());
+        if (hasAuthorDisplayName) {
+            expectedPayload.put("authorDisplayName", "Author Display");
+        }
+
+        assertThat(gatewayPayload).isEqualTo(expectedPayload);
     }
 
     @Test

@@ -104,22 +104,13 @@ class MessageOutboxController {
                 event.messageId(),
                 MessageAuthorResponse.from(event.author()),
                 MessageTargetResponse.from(event.target()),
-                event.mentions().stream().map(DeadLetterEventResponse::mentionToken).toList(),
+                MessageMentionTokens.tokens(event.mentions()),
                 event.correlationId(),
                 event.occurredAt(),
                 deadLetter.attempts(),
                 deadLetter.lastError(),
                 deadLetter.deadLetteredAt()
             );
-        }
-
-        private static String mentionToken(MessageMentionTarget mention) {
-            return switch (mention) {
-                case UserMentionTarget user -> user.userId().toString();
-                case RoleMentionTarget role -> role.roleId().toString();
-                case ChannelMentionTarget channel -> channel.channelId().toString();
-                case SpecialMentionTarget special -> special.kind().name().toLowerCase(java.util.Locale.ROOT);
-            };
         }
     }
 

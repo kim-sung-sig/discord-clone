@@ -542,7 +542,8 @@ class JdbcMessageStore implements
             statement.setObject(3, message.channelId());
             statement.setObject(4, message.authorId());
             statement.setString(5, message.content().value());
-            statement.setArray(6, connection.createArrayOf("text", mentionTokens(message).toArray(String[]::new)));
+            String[] mentionTokens = MessageMentionTokens.tokens(message.mentions()).toArray(String[]::new);
+            statement.setArray(6, connection.createArrayOf("text", mentionTokens));
             statement.setBoolean(7, message.pinned());
             statement.setBoolean(8, message.deleted());
             statement.setBoolean(9, message.edited());
@@ -634,12 +635,6 @@ class JdbcMessageStore implements
         }
     }
 
-    private static List<String> mentionTokens(Message message) {
-        return message.mentions().stream()
-            .map(JdbcMessageStore::mentionToken)
-            .toList();
-    }
-
     private static List<String> mentionTokensFrom(ResultSet resultSet) throws SQLException {
         Object[] tokens = (Object[]) resultSet.getArray("mention_tokens").getArray();
         List<String> values = new ArrayList<>(tokens.length);
@@ -647,15 +642,6 @@ class JdbcMessageStore implements
             values.add((String) token);
         }
         return List.copyOf(values);
-    }
-
-    private static String mentionToken(MessageMentionTarget mention) {
-        return switch (mention) {
-            case UserMentionTarget user -> user.userId().toString();
-            case RoleMentionTarget role -> role.roleId().toString();
-            case ChannelMentionTarget channel -> channel.channelId().toString();
-            case SpecialMentionTarget special -> special.kind().name().toLowerCase(Locale.ROOT);
-        };
     }
 
     private static void replaceEdits(Connection connection, Message message) throws SQLException {
