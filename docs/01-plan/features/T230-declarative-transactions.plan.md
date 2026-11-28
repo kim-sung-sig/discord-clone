@@ -1,0 +1,63 @@
+# T230 선언적 트랜잭션 전환 계획
+
+## 승인과 상태
+
+- 상태: 0단계 진행 중
+- 승인 근거: 2026-11-28 사용자 결정과 [T230 아키텍처 방향 ADR](../../02-design/features/T230-architecture-direction.adr.md).
+- 목표: 수동 트랜잭션을 걷어내고 기존 원자성, 잠금, 실패 처리 의미를 유지한다.
+
+## 범위와 경계
+
+트랜잭션 경계는 boot·services adapter의 원자적 port 메서드에 `@Transactional`로 선언한다. ADR의 예외가 실제 적용되기 전까지 `backend/modules/*`에는 트랜잭션 어노테이션을 두지 않는다. 컨텍스트 간 port와 인가 및 outbox/inbox 계약은 ADR을 따른다.
+
+범위 밖은 저장 도구 전면 교체, 메시지 조회 N+1·색인 개선(T224-1~2), JPA entity 도입이다. JdbcClient·MyBatis·JPA 선택은 파일럿 뒤 결정한다.
+
+## 관찰과 변경 파일
+
+`backend` job에는 `postgres:17`과 `POSTGRES_JDBC_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`가 이미 있다. `Backend tests` 단계에 DB 테스트 실행 변수가 없어 조건부 테스트 파일 26개가 PR CI에서 건너뛰어진다.
+
+0단계 변경 범위는 이 계획서, T230 ADR, [T224 복원 계획서](T224-jpa-persistence-migration.plan.md), `.github/workflows/ci.yml`이다. 새 환경 변수로 기존 문자열 단언이 깨지는 경우에만 관련 CI 계약을 조정한다.
+
+## 구현 및 검증
+
+### 0단계. CI PostgreSQL 테스트 실행
+
+`backend` job의 `Backend tests` 단계에 `DISCORD_RUN_POSTGRES_TESTS: "true"`를 추가한다. 이미 준비된 PostgreSQL로 조건부 테스트 파일 26개를 실행한다. 이 게이트로 PR CI에서 처음 실행되므로 선행 실패가 드러날 수 있다. 게이트는 기존에 건너뛰던 문제를 드러내며, 발견한 실패는 원인별로 분류한 뒤 별도 작업에서 고친다.
+
+완료 기준은 **게이트가 켜지고 모든 실패가 원인별로 분류된 상태**다. 로컬에 Docker가 없는 작업 환경에서는 CI가 유일한 DB 검증 수단이다.
+
+### 1단계. 트랜잭션 기반
+
+- 기존 연결 헬퍼도 같은 트랜잭션에 참여하도록 `TransactionAwareDataSourceProxy` 또는 `JdbcClient`/`DataSourceUtils`를 검토한다.
+- 쓰기 도중 실패를 유도하고 일부만 커밋되는 일이 없는지 PostgreSQL에서 확인할 롤백 테스트 틀을 만든다.
+- adapter에서 `setAutoCommit`, `commit()`, `rollback()` 호출을 금지하는 가드 테스트를 둔다. 기존 수동 트랜잭션 클래스는 예외 목록에 두고 전환할 때마다 제거한다.
+
+### 2단계. 스레드 저장소 파일럿
+
+`JdbcThreadService`의 수동 트랜잭션 1곳을 전환한다. 명시적 행 잠금이 없는 경로에서 연결 참여, 롤백, 기존 PostgreSQL 계약을 확인한 뒤 이후 전환 방식을 확정한다.
+
+### 3단계. 묶음 전환
+
+파일럿을 제외한 클래스는 위험이 작은 순서로 PR당 2~3개씩 묶는다. 클래스마다 (a) 기존 `Connection` 헬퍼를 유지한 채 수동 트랜잭션을 제거하는 변경과 (b) 나중에 `JdbcClient`로 옮기는 변경을 나눈다. (b)의 도구 적용 여부는 파일럿 결정에 따른다.
+
+| 수동 처리 위치 수 | 클래스 |
+| --- | --- |
+| 4 | `JdbcMessageStore` |
+| 3 | `JdbcServerEventService`, `JdbcInviteService` |
+| 2 | `JdbcDirectMessageService`, `JdbcAuthStore` |
+| 1 | `JdbcTotpStore`, `JdbcThreadService`(2단계), `JdbcNotificationInboxService`, `JdbcModerationService`, `JdbcGuildStore`, `JdbcGatewaySessionCursorStore`, `JdbcGatewayEventLog`, `JdbcChannelReadService` |
+
+### 4단계. 후속 정리
+
+`services/identity`의 `TransactionTemplate`을 정리하고 검증이 끝난 지식을 wiki에 반영한다. 전환한 각 저장소에서 `InMemory*` 쌍이 맡던 동작을 PostgreSQL 테스트가 덮는지 확인한 뒤 해당 쌍을 제거한다.
+
+## 전환 위험과 검증 기준
+
+1. 트랜잭션 인식 처리가 없는 `DataSource`에서 `getConnection()`을 직접 호출하면 `@Transactional` 메서드 안에서도 트랜잭션에 참여하지 않는 별도 연결을 얻는다. 롤백 테스트에서 같은 원자적 쓰기에 속한 변경이 함께 되돌아가는지 확인한다.
+2. checked 예외인 `SQLException`은 기본 롤백 대상에서 빠진다. 현재 수동 코드는 `SQLException | RuntimeException`에서 롤백하므로 checked 예외가 경계를 통과하는 경로는 `rollbackFor`로 기존 의미를 맞춘다.
+3. `final` 클래스인 `JdbcExpressionService`, `JdbcModerationService`, `JdbcTotpStore`는 Spring 기본 클래스 기반 프록시(CGLIB)로 감쌀 수 없다. 실제 호출이 프록시를 통과하는지 확인한다.
+4. T212의 moderation·guild `FOR UPDATE` 잠금 대상과 획득 순서를 유지한다. 트랜잭션 범위를 넓히지 않고 기존 경합 테스트로 확인한다.
+5. `JdbcInviteService.create`의 중복 키(SQLState `23505`) 재시도는 시도마다 새 트랜잭션이 필요하다. 재시도 루프를 트랜잭션 밖에 두고 각 시도를 트랜잭션 경계로 진입시킨다. 같은 클래스 안의 호출(self-invocation)에는 프록시 AOP가 적용되지 않는다.
+6. `REPEATABLE READ READ ONLY`처럼 직접 지정하던 격리 수준과 읽기 전용 속성은 `@Transactional(isolation = Isolation.REPEATABLE_READ, readOnly = true)`로 옮기고 동일한 설정이 적용되는지 확인한다.
+
+0단계의 CI 실행과 실패 분류는 코디네이터가 맡는다. 첫 CI 실행에서 드러나는 실패 수와 원인은 실행 결과가 나올 때까지 미확인이다.
