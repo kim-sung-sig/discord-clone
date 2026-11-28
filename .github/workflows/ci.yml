@@ -38,6 +38,7 @@ jobs:
       - name: Backend tests
         run: ./gradlew test
         env:
+          DISCORD_RUN_POSTGRES_TESTS: "true"
           POSTGRES_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/discord
           POSTGRES_USER: dev_user
           POSTGRES_PASSWORD: dev_password
