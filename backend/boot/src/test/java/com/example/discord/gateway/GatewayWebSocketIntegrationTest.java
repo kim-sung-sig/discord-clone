@@ -12,45 +12,24 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.client.standard.StandardWebSocketClient;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {
-        "discord.gateway.internal-publisher-token=test-harness",
-        "discord.gateway.heartbeat-timeout-ms=100"
-    }
+    properties = "discord.gateway.internal-publisher-token=test-harness"
 )
 @AutoConfigureMockMvc
-class GatewayWebSocketIntegrationTest {
-    @LocalServerPort
-    private int port;
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private GatewaySessionMaintenance sessionMaintenance;
-
+class GatewayWebSocketIntegrationTest extends GatewayWebSocketTestSupport {
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -172,26 +151,6 @@ class GatewayWebSocketIntegrationTest {
     }
 
     @Test
-    void websocketHeartbeatTimeoutClosesStaleSocket() throws Exception {
-        AuthSession owner = signup("gateway_ws_timeout_owner");
-        createGuild(owner);
-        SocketProbe probe = connect();
-
-        probe.session().sendMessage(new TextMessage("""
-            {
-              "type": "IDENTIFY",
-              "accessToken": "%s"
-            }
-            """.formatted(owner.accessToken())));
-        assertThat(JsonPath.<String>read(probe.nextMessage(), "$.type")).isEqualTo("READY");
-
-        Thread.sleep(150);
-        sessionMaintenance.closeTimedOutSessions();
-
-        assertThat(probe.awaitClose()).isTrue();
-    }
-
-    @Test
     void clientFrameContractFixtureIsAcceptedByTheServer() throws Exception {
         JsonNode frames = objectMapper.readTree(Files.readString(clientFrameFixture()));
         AuthSession owner = signup("gateway_ws_contract_owner");
@@ -258,25 +217,6 @@ class GatewayWebSocketIntegrationTest {
         throw new IllegalStateException("qa/contracts/gateway-client-frames.json not found above " + Path.of("").toAbsolutePath());
     }
 
-    private SocketProbe connect() throws Exception {
-        BlockingQueue<String> messages = new LinkedBlockingQueue<>();
-        BlockingQueue<String> closeStatuses = new LinkedBlockingQueue<>();
-        WebSocketSession session = new StandardWebSocketClient()
-            .execute(new TextWebSocketHandler() {
-                @Override
-                protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-                    messages.add(message.getPayload());
-                }
-
-                @Override
-                public void afterConnectionClosed(WebSocketSession session, org.springframework.web.socket.CloseStatus status) {
-                    closeStatuses.add(status.toString());
-                }
-            }, "ws://127.0.0.1:" + port + "/ws/gateway")
-            .get(5, TimeUnit.SECONDS);
-        return new SocketProbe(session, messages, closeStatuses);
-    }
-
     private long publish(AuthSession requester, String type, String guildId, String channelId, String content) throws Exception {
         String channelJson = channelId == null ? "null" : "\"" + channelId + "\"";
         MvcResult result = mockMvc.perform(post("/api/gateway/events")
@@ -298,21 +238,6 @@ class GatewayWebSocketIntegrationTest {
 
         Number sequence = JsonPath.read(result.getResponse().getContentAsString(), "$.sequence");
         return sequence.longValue();
-    }
-
-    private String createGuild(AuthSession owner) throws Exception {
-        MvcResult guildResult = mockMvc.perform(post("/api/guilds")
-                .header("Authorization", owner.bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "name": "Discord Clone"
-                    }
-                    """))
-            .andExpect(status().isCreated())
-            .andReturn();
-
-        return JsonPath.read(guildResult.getResponse().getContentAsString(), "$.id");
     }
 
     private String createChannel(String guildId, String name, AuthSession requester) throws Exception {
@@ -360,48 +285,5 @@ class GatewayWebSocketIntegrationTest {
                     }
                     """))
             .andExpect(status().isOk());
-    }
-
-    private AuthSession signup(String username) throws Exception {
-        MvcResult signup = mockMvc.perform(post("/api/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {
-                      "email": "%s@example.com",
-                      "username": "%s",
-                      "displayName": "%s",
-                      "password": "correct horse battery staple"
-                    }
-                    """.formatted(username, username, username)))
-            .andExpect(status().isCreated())
-            .andReturn();
-
-        String body = signup.getResponse().getContentAsString();
-        return new AuthSession(
-            JsonPath.read(body, "$.accessToken"),
-            UUID.fromString(JsonPath.read(body, "$.user.id"))
-        );
-    }
-
-    private record AuthSession(String accessToken, UUID userId) {
-        String bearer() {
-            return "Bearer " + accessToken;
-        }
-    }
-
-    private record SocketProbe(
-        WebSocketSession session,
-        BlockingQueue<String> messages,
-        BlockingQueue<String> closeStatuses
-    ) {
-        String nextMessage() throws InterruptedException {
-            String message = messages.poll(Duration.ofSeconds(5).toMillis(), TimeUnit.MILLISECONDS);
-            assertThat(message).isNotNull();
-            return message;
-        }
-
-        boolean awaitClose() throws InterruptedException {
-            return closeStatuses.poll(Duration.ofSeconds(5).toMillis(), TimeUnit.MILLISECONDS) != null;
-        }
     }
 }
